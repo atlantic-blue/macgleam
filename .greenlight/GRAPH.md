@@ -3,7 +3,7 @@
 Companion to CONTRACTS.md. Slices are thin vertical paths of user value,
 mapped onto milestones M0 to M7 from ROADMAP.md. Each slice is sized so one
 agent completes it within half a fresh context window. Contract numbers (C1 to
-C36) refer to CONTRACTS.md.
+C37) refer to CONTRACTS.md.
 
 Reading a slice entry:
 
@@ -152,7 +152,7 @@ s7a can start in parallel the moment the workspace exists.
   the sheen reads as calm not busy, both appearances look intentional.
 
 ### s0c. hub zoom
-- Contracts: consumes C1, C2.
+- Contracts: C37 (hub navigation model), consuming C1, C2, C36.
 - Depends on: s0b.
 - Verification: entering and leaving a card round trips with matched
   geometry; module state survives the round trip; arrow keys walk the cards,
