@@ -37,17 +37,17 @@ struct CleanupModuleHappyPathTests {
     let cache = ModuleFixture.cacheFinding()
     let log = ModuleFixture.logFinding()
 
-    feed.send(.phase(.indeterminate), .finding(cache), .progress(makeCounters(10, 500, 1)))
+    feed.send(.phase(.indeterminate), .finding(cache), .progress(makeCounters(10, 500, 2)))
     await expectEventually("the counters reach 500 reclaimable bytes") {
       scanProgress(harness.model)?.counters.bytesReclaimable == 500
     }
-    #expect(scanProgress(harness.model)?.counters == makeCounters(10, 500, 1))
+    #expect(scanProgress(harness.model)?.counters == makeCounters(10, 500, 2))
     #expect(harness.model.hubEstimateBytes == 500)
 
     feed.send(
       .phase(.determinate(estimatedTotalFiles: 40)),
       .finding(log),
-      .progress(makeCounters(30, 1_300, 2))
+      .progress(makeCounters(30, 1_300, 3))
     )
     await expectEventually("the counters reach 1300 reclaimable bytes") {
       scanProgress(harness.model)?.counters.bytesReclaimable == 1_300
@@ -55,7 +55,7 @@ struct CleanupModuleHappyPathTests {
     #expect(scanProgress(harness.model)?.phase == .determinate(estimatedTotalFiles: 40))
     #expect(harness.model.hubEstimateBytes == 1_300)
 
-    feed.send(.phase(.settling), .progress(makeCounters(40, 1_300, 2)))
+    feed.send(.phase(.settling), .progress(makeCounters(40, 1_300, 3)))
     feed.finish()
 
     await expectEventually("the model reaches reviewing") { currentReview(harness.model) != nil }

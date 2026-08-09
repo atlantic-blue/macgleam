@@ -89,11 +89,11 @@ struct CleanupScanProgressView: View {
 
   private var counterLine: String {
     let files = progress.counters.filesSeen
-    let findings = progress.counters.findingCount
+    let items = progress.counters.itemCount
     let filesPart = files == 1 ? "1 file seen" : "\(files) files seen"
-    guard findings > 0 else { return filesPart }
-    let findingsPart = findings == 1 ? "1 finding" : "\(findings) findings"
-    return "\(filesPart), \(findingsPart)"
+    guard items > 0 else { return filesPart }
+    let itemsPart = items == 1 ? "1 item" : "\(items) items"
+    return "\(filesPart), \(itemsPart)"
   }
 
   private func determinateFraction(estimatedTotalFiles: UInt64) -> Double {

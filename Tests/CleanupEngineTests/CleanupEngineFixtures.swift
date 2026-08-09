@@ -411,6 +411,13 @@ struct ScanOutcome: Sendable {
   var reclaimableByteTotal: UInt64 {
     findings.reduce(0) { $0 + $1.byteSize }
   }
+
+  /// Path entries across every yielded finding. `ScanCounters.itemCount`
+  /// counts these, not findings, because one category streams as several
+  /// findings (C4, C15).
+  var entryCount: Int {
+    findings.reduce(0) { $0 + $1.entries.count }
+  }
 }
 
 func collectScan(
@@ -473,28 +480,23 @@ func countersAreMonotonic(_ counters: [ScanCounters]) -> Bool {
   zip(counters, counters.dropFirst()).allSatisfy { earlier, later in
     earlier.filesSeen <= later.filesSeen
       && earlier.bytesReclaimable <= later.bytesReclaimable
-      && earlier.findingCount <= later.findingCount
+      && earlier.itemCount <= later.itemCount
   }
 }
 
-/// A finding stripped of its identifiers, for comparing two scans of the
-/// same file system state.
-struct FindingShape: Hashable {
-  let category: FindingCategory
-  let paths: [AbsolutePath]
-  let byteSize: UInt64
-  let risk: RiskLevel
-  let isPreselected: Bool
-  let explanation: String
-
-  init(_ finding: Finding) {
-    category = finding.category
-    paths = finding.paths.sorted()
-    byteSize = finding.byteSize
-    risk = finding.risk
-    isPreselected = finding.isPreselected
-    explanation = finding.explanation
+/// A scan reduced to the entries each category yielded, whatever partition
+/// into findings the batching produced. Comparing two scans of one file system
+/// state at this level is comparing what C15 promises: the entries are the
+/// same, where the batch boundaries fall follows enumeration order, and C13
+/// guarantees no enumeration order.
+func entriesByCategory(_ outcome: ScanOutcome) -> [FindingCategory: Set<PathEntry>] {
+  outcome.findings.reduce(into: [:]) { totals, finding in
+    totals[finding.category, default: []].formUnion(finding.entries)
   }
+}
+
+func distinctEntryCount(_ outcome: ScanOutcome) -> Int {
+  entriesByCategory(outcome).values.reduce(0) { $0 + $1.count }
 }
 
 func operationTarget(_ operation: Operation) -> AbsolutePath? {

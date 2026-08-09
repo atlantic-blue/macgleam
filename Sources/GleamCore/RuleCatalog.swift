@@ -5,28 +5,66 @@ import Foundation
 /// Deliberately not a regular expression: patterns are reviewable by a human.
 public struct PathPattern: Codable, Sendable, Equatable {
   public let pattern: String
+  /// The literal components the pattern is compared against, split once at
+  /// construction because matching sits on the per file hot path. A trailing
+  /// subtree wildcard is recorded as a flag rather than kept as a component.
+  private let components: [String]
+  private let isSubtree: Bool
 
   public init(pattern: String) {
+    var components = pattern.split(separator: "/").map(String.init)
+    let isSubtree = components.last == "**"
+    if isSubtree { components.removeLast() }
     self.pattern = pattern
+    self.components = components
+    self.isSubtree = isSubtree
   }
 
   /// Componentwise match. "*" matches exactly one component. A trailing "**"
   /// matches any descendant of the prefix, respecting component boundaries.
   public func matches(_ path: AbsolutePath) -> Bool {
-    var patternComponents = pattern.split(separator: "/").map(String.init)
-    let pathComponents = path.components
-    if patternComponents.last == "**" {
-      patternComponents.removeLast()
-      guard pathComponents.count > patternComponents.count else { return false }
-      return zip(patternComponents, pathComponents).allSatisfy(Self.componentMatches)
-    }
-    guard patternComponents.count == pathComponents.count else { return false }
-    return zip(patternComponents, pathComponents).allSatisfy(Self.componentMatches)
+    matches(pathComponents: path.components)
   }
 
-  private static func componentMatches(_ patternComponent: String, _ pathComponent: String) -> Bool
-  {
-    patternComponent == "*" || patternComponent == pathComponent
+  public func matches(pathComponents: [String]) -> Bool {
+    if isSubtree {
+      guard pathComponents.count > components.count else { return false }
+    } else {
+      guard pathComponents.count == components.count else { return false }
+    }
+    return prefixMatches(pathComponents)
+  }
+
+  /// True when the pattern matches the path or any ancestor directory of it.
+  /// A path's ancestors are its own component prefixes, so this answers the
+  /// whole ancestor chain in one componentwise pass with no path building.
+  public func matchesPathOrAncestor(of pathComponents: [String]) -> Bool {
+    if isSubtree {
+      guard pathComponents.count > components.count else { return false }
+    } else {
+      guard pathComponents.count >= components.count else { return false }
+    }
+    return prefixMatches(pathComponents)
+  }
+
+  private func prefixMatches(_ pathComponents: [String]) -> Bool {
+    for index in components.indices where components[index] != "*" {
+      guard components[index] == pathComponents[index] else { return false }
+    }
+    return true
+  }
+
+  public static func == (left: PathPattern, right: PathPattern) -> Bool {
+    left.pattern == right.pattern
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case pattern
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(pattern: try container.decode(String.self, forKey: .pattern))
   }
 }
 
@@ -42,12 +80,13 @@ public struct Denylist: Codable, Sendable, Equatable {
   /// Blocks a path when the path matches a pattern or is a descendant of a
   /// blocked directory.
   public func blocks(_ path: AbsolutePath) -> Bool {
-    var candidate: AbsolutePath? = path
-    while let current = candidate {
-      if patterns.contains(where: { $0.matches(current) }) { return true }
-      candidate = current.parent
-    }
-    return false
+    blocks(pathComponents: path.components)
+  }
+
+  /// The same answer for a path already split into components, so a caller
+  /// scanning many rules against one path splits it once.
+  public func blocks(pathComponents: [String]) -> Bool {
+    patterns.contains { $0.matchesPathOrAncestor(of: pathComponents) }
   }
 }
 

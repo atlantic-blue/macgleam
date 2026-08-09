@@ -284,12 +284,21 @@ s7a can start in parallel the moment the workspace exists.
   scanning and drilling in feels identical to the hub zoom.
 
 ### s2e. performance gates
-- Contracts: enforces the performance clauses of C20 and C22.
+- Contracts: amends C4 (itemCount), C5, C15 (ScanStreamPolicy, the streaming
+  guarantee), C20, C21, C22 and C38 so findings stream as bounded batches;
+  enforces the performance and streaming clauses of C20 and C22.
 - Depends on: s2a, s2d.
 - Verification: on a generated fixture of typical shape, the full Cleanup
   scan finishes under 60 seconds and the Space Lens map under 30 on Apple
   silicon; peak resident memory during the largest scan stays under 500
-  megabytes; the gates run in continuous integration and fail on regression.
+  megabytes; the first finding and the first map node each arrive within two
+  seconds of their run starting and within the first half of it; no finding
+  carries more than ScanStreamPolicy.maximumFindingEntries entries; a
+  fixture crossing ScanStreamPolicy.firstFindingCheckpointFiles proves a
+  sparse category streams its first finding mid walk rather than at the end;
+  a category's paths, file count and byte total are the sums across its
+  findings; the gates run in continuous integration and fail on regression.
+  The C15 migration note lists the existing pins this breaks.
 - Tier: auto.
 
 ## M3. Performance and the privileged helper

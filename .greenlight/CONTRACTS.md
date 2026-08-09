@@ -170,7 +170,7 @@ public struct AbsolutePath: Codable, Sendable, Hashable, Comparable {
 /// - `finishedAt` is nil exactly while `state` is `.running`, and set in the
 ///   same mutation that moves state to completed, cancelled or failed.
 /// - Counters are monotonic within a session: filesSeen, bytesReclaimable and
-///   findingCount never decrease. The motion design (counters only count up)
+///   itemCount never decrease. The motion design (counters only count up)
 ///   depends on this at the model layer, not on view smoothing alone.
 /// - A cancelled or failed scan session never has side effects on disk.
 ///   Scanning is read only everywhere in MacGleam (see C13, C15).
@@ -190,10 +190,19 @@ public struct ScanSession: Identifiable, Codable, Sendable, Equatable {
     public var counters: ScanCounters
 }
 
+/// Amended 2026-08-09 in s2e: `findingCount` becomes `itemCount` and counts
+/// path entries rather than findings. A streaming scan emits a category as
+/// several findings (C15), so a count of findings moves with a constant
+/// inside the engine: the same disk would report 57 or 114 depending on the
+/// batch size, and the scan progress line would show a number nobody outside
+/// the engine can interpret. A count of items is what the person reading it
+/// already thinks it is, and it does not move when the batch size does.
 public struct ScanCounters: Codable, Sendable, Equatable {
     public var filesSeen: UInt64
     public var bytesReclaimable: UInt64
-    public var findingCount: UInt32
+    /// Path entries across the findings emitted so far, not findings. Rises
+    /// by a finding's entry count in the same step that emits that finding.
+    public var itemCount: UInt32
     public static let zero: ScanCounters
 }
 
@@ -213,6 +222,9 @@ public enum GleamModule: String, Codable, Sendable, CaseIterable {
 
 ### C5. Finding
 
+Amended 2026-08-09 in s2e: a finding is a bounded batch, not a whole
+category. See the second migration note after this contract.
+
 Amended 2026-08-09 in s2d: findings carry per path allocated byte sizes.
 This retires the s2b ScannedAllocationCache pattern and is a breaking
 change to the Finding initialiser and its Codable encoding. The migration
@@ -225,6 +237,13 @@ note after this contract lists the existing test pins that change.
 /// Guarantees:
 /// - `entries` is never empty. Every entry's path is inspectable in the UI
 ///   down to the full path string (mono type token).
+/// - A finding is a bounded unit of review, never a whole category. Every
+///   finding a scan emits carries at most
+///   `ScanStreamPolicy.maximumFindingEntries` entries (C15), so one category
+///   is normally spread over several findings. `paths` and `byteSize` are
+///   this finding's own; a category's path list, file count and byte total
+///   are sums across its findings. Nothing that consumes findings may assume
+///   one finding per category.
 /// - `PathEntry.allocatedBytes` is the allocated (on disk) byte total that
 ///   removing the entry's path reclaims: the allocated size of a file, the
 ///   subtree allocated total of a directory. Allocated, never logical, so
@@ -785,10 +804,54 @@ public enum FileSystemError: Error, Sendable, Equatable {
 /// Guarantees:
 /// - `scan` is read only (it only holds `FileSystemReading`) and side effect
 ///   free. Running it twice against the same file system state yields the
-///   same findings (identifiers aside).
+///   same findings (identifiers aside), as far as the ordering clause below
+///   allows: the entries are the same, their partition into findings is the
+///   same only where the file system enumerates in the same order.
 /// - `scan` emits `phase` transitions per C4 and `progress` counters that
-///   are monotonic. Findings stream as discovered, grouped by category at
-///   the consumer.
+///   are monotonic: filesSeen, itemCount and bytesReclaimable only ever
+///   count up, and a finding's entries and bytes are added in the same step
+///   that emits it, never before.
+/// - Findings stream, and streaming here is a testable guarantee rather
+///   than a description of intent. A finding is emitted the moment its
+///   batch is complete, while the walk is still running; no engine holds a
+///   category's matches until the walk ends, so the first finding never
+///   waits on the last file. Concretely:
+///   - Every finding a scan emits carries at most
+///     `ScanStreamPolicy.maximumFindingEntries` entries, all of one
+///     category. The cap is a contract guarantee, not an implementation
+///     choice, and that is the point: it makes the DESIGN.md memory ceiling
+///     a property of the design rather than of whichever disk the scan
+///     happens to meet. The one exemption is set shaped categories, named
+///     in C21.
+///   - An open batch flushes when it reaches the cap, and every open batch
+///     flushes when the walk ends. A category's first batch additionally
+///     flushes at the first `ScanStreamPolicy.firstFindingCheckpointFiles`
+///     boundary of `filesSeen` at or after its first match, however few
+///     entries it holds, so a sparse category streams a row early instead
+///     of waiting for the end of the walk. Later batches of that category
+///     flush on the cap or at the end.
+///   - So a scan that matches anything emits its first finding within
+///     `firstFindingCheckpointFiles` files of its first match. Two things
+///     follow that a test asserts directly: the first `.finding` event
+///     arrives before the walk finishes, and the elapsed time to it is a
+///     small fraction of the run rather than nearly all of it.
+/// - Several findings may share one category. Consumers aggregate by
+///   category: nothing may assume one finding per category, address a
+///   category by taking the first of its findings, or read a category's
+///   whole path list, file count or byte total off any single finding.
+///   Those three are sums across the category's findings.
+/// - Beyond its open batches a scan retains nothing proportional to files
+///   seen: no full file list kept for a later matching pass, no per rule
+///   match list held to the end. Live memory during a scan is bounded by
+///   the number of open batches times the entry cap, which is what lets the
+///   500 megabyte ceiling hold on a disk nobody has measured. The one
+///   exemption is C21's content hashing.
+/// - Entries within one finding are ordered by path. Which entries land in
+///   which finding follows enumeration order. That is the honest cost of
+///   streaming: a global sort over a category's whole match list cannot
+///   survive without the buffer it was sorting, so the ordering promise
+///   shrinks from "a category's paths are sorted" to "each finding's paths
+///   are sorted".
 /// - `scan` respects `context.hasFullDiskAccess`: when false the engine
 ///   scans what the user domain allows and reports what it skipped through
 ///   `ScanEvent.degraded`, so the honest banner has real content.
@@ -830,7 +893,143 @@ public enum PlanningError: Error, Sendable, Equatable {
     case findingFromDifferentSession(UUID)
     case keptCopyMissing(findingID: UUID)
 }
+
+/// The streaming shape every engine's scan obeys. Two numbers, both asserted
+/// against by name, so a change to either is a contract change and not a
+/// tuning pass.
+public enum ScanStreamPolicy {
+    /// The most entries any one finding a scan emits may carry.
+    ///
+    /// 2,000 is chosen from both ends. Memory: an entry is a path string plus
+    /// a byte count, on the order of 128 bytes on a real tree, so one open
+    /// batch costs roughly 256 kilobytes and a catalogue of 50 rules matching
+    /// concurrently holds under 13 megabytes against a 500 megabyte ceiling.
+    /// Review: 110,003 matching files become a little under sixty findings
+    /// rather than five unopenable ones, and 2,000 rows is still a list a
+    /// person can scroll. Ten times smaller turns one category into hundreds
+    /// of groups; ten times larger puts a 1.25 megabyte buffer behind every
+    /// rule and makes the flush granularity coarser than the review needs.
+    public static let maximumFindingEntries = 2_000
+
+    /// How often, in files enumerated, a category that has emitted nothing
+    /// yet flushes its first partial batch.
+    ///
+    /// 1,000 files is tens of milliseconds of walking on any disk the app
+    /// supports, which is what puts the first finding at the start of a scan
+    /// rather than the end, and it is small enough that an ordinary fixture
+    /// crosses it in a unit test rather than only in a performance gate.
+    /// Only the first batch of a category uses it, so a scan of two million
+    /// files does not emit two thousand fragments per category.
+    public static let firstFindingCheckpointFiles: UInt64 = 1_000
+}
 ```
+
+Migration note for the C15 amendment (s2e). The measured problem: on a
+120,000 file fixture the Cleanup scan collected every matching file, then
+emitted 110,003 entries as five findings at 99.2 per cent of the run. The
+scan itself was fast (2.03 seconds); the shape was structurally non
+streaming, because a per rule aggregate cannot exist before the walk ends,
+and at a real disk's match count the accumulated buffer is what would
+eventually meet the 500 megabyte ceiling. Batching fixes both, and it costs
+the following, stated rather than absorbed:
+
+- `ScanCounters.findingCount` becomes `itemCount` and counts entries (C4),
+  because a count of batches is a number that moves with a constant inside
+  the engine.
+- A category's totals are now sums. Any consumer reading a whole category
+  off one finding is wrong, including the review screen's category header.
+- Two scans of the same tree agree on entries and on each finding's internal
+  order, not necessarily on where the batch boundaries fall.
+- `duplicateSet` and `similarPhotoSet` are exempt from the cap and stay
+  unbounded, and duplicate grouping still indexes across the whole walk
+  (C21). Clutter therefore has no memory guarantee by construction, and no
+  gate covers it yet.
+
+The existing test pins this breaks, for the test writer to update
+deliberately in s2e. Three assertions become false, and the rest is a
+rename that the compiler finds.
+
+Behavioural, the assertion is wrong under the amended contract:
+
+- Tests/CleanupEngineTests/CleanupScanMechanicsTests.swift, "the final
+  counters equal the sum of the yielded findings":
+  `final.findingCount == UInt32(outcome.findings.count)`. Becomes
+  `final.itemCount` equals the entry count across the yielded findings. The
+  old equality is false by design once a category spans several findings.
+- Tests/ClutterEngineTests/ClutterScanMechanicsTests.swift, "counters only
+  count up and the final counters equal the yielded findings": the same
+  line, the same fix.
+- Tests/CleanupEngineTests/CleanupCategoryDiscoveryTests.swift, "scanning
+  the same file system state twice yields the same findings, identifiers
+  aside": `Set(FindingShape)` equality, where `FindingShape` carries an
+  ordered path array. It would still go green, because the JunkTree fixture
+  never fills a batch and the in memory enumerator iterates one dictionary
+  in one order within a process, so it would be passing for a reason the
+  contract no longer promises. Restate it as what the amended contract does
+  promise: equal entry unions, equal category multiset, and each finding's
+  entries sorted by path.
+
+Mechanical, from `ScanCounters.findingCount` becoming `itemCount`. Behaviour
+under test is unchanged in every one:
+
+- Tests/GleamCoreTests/DomainFixtures.swift, `makeScanCounters`: the
+  `findingCount` parameter and its default.
+- Tests/GleamCoreTests/ScanSessionTests.swift: "zero has every counter at
+  zero", "round trips losslessly at the extremes", "increasing counters
+  apply to a running session", "counters never decrease when a wholly lower
+  update arrives", "no counter decreases under a mixed update", "no counter
+  decreases across a sequence of updates".
+- Tests/CleanupEngineTests/CleanupEngineFixtures.swift and
+  Tests/ClutterEngineTests/ClutterEngineFixtures.swift,
+  `countersAreMonotonic`.
+- Tests/ClutterEngineTests/SimilarPhotosSessionAndDeterminismTests.swift,
+  "progress counters never decrease during a similar photos scan".
+- Tests/ClutterEngineTests/DuplicatesSessionMechanicsTests.swift,
+  "duplicate findings ride the scan session with advancing phases and
+  counters that only count up".
+- Tests/CleanupModuleTests/CleanupModuleTestSupport.swift, `makeCounters`
+  and the fake engine's per finding counter step. The third positional
+  argument stops meaning findings and starts meaning items, so every call
+  site still compiles while reading differently. Those sites, each of which
+  wants its third argument reread rather than merely recompiled:
+  CleanupModuleHappyPathTests "the first clean end to end: scan, review
+  down to file paths, deselect, execute in trash mode, result,
+  acknowledge" (including the exact
+  `counters == makeCounters(10, 500, 1)` assertion) and "the next scan
+  revises the hub estimate kept from the last result";
+  CleanupModuleCancellationTests "cancelling a scan discards the partial
+  findings and returns to idle" and "events from a cancelled scan never
+  resurface"; CleanupModuleCommandTotalityTests "every command outside its
+  table is the identity while scanning, including another startScan" and
+  "startScan from reviewing discards the findings and selection and mints a
+  fresh session"; CleanupModuleFailureTests "a failing scan stream lands
+  idle with a plain sentence"; CleanupModuleDegradedNoticesTests "the next
+  scan replaces the banner with the provider's current state".
+
+New surface with no pin yet, so it is new test work rather than a break:
+`CleanupReviewCategory.byteTotal` and `.pathCount` (C38), the entry cap and
+the first finding checkpoint (C15), and a Cleanup fixture large enough to
+cross both. Sources/MacGleam/CleanupScanProgressView.swift's counter line
+says "N findings" today and must say items, which is the whole reason the
+counter was renamed.
+
+Not broken, and worth saying rather than leaving the test writer to check
+for themselves. Every Cleanup engine assertion that unions a category's
+paths or sums its bytes holds unchanged, because
+Tests/CleanupEngineTests/CleanupEngineFixtures.swift's `ScanOutcome` already
+returns arrays per category (`findings(in:)`, `trashBinFindings`,
+`itemisedPaths`, `reclaimableByteTotal`) and every caller already unions or
+sums across them: CleanupCategoryDiscoveryTests, CleanupDegradedModeTests,
+CleanupRuleDrivenDiscoveryTests, CleanupScanDenylistTests and
+CleanupPreselectionTests. The JunkTree fixture is a handful of files per
+category, far under the cap and under one checkpoint, so batching never
+splits anything there. Every Cleanup plan test constructs its findings
+directly and is untouched. Every CleanupModule test already drives two
+findings of one category (`cacheFinding` and `spareCacheFinding`) through
+the model, so C38's amended wording describes behaviour those tests already
+pin, including "the review groups findings by category in the order the
+first of each streamed" and "toggling a category selects every member when
+one is unselected, then deselects every member".
 
 ### C16. PathOwnershipPolicy
 
@@ -1018,9 +1217,20 @@ engine tests run against an in memory `FileSystemReading` with fixture trees.
 /// attachment copies, and every trash bin including external volume trashes.
 ///
 /// Guarantees:
-/// - Emits only Cleanup categories from C5. Categories are itemised: a
-///   cache finding lists the actual paths, never a directory total the user
-///   cannot inspect.
+/// - Emits only Cleanup categories from C5. Itemisation is per finding
+///   entry, not per category: every entry names a real file path the user
+///   can inspect, never a directory total. A category is not one finding.
+///   A rule's matches stream as a series of capped findings (C15), so a
+///   category's paths, file count and byte total are sums across its
+///   findings, and a scan that used to end with one finding per rule now
+///   emits many while it runs. What that changes, on the s2e fixture of
+///   120,000 files with 110,003 matches across five categories: the
+///   measured behaviour before was five findings arriving at 99.2 per cent
+///   of a 2.03 second scan; the shape the contract now requires is a little
+///   under sixty findings, arithmetic from the cap rather than a
+///   measurement, the first of them within
+///   `ScanStreamPolicy.firstFindingCheckpointFiles` files of the first
+///   match rather than at the end of the walk.
 /// - Preselection follows the rules catalogue: a finding is preselected
 ///   only when its rule says preselectable and its risk is safe. Nothing
 ///   risky is ever preselected, whatever the catalogue says (the engine
@@ -1028,15 +1238,24 @@ engine tests run against an in memory `FileSystemReading` with fixture trees.
 /// - Mail attachment findings cover local copies only; removing one never
 ///   touches server state, and the explanation says so.
 /// - Trash bin findings are per volume so the review shows where each bin
-///   lives.
+///   lives, and batching never loses that: the volume is part of the
+///   category (C5 `trashBin(volume:)`), so every batch of a bin carries its
+///   own volume however many batches the bin takes.
 /// - `plan` maps findings to `moveToTrash` when settings.deletionMode is
 ///   trash, `deletePermanently` when permanent. Trash bin contents always
 ///   plan as `deletePermanently` (moving trash to trash is meaningless),
 ///   and this is the one Cleanup case allowed to do so; it still requires
 ///   the confirmation from C6.
 /// - Performance: the full scan of a typical 512 gigabyte system disk
-///   completes in under 60 seconds on Apple silicon. Enforced by a
-///   performance test against a generated fixture tree in M2.
+///   completes in under 60 seconds on Apple silicon; the first finding
+///   arrives within two seconds of the scan starting and within the first
+///   half of the run; resident memory stays under the DESIGN.md ceiling
+///   throughout. All three are enforced by gates against a generated
+///   fixture tree in M2 (s2e). The middle one is C15's streaming clause
+///   stated as a number, and it is the one that catches the regression this
+///   engine actually had: an engine that buffers and then emits puts its
+///   first finding at essentially the whole of the run, so the absolute two
+///   second bound alone would pass it on fast hardware.
 public struct CleanupEngine: GleamEngine { /* module == .cleanup */ }
 ```
 
@@ -1052,7 +1271,25 @@ public struct CleanupEngine: GleamEngine { /* module == .cleanup */ }
 ///   finding.
 /// - Duplicate sets are grouped by full content hash; two files of equal
 ///   size and different content are never in one set. Each set is one
-///   Finding with category `duplicateSet(keptPath:)`.
+///   Finding with category `duplicateSet(keptPath:)`, whatever its size.
+/// - Set shaped categories are the one exemption from C15's entry cap.
+///   `duplicateSet` and `similarPhotoSet` are never split, because a split
+///   would break C5's guarantee that the kept path is a member of the
+///   finding's own paths, and would leave members sitting in a finding
+///   whose category names a kept copy it does not contain. The cost is
+///   stated rather than hidden: a pathological set, thousands of copies of
+///   one file, is the one finding in MacGleam whose size is not bounded by
+///   construction, and duplicate grouping is also the one scan that must
+///   index candidates across the whole walk, so C15's "retains nothing
+///   proportional to files seen" does not hold here either. Neither is
+///   covered by the s2e gates, which cover Cleanup and Space Lens. A
+///   Clutter performance gate is separate work and these two are what it
+///   should measure.
+/// - Large file, old file and downloads triage findings carry one entry
+///   each, far under the cap, and already stream as the walk runs. C15's
+///   rule that a category spans many findings has always been true here:
+///   `largeFile` is one finding per file, so a consumer assuming one
+///   finding per category was wrong before batching existed.
 /// - Keep one invariant: `plan` never emits an operation targeting the kept
 ///   path of any set, and throws `PlanningError.keptCopyMissing` if a
 ///   selection somehow excludes it. At least one copy always survives, by
@@ -1082,11 +1319,16 @@ public struct ClutterEngine: GleamEngine { /* module == .clutter */ }
 /// - `sizeRevision` events only ever increase a node's subtree total
 ///   (the map grows, matching the motion design), and totals converge to
 ///   the true allocated byte totals when the stream completes.
-/// - Mapping a full volume completes in under 30 seconds on Apple silicon.
-///   Enforced by a performance test in M2.
+/// - Mapping a full volume completes in under 30 seconds on Apple silicon,
+///   and the first node arrives within two seconds of the map starting and
+///   within the first half of the run. Enforced by gates in M2 (s2e).
 /// - Selecting nodes for deletion produces ordinary Findings with category
-///   `spaceLensSelection` and risk `review` (never preselected), then the
-///   standard `plan` path applies: Trash by default, identical to Cleanup.
+///   `spaceLensSelection` and risk `review` (never preselected), one entry
+///   per selected node. The category therefore spans as many findings as
+///   the user selected nodes, and its totals are sums across them (C15);
+///   each finding is already far under the entry cap, so nothing here
+///   batches. Then the standard `plan` path applies: Trash by default,
+///   identical to Cleanup.
 /// - The map never offers selection of a denylisted path; such nodes render
 ///   but are not selectable.
 public struct SpaceLensEngine: GleamEngine {
@@ -1963,31 +2205,66 @@ public enum CleanupModuleState: Sendable, Equatable {
 /// - `phase` only ever advances per C4 (indeterminate, determinate,
 ///   settling; determinate may be skipped, never revisited).
 /// - `counters` are monotonic within the session per C4: filesSeen,
-///   bytesReclaimable and findingCount never decrease across successive
-///   scanning states.
+///   bytesReclaimable and itemCount never decrease across successive
+///   scanning states. `itemCount` counts path entries, not findings, so the
+///   figure the progress line shows does not move when the engine's batch
+///   size does (C4, amended in s2e).
 public struct CleanupScanProgress: Sendable, Equatable {
     public let sessionID: UUID
     public let phase: ScanPhase
     public let counters: ScanCounters
 }
 
-/// One category group in review, in the order its first finding streamed.
+/// One category group in review: every finding of one category, in the order
+/// they streamed. The group, not the finding, is what the review screen
+/// shows as a category, which is what makes a streaming scan (C15) invisible
+/// to the person reading the list.
+///
+/// Guarantees:
+/// - `findings` is never empty and every member carries `category`.
+/// - A category appears exactly once in a review. The group is Identifiable
+///   by its category, so a second group of the same category would be a
+///   duplicate identity in the list; every finding of a category lands in
+///   this one group however many findings the scan emitted for it.
+/// - `findings` is in arrival order, and the group's position in
+///   `CleanupReviewState.categories` is fixed by the arrival of the
+///   category's first finding. Neither is re sorted when later findings of
+///   an existing category arrive, so rows append and the list never
+///   reshuffles under the user mid scan (DESIGN.md: rows insert with a
+///   staggered spring, never a jump cut).
+/// - `byteTotal` and `pathCount` are the category's own figures, summed
+///   across its findings. They exist because after batching no single
+///   finding carries them, and a consumer deriving them separately is
+///   exactly the drift this model exists to prevent.
 public struct CleanupReviewCategory: Sendable, Equatable, Identifiable {
     public let category: FindingCategory
     public let findings: [Finding]
     public var id: FindingCategory { category }
+    /// Derived: the sum of `byteSize` over `findings`.
+    public var byteTotal: UInt64 { get }
+    /// Derived: the count of paths across `findings`.
+    public var pathCount: UInt32 { get }
 }
 
 /// The reviewed findings and the current selection.
 ///
 /// Guarantees:
 /// - `categories` is never empty (an empty scan lands on cleanSweep, not
-///   here) and every finding in it belongs to `sessionID`.
+///   here), holds one group per distinct category, and every finding in it
+///   belongs to `sessionID`.
 /// - `selectedFindingIDs` only contains identifiers of findings present in
 ///   `categories`.
 /// - `selectedByteTotal` is exactly the sum of `byteSize` over the selected
 ///   findings; `selectedFileCount` is exactly the count of paths across
-///   them. Pure derivations, no stored copies to drift.
+///   them. Pure derivations, no stored copies to drift. Both were already
+///   sums over findings rather than over categories, so both hold unchanged
+///   when a category spans several findings (C15).
+/// - Selection is per finding identifier, never per category. A category
+///   whose findings are partly selected is an ordinary state, and the
+///   totals report exactly the selected part of it: a half selected
+///   category contributes half its bytes, not all and not none. Reaching
+///   that state takes `toggleFinding`; `toggleCategory` is all or nothing
+///   across the whole group.
 public struct CleanupReviewState: Sendable, Equatable {
     public let sessionID: UUID
     public let categories: [CleanupReviewCategory]
@@ -2087,8 +2364,12 @@ public enum CleanupCommandRefusal: Sendable, Equatable {
 ///   moves to idle with `failureNotice` set to a plain sentence.
 /// - `toggleFinding`, `toggleCategory`: reviewing only, selection change
 ///   only, never a lifecycle change. An unknown finding identifier is
-///   ignored. `toggleCategory` selects every finding in the category when
-///   at least one is unselected, otherwise deselects every one.
+///   ignored. `toggleCategory` addresses every finding in the category's
+///   group, which after batching is usually several (C15): it selects all
+///   of them when at least one is unselected, otherwise deselects all of
+///   them. So one category toggle is all or nothing over the whole
+///   category however many findings it spans, and the byte total moves by
+///   the category's whole `byteTotal` either way.
 /// - `executeSelection`: reviewing to executing when admitted; a non nil
 ///   refusal is returned and nothing changes otherwise.
 /// - `cancelScan`: scanning to idle, partial findings discarded. Safe by
@@ -2118,6 +2399,12 @@ public enum CleanupCommandRefusal: Sendable, Equatable {
 ///   (C20), and this model additionally never defaults a finding whose
 ///   risk is not `.safe` to selected, whatever the finding claims. Defence
 ///   in depth, same shape as the engine's own conjunction rule.
+/// - Batching does not change which paths arrive preselected. Every finding
+///   a rule produces carries that rule's own risk and preselection (C20),
+///   so a Cleanup category is uniformly preselected or uniformly not, and
+///   entering review still selects whole categories rather than fragments
+///   of them. A category arriving half selected would mean the engine
+///   broke its own conjunction rule.
 /// - `permanentDeletionScope()` returns, while reviewing, the exact file
 ///   count and byte total of the operations the current selection would
 ///   plan as `deletePermanently` under the current deletion mode: every

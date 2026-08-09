@@ -38,12 +38,12 @@ enum Fixture {
 func makeScanCounters(
   filesSeen: UInt64 = 100,
   bytesReclaimable: UInt64 = 4096,
-  findingCount: UInt32 = 5
+  itemCount: UInt32 = 5
 ) -> ScanCounters {
   ScanCounters(
     filesSeen: filesSeen,
     bytesReclaimable: bytesReclaimable,
-    findingCount: findingCount
+    itemCount: itemCount
   )
 }
 

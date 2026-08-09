@@ -21,24 +21,52 @@ public struct AbsolutePath: Codable, Sendable, Hashable, Comparable {
   }
 
   /// Componentwise strict prefix check. "/Library/App" is not a descendant
-  /// of "/Library/Ap", and no path is a descendant of itself.
+  /// of "/Library/Ap", and no path is a descendant of itself. Both values are
+  /// normalised, so a component boundary is exactly a "/" in the string.
   public func isDescendant(of ancestor: AbsolutePath) -> Bool {
-    let own = components
-    let ancestorComponents = ancestor.components
-    guard own.count > ancestorComponents.count else { return false }
-    return zip(ancestorComponents, own).allSatisfy(==)
+    guard ancestor.value != "/" else { return value != "/" }
+    let own = value.utf8
+    let ancestorBytes = ancestor.value.utf8
+    guard own.count > ancestorBytes.count else { return false }
+    var index = own.startIndex
+    for byte in ancestorBytes {
+      guard own[index] == byte else { return false }
+      own.formIndex(after: &index)
+    }
+    return own[index] == UInt8(ascii: "/")
   }
 
   public func isAncestor(of descendant: AbsolutePath) -> Bool {
     descendant.isDescendant(of: self)
   }
 
+  /// This path's ancestor directories, nearest first, down to and including
+  /// `root`. Empty when the path is not a descendant of `root`.
+  public func ancestors(downTo root: AbsolutePath) -> [AbsolutePath] {
+    guard isDescendant(of: root) else { return [] }
+    let rootLength = root.value.utf8.count
+    var result: [AbsolutePath] = []
+    var current = value
+    while current.utf8.count > rootLength {
+      guard let slash = current.lastIndex(of: "/") else { break }
+      current = slash == current.startIndex ? "/" : String(current[..<slash])
+      result.append(AbsolutePath(normalised: current))
+    }
+    return result
+  }
+
   public var lastComponent: String {
     components.last ?? "/"
   }
 
-  var components: [String] {
+  public var components: [String] {
     value.split(separator: "/").map(String.init)
+  }
+
+  /// Wraps a value the caller already knows is normalised. Only for values
+  /// derived from another path's own value, such as a prefix of it.
+  private init(normalised value: String) {
+    self.value = value
   }
 
   var parent: AbsolutePath? {

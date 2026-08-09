@@ -38,7 +38,7 @@ struct SimilarPhotosSessionAndDeterminismTests {
     for (earlier, later) in zip(capture.progress, capture.progress.dropFirst()) {
       #expect(earlier.filesSeen <= later.filesSeen)
       #expect(earlier.bytesReclaimable <= later.bytesReclaimable)
-      #expect(earlier.findingCount <= later.findingCount)
+      #expect(earlier.itemCount <= later.itemCount)
     }
   }
 

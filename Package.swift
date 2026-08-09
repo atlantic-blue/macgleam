@@ -77,6 +77,11 @@ let package = Package(
             path: "Sources/SpaceLensModule"
         ),
         .testTarget(
+            name: "PerformanceGateTests",
+            dependencies: ["GleamCore", "CleanupEngine", "SpaceLensEngine"],
+            path: "Tests/PerformanceGateTests"
+        ),
+        .testTarget(
             name: "SpaceLensModuleTests",
             dependencies: ["SpaceLensModule", "SpaceLensEngine", "GleamCore", "GleamHub", "GleamDesign"],
             path: "Tests/SpaceLensModuleTests"

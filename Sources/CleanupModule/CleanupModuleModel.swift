@@ -301,7 +301,7 @@ public final class CleanupModuleModel {
       counters = ScanCounters(
         filesSeen: max(counters.filesSeen, next.filesSeen),
         bytesReclaimable: max(counters.bytesReclaimable, next.bytesReclaimable),
-        findingCount: max(counters.findingCount, next.findingCount)
+        itemCount: max(counters.itemCount, next.itemCount)
       )
     }
 

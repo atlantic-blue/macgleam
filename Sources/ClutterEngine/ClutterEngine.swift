@@ -71,7 +71,7 @@ extension ClutterEngine {
     yield(.phase(.determinate(estimatedTotalFiles: counters.filesSeen)))
     for finding in try await buildFindings(files: files, context: context) {
       try Task.checkCancellation()
-      counters.findingCount += 1
+      counters.itemCount += UInt32(finding.entries.count)
       counters.bytesReclaimable += finding.byteSize
       yield(.finding(finding))
       yield(.progress(counters))

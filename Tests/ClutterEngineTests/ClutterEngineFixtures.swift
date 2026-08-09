@@ -441,6 +441,13 @@ struct ScanOutcome: Sendable {
   var reclaimableByteTotal: UInt64 {
     findings.reduce(0) { $0 + $1.byteSize }
   }
+
+  /// Path entries across every yielded finding. `ScanCounters.itemCount`
+  /// counts these, not findings, because one category streams as several
+  /// findings (C4, C15).
+  var entryCount: Int {
+    findings.reduce(0) { $0 + $1.entries.count }
+  }
 }
 
 func collectScan(
@@ -504,7 +511,7 @@ func countersAreMonotonic(_ counters: [ScanCounters]) -> Bool {
   zip(counters, counters.dropFirst()).allSatisfy { earlier, later in
     earlier.filesSeen <= later.filesSeen
       && earlier.bytesReclaimable <= later.bytesReclaimable
-      && earlier.findingCount <= later.findingCount
+      && earlier.itemCount <= later.itemCount
   }
 }
 

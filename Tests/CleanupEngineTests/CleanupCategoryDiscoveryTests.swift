@@ -145,14 +145,28 @@ struct CleanupCategoryDiscoveryTests {
     }
   }
 
-  @Test("scanning the same file system state twice yields the same findings, identifiers aside")
-  func scanningTwiceYieldsTheSameFindings() async throws {
+  @Test(
+    "scanning the same file system state twice yields the same entries per category, wherever the batch boundaries fall"
+  )
+  func scanningTwiceYieldsTheSameEntries() async throws {
     let fileSystem = await JunkTree.seeded()
     let first = try await runCleanupScan(rules: JunkTree.catalog(), over: fileSystem)
     let second = try await runCleanupScan(rules: JunkTree.catalog(), over: fileSystem)
 
     #expect(!first.findings.isEmpty)
-    #expect(
-      Set(first.findings.map(FindingShape.init)) == Set(second.findings.map(FindingShape.init)))
+    #expect(entriesByCategory(first) == entriesByCategory(second))
+    #expect(first.entryCount == distinctEntryCount(first))
+    #expect(second.entryCount == distinctEntryCount(second))
+  }
+
+  @Test("each finding's own entries are ordered by path")
+  func findingEntriesAreOrderedByPath() async throws {
+    let fileSystem = await JunkTree.seeded()
+    let outcome = try await runCleanupScan(rules: JunkTree.catalog(), over: fileSystem)
+
+    #expect(!outcome.findings.isEmpty)
+    for finding in outcome.findings {
+      #expect(finding.paths == finding.paths.sorted())
+    }
   }
 }
