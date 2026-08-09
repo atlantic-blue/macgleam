@@ -7,7 +7,9 @@ let package = Package(
         .macOS(.v14)
     ],
     products: [
-        .library(name: "GleamDesign", targets: ["GleamDesign"])
+        .library(name: "GleamDesign", targets: ["GleamDesign"]),
+        .library(name: "GleamHub", targets: ["GleamHub"]),
+        .executable(name: "MacGleam", targets: ["MacGleam"])
     ],
     targets: [
         .target(
@@ -18,6 +20,21 @@ let package = Package(
             name: "GleamDesignTests",
             dependencies: ["GleamDesign"],
             path: "Tests/GleamDesignTests"
+        ),
+        .target(
+            name: "GleamHub",
+            dependencies: ["GleamDesign"],
+            path: "Sources/GleamHub"
+        ),
+        .testTarget(
+            name: "GleamHubTests",
+            dependencies: ["GleamHub", "GleamDesign"],
+            path: "Tests/GleamHubTests"
+        ),
+        .executableTarget(
+            name: "MacGleam",
+            dependencies: ["GleamHub", "GleamDesign"],
+            path: "Sources/MacGleam"
         )
     ]
 )

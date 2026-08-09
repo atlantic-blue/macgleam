@@ -3,7 +3,7 @@
 Companion to CONTRACTS.md. Slices are thin vertical paths of user value,
 mapped onto milestones M0 to M7 from ROADMAP.md. Each slice is sized so one
 agent completes it within half a fresh context window. Contract numbers (C1 to
-C35) refer to CONTRACTS.md.
+C36) refer to CONTRACTS.md.
 
 Reading a slice entry:
 
@@ -140,13 +140,14 @@ s7a can start in parallel the moment the workspace exists.
 - Tier: auto.
 
 ### s0b. hub shell
-- Contracts: consumes C1, C2 (the status scene and cards are GleamDesign
-  components, no new contracts).
+- Contracts: C36 (hub shell model), consuming C1, C2.
 - Depends on: s0a.
 - Verification: the hub renders the orb with its two idle states (healthy,
-  attention needed) and six placeholder cards in the hexagonal layout; state
-  driven orb mood switching is testable through the view model; Reduce Motion
-  swaps the orb animation for the static gradient.
+  attention needed) and six placeholder cards in the hexagonal layout; mood,
+  status line and card derivation are pure functions of HubMachineState,
+  driven in tests without any view; the appearance resolver is total over
+  every mood and Reduce Motion pair and never returns a spring under Reduce
+  Motion; the card order is the fixed HubModule order.
 - Tier: verify. Human check: the orb breathes at roughly a 6 second period,
   the sheen reads as calm not busy, both appearances look intentional.
 
