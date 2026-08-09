@@ -2,7 +2,7 @@
 stage:    implement
 updated:  2026-08-09
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     M2 slice s2b, duplicates
+next:     M2 slice s2c, similar photos
 blocked:  none
 prs:      atlantic-blue/macgleam#1
           atlantic-blue/macgleam#2
@@ -17,7 +17,8 @@ steps:
   - [x] s1e executor (atlantic-blue/macgleam#8)
   - [x] s1f disk access onboarding (atlantic-blue/macgleam#9)
   - [x] s1g cleanup module (atlantic-blue/macgleam#10)
-  - [ ] s2a large and old files (this branch)
+  - [x] s2a large and old files (atlantic-blue/macgleam#11)
+  - [ ] s2b duplicates (this branch)
 
   - [ ] M2 to M7 per .greenlight/GRAPH.md
 ```
@@ -81,3 +82,10 @@ Julian judges them on a running app. Open items:
 - C36 (hub shell model) was added to CONTRACTS.md during s0b because the
   view model needed a typed surface for isolated test writing; GRAPH.md s0b
   entry updated accordingly.
+
+- Recorded debt from s2b: duplicate member allocated sizes travel from scan
+  to plan through a process wide ScannedAllocationCache, because Finding
+  carries no per path byte sizes and plan is synchronous without a file
+  system. The clean fix is per path sizes on Finding (a C5 contract change),
+  which would also make denylist byte apportioning exact. Architect it
+  before or with s2d, which reuses the same pattern for Space Lens.
