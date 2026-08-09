@@ -2,13 +2,14 @@
 stage:    implement
 updated:  2026-08-09
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     slice s0c, the hub zoom with matched geometry and keyboard walking
+next:     M1 slice s1a, the domain model
 blocked:  none
 prs:      atlantic-blue/macgleam#1
+          atlantic-blue/macgleam#2
 steps:
   - [x] s0a tokens and workspace (atlantic-blue/macgleam#1)
-  - [ ] s0b hub shell (this branch)
-  - [ ] s0c hub zoom
+  - [x] s0b hub shell (atlantic-blue/macgleam#2)
+  - [ ] s0c hub zoom (this branch)
   - [ ] M1 s1a to s1g, the first clean
   - [ ] M2 to M7 per .greenlight/GRAPH.md
 ```
@@ -35,6 +36,16 @@ Julian judges them on a running app. Open items:
   capture; reproduce with swift run MacGleam). Screen capture of the live
   window was not possible: the terminal lacks the Screen Recording
   permission, which only Julian can grant.
+- s0c hub zoom: the zoom is one continuous motion with no crossfade seams
+  and no dropped frames on a 60 hertz display; the hexagon reads as a
+  hexagon; hover breathing feels alive not busy. Self check done: 101 tests
+  green including several hundred parameterised navigation cases, mutation
+  check on the zoom spring watched both ways, app launches and creates its
+  window, render with the focus ring and hexagonal offsets at
+  ~/claude/orgs/atlantic-blue/ideas/macgleam/verify-queue/s0c-hub-rendered.png
+  (rendered offscreen, same caveat as s0b). The keyboard flow (arrows,
+  Return, Escape) and the zoom motion itself cannot be judged from a still;
+  run swift run MacGleam on main once this merges.
 
 ## Notes for resume
 

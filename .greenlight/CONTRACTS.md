@@ -14,7 +14,7 @@ How to read this file:
 - All code is Swift 6 with strict concurrency. Every crossing type is Sendable.
   Types that cross the process boundary to GleamHelper are additionally Codable
   and Equatable.
-- Contracts are numbered C1 to C36. GRAPH.md maps contracts to slices and
+- Contracts are numbered C1 to C37. GRAPH.md maps contracts to slices and
   carries each slice's verification tier.
 - Nothing here says how. Enumeration strategy, hashing algorithm choice, shader
   code and storage engines are implementation, except where DESIGN.md locked a
@@ -22,7 +22,7 @@ How to read this file:
 
 Package layout, restated from DESIGN.md: GleamDesign (C1, C2), GleamCore
 (C3 to C19), engine packages (C20 to C29), GleamHelperCore (C30, C31), app
-services (C32 to C35), hub interface (C36).
+services (C32 to C35), hub interface (C36, C37).
 
 ---
 
@@ -1677,6 +1677,157 @@ public enum OrbAppearanceResolver {
         for mood: OrbMood,
         reduceMotion: Bool
     ) -> OrbAppearance { fatalError("contract") }
+}
+```
+
+### C37. Hub navigation model
+
+```swift
+import Foundation
+import GleamDesign
+
+/// The keys the hub navigation understands. A closed set: full operation
+/// without a pointer means these six are sufficient to reach every module
+/// and come back.
+public enum HubKeyEvent: String, CaseIterable, Sendable, Equatable {
+    case arrowLeft
+    case arrowRight
+    case arrowUp
+    case arrowDown
+    case `return`
+    case escape
+}
+
+/// One module's preserved state, opaque to the hub. The module encodes its
+/// own Codable state into `payload` on leaving and decodes it on re entry;
+/// the hub stores and returns bytes and never interprets them.
+///
+/// Opaque data rather than a generic parameter is deliberate: a generic
+/// would make the navigation state's type depend on every module's state
+/// type, coupling s0c to modules that ship across M1 to M6. The cost is
+/// stated plainly: nothing at compile time proves a module decodes the type
+/// it encoded. Each module owns that round trip and tests it when it ships.
+public struct ModuleStateSlot: Codable, Sendable, Equatable {
+    public let payload: Data
+    public init(payload: Data)
+}
+
+/// Where the user is, and every module's preserved state.
+///
+/// Guarantees:
+/// - Focus is always exactly one card when on the hub, by construction: the
+///   hub case carries a non optional HubModule and no unfocused hub state
+///   is representable.
+/// - `initial` is the hub with focus on the first card in
+///   `HubModule.allCases` order (smartCare) and no stored slots.
+/// - Values are immutable. `storingSlot` returns a copy with that module's
+///   slot replaced and everything else identical; it is the only operation
+///   anywhere that changes `moduleStateSlots`.
+public struct HubNavigationState: Codable, Sendable, Equatable {
+    public enum Position: Codable, Sendable, Equatable {
+        case hub(focus: HubModule)
+        case module(HubModule)
+    }
+    public let position: Position
+    public let moduleStateSlots: [HubModule: ModuleStateSlot]
+
+    public init(position: Position, moduleStateSlots: [HubModule: ModuleStateSlot])
+    public static let initial: HubNavigationState
+    public func storingSlot(_ slot: ModuleStateSlot, for module: HubModule) -> HubNavigationState
+}
+
+/// The outcome of one key press: the next state, plus the zoom the view
+/// must perform when a module boundary was crossed.
+///
+/// Guarantees:
+/// - `zoom` is non nil exactly when `next` is on the other side of a module
+///   boundary from the input state: nil for every focus move and every
+///   ignored key.
+public struct HubNavigationTransition: Sendable, Equatable {
+    public let next: HubNavigationState
+    public let zoom: HubZoom?
+}
+
+/// A matched geometry zoom, as data: which module and which way. Views
+/// interpret it; its animation resolves through HubZoomResolver.
+public struct HubZoom: Sendable, Equatable {
+    public let module: HubModule
+    public let direction: HubZoomDirection
+}
+
+public enum HubZoomDirection: String, CaseIterable, Sendable, Equatable {
+    case zoomIn
+    case zoomOut
+}
+
+/// The pure key transition. The whole hub navigation behaviour is this one
+/// function, driven in tests without a view.
+///
+/// Guarantees:
+/// - Total and deterministic: every (state, key, enabledModules) input
+///   returns a transition; equal inputs return equal outputs; no clock, no
+///   randomness, no hidden state.
+/// - Spatial order: the six cards form two columns of three flanking the
+///   orb, in `HubModule.allCases` order (C36). Left column top to bottom is
+///   smartCare, cleanup, protection; right column top to bottom is
+///   performance, applications, myClutter.
+/// - On the hub, arrowUp and arrowDown move within the focused card's
+///   column and clamp at its ends; arrowLeft and arrowRight move to the
+///   same row of the other column and clamp when focus is already in the
+///   pressed direction's column. A clamped press returns the state
+///   unchanged. Arrow walking therefore never leaves the six cards, over
+///   any key sequence.
+/// - On the hub, `return` on an enabled focused module moves to
+///   `.module(focused)` with a zoomIn for it; on a disabled module (C36,
+///   isEnabled false cards render but do not enter) the state is unchanged
+///   and no zoom is emitted. `escape` on the hub is the identity.
+/// - In a module, `escape` moves to the hub with focus restored to the
+///   module that was entered, with a zoomOut for it. Every other key in a
+///   module is the identity: module content owns its own keys, the hub
+///   model listens for escape alone.
+/// - Entering then escaping restores focus to the entered card, for every
+///   module.
+/// - No transition creates, drops or alters a module state slot:
+///   `next.moduleStateSlots` always equals the input's. Slots therefore
+///   survive enter, leave and re enter, over any key sequence, as a
+///   property test.
+public enum HubNavigationResolver {
+    public static func transition(
+        _ state: HubNavigationState,
+        applying key: HubKeyEvent,
+        enabledModules: Set<HubModule>
+    ) -> HubNavigationTransition { fatalError("contract") }
+}
+
+/// Pure mapping from zoom direction and Reduce Motion flag to the animation
+/// the view performs. The analogue of OrbAppearanceResolver (C36):
+/// asserting on the returned value is what makes the never a spring under
+/// Reduce Motion guarantee a unit test rather than a screenshot.
+///
+/// Guarantees:
+/// - Total: all four (direction, reduceMotion) pairs return an appearance,
+///   asserted in one table test.
+/// - With reduceMotion false, both directions are matchedGeometry with the
+///   snappy spring (C2 assigns snappy to navigation), and leaving uses the
+///   same token as entering: the exact reverse, one continuous motion.
+/// - With reduceMotion true, both directions are crossfade with the
+///   standard fade. There is no input for which reduceMotion true returns
+///   matchedGeometry, so the result never contains a spring.
+/// - Every animation named in a returned appearance is a C2 token. No raw
+///   curve or duration appears anywhere in this mapping.
+public enum HubZoomResolver {
+    public static func appearance(
+        for direction: HubZoomDirection,
+        reduceMotion: Bool
+    ) -> HubZoomAppearance { fatalError("contract") }
+}
+
+/// What the zoom does, as data.
+public enum HubZoomAppearance: Sendable, Equatable {
+    /// Full motion: the matched geometry zoom with a C2 spring.
+    case matchedGeometry(spring: GleamSpring)
+    /// Reduce Motion: a crossfade with a C2 fade token.
+    case crossfade(fade: GleamFade)
 }
 ```
 

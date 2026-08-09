@@ -2,11 +2,16 @@ import GleamDesign
 import GleamHub
 import SwiftUI
 
-/// One module card. Renders its title and live figure; entering the module is
-/// later slice territory.
+/// One module card. Renders its title and live figure, breathes on hover,
+/// shows the keyboard focus ring, and enters its module on click through the
+/// same resolver path as Return.
 struct HubCardView: View {
   let card: HubCard
+  let isFocused: Bool
+  let onEnter: () -> Void
   @Environment(\.colorScheme) private var colorScheme
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @State private var isHovering = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: GleamSpacing.points(1)) {
@@ -24,7 +29,21 @@ struct HubCardView: View {
       RoundedRectangle(cornerRadius: GleamRadius.card.value)
         .fill(GleamColorToken.surface.color(for: colorScheme))
     )
+    .overlay(
+      RoundedRectangle(cornerRadius: GleamRadius.card.value)
+        .strokeBorder(
+          isFocused
+            ? GleamColorToken.accent.color(for: colorScheme)
+            : Color.clear,
+          lineWidth: 2
+        )
+    )
     .opacity(card.isEnabled ? 1 : 0.5)
+    .scaleEffect(isHovering ? 1.02 : 1)
+    .animation(GleamSpring.snappy.animation(reduceMotion: reduceMotion), value: isHovering)
+    .onHover { isHovering = $0 }
+    .contentShape(RoundedRectangle(cornerRadius: GleamRadius.card.value))
+    .onTapGesture(perform: onEnter)
   }
 }
 
