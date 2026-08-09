@@ -2,7 +2,7 @@
 stage:    implement
 updated:  2026-08-09
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     M1 slice s1g, the cleanup module
+next:     M2 slice s2a, large and old files
 blocked:  none
 prs:      atlantic-blue/macgleam#1
           atlantic-blue/macgleam#2
@@ -15,8 +15,9 @@ steps:
   - [x] s1c rules baseline (atlantic-blue/macgleam#6)
   - [x] s1d cleanup scan (atlantic-blue/macgleam#7)
   - [x] s1e executor (atlantic-blue/macgleam#8)
-  - [ ] s1f disk access onboarding (this branch)
-  - [ ] M1 s1a to s1g, the first clean
+  - [x] s1f disk access onboarding (atlantic-blue/macgleam#9)
+  - [ ] s1g cleanup module (this branch)
+
   - [ ] M2 to M7 per .greenlight/GRAPH.md
 ```
 
@@ -42,6 +43,14 @@ Julian judges them on a running app. Open items:
   capture; reproduce with swift run MacGleam). Screen capture of the live
   window was not possible: the terminal lacks the Screen Recording
   permission, which only Julian can grant.
+- s1g cleanup module: run a real clean on a scratch account, restore a file
+  from the Trash, and confirm the choreography (staggered rows, fly to
+  summary, ticking counter, clean sweep reward state) uses only token
+  motion, in both appearances and under Reduce Motion. Self check done: 442
+  tests green with the model driven end to end through fakes, mutation on
+  the preselection defence watched both ways, app launches with the real
+  cleanup screen behind the cleanup card. The whole view choreography is
+  untested by the suite by design; it is this check.
 - s1f disk access onboarding: grant Full Disk Access in System Settings and
   watch the flow advance without touching the app; also flip it off and watch
   the degraded banner return. Self check done: 386 tests green including the

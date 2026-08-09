@@ -14,7 +14,7 @@ How to read this file:
 - All code is Swift 6 with strict concurrency. Every crossing type is Sendable.
   Types that cross the process boundary to GleamHelper are additionally Codable
   and Equatable.
-- Contracts are numbered C1 to C37. GRAPH.md maps contracts to slices and
+- Contracts are numbered C1 to C38. GRAPH.md maps contracts to slices and
   carries each slice's verification tier.
 - Nothing here says how. Enumeration strategy, hashing algorithm choice, shader
   code and storage engines are implementation, except where DESIGN.md locked a
@@ -22,7 +22,7 @@ How to read this file:
 
 Package layout, restated from DESIGN.md: GleamDesign (C1, C2), GleamCore
 (C3 to C19), engine packages (C20 to C29), GleamHelperCore (C30, C31), app
-services (C32 to C35), hub interface (C36, C37).
+services (C32 to C35), hub interface (C36, C37), cleanup module interface (C38).
 
 ---
 
@@ -1828,6 +1828,307 @@ public enum HubZoomAppearance: Sendable, Equatable {
     case matchedGeometry(spring: GleamSpring)
     /// Reduce Motion: a crossfade with a C2 fade token.
     case crossfade(fade: GleamFade)
+}
+```
+
+---
+
+## Module interfaces
+
+### C38. Cleanup module model
+
+```swift
+import Foundation
+import Observation
+
+/// What the onboarding flow (s1f, C32) hands the cleanup module about Full
+/// Disk Access. A plain value so tests construct any degraded condition
+/// directly.
+///
+/// Guarantees:
+/// - `unavailable` is empty exactly when `hasFullDiskAccess` is true. Each
+///   entry is a plain sentence naming something the module cannot reach,
+///   renderable in the honest banner verbatim.
+public struct CleanupDegradedState: Sendable, Equatable {
+    public let hasFullDiskAccess: Bool
+    public let unavailable: [String]
+    public init(hasFullDiskAccess: Bool, unavailable: [String])
+}
+
+/// The module's view of the onboarding model's degraded state. A protocol
+/// so tests script grant and decline without the real monitor.
+public protocol CleanupDegradedStateProviding: Sendable {
+    func current() async -> CleanupDegradedState
+}
+
+/// Mints the per session contexts of C15. The one place the file system,
+/// rules catalogue and ownership policy are visible to the module wiring;
+/// the model itself never holds them, which makes "the model never touches
+/// the file system" a compile time property rather than a review note.
+///
+/// Guarantees:
+/// - Every `makeScanContext` call mints a fresh session identifier. No two
+///   calls return contexts sharing one.
+/// - `makePlanContext(sessionID:settings:)` returns a context for exactly
+///   that session, so C15's `findingFromDifferentSession` stays reachable
+///   in tests and unreachable in correct wiring.
+public protocol CleanupSessionProviding: Sendable {
+    func makeScanContext(settings: Settings, hasFullDiskAccess: Bool) async -> ScanContext
+    func makePlanContext(sessionID: UUID, settings: Settings) async -> PlanContext
+}
+
+/// Where the cleanup module is. One closed lifecycle; the degraded banner
+/// is not a state here because degraded scanning still scans (C15), so it
+/// rides alongside as `degradedNotices` on the model.
+public enum CleanupModuleState: Sendable, Equatable {
+    /// No scan this session. The entry state, and the state after a result
+    /// is acknowledged or a scan fails or is cancelled.
+    case idle
+    case scanning(CleanupScanProgress)
+    case reviewing(CleanupReviewState)
+    case executing(CleanupExecutionProgress)
+    case result(CleanupResultSummary)
+    /// The scan completed and found nothing. The designed reward state
+    /// (DESIGN.md clean sweep), never a blank panel: it says what was
+    /// checked.
+    case cleanSweep(filesChecked: UInt64)
+}
+
+/// Scan progress as the view renders it: the three phase choreography plus
+/// the live counters.
+///
+/// Guarantees:
+/// - `phase` only ever advances per C4 (indeterminate, determinate,
+///   settling; determinate may be skipped, never revisited).
+/// - `counters` are monotonic within the session per C4: filesSeen,
+///   bytesReclaimable and findingCount never decrease across successive
+///   scanning states.
+public struct CleanupScanProgress: Sendable, Equatable {
+    public let sessionID: UUID
+    public let phase: ScanPhase
+    public let counters: ScanCounters
+}
+
+/// One category group in review, in the order its first finding streamed.
+public struct CleanupReviewCategory: Sendable, Equatable, Identifiable {
+    public let category: FindingCategory
+    public let findings: [Finding]
+    public var id: FindingCategory { category }
+}
+
+/// The reviewed findings and the current selection.
+///
+/// Guarantees:
+/// - `categories` is never empty (an empty scan lands on cleanSweep, not
+///   here) and every finding in it belongs to `sessionID`.
+/// - `selectedFindingIDs` only contains identifiers of findings present in
+///   `categories`.
+/// - `selectedByteTotal` is exactly the sum of `byteSize` over the selected
+///   findings; `selectedFileCount` is exactly the count of paths across
+///   them. Pure derivations, no stored copies to drift.
+public struct CleanupReviewState: Sendable, Equatable {
+    public let sessionID: UUID
+    public let categories: [CleanupReviewCategory]
+    public let selectedFindingIDs: Set<UUID>
+    public var selectedByteTotal: UInt64 { get }
+    public var selectedFileCount: UInt32 { get }
+}
+
+/// Execution progress as the view renders it: per operation completion and
+/// the reclaimed figure ticking up.
+///
+/// Guarantees:
+/// - `finishedOperations` and `bytesReclaimed` never decrease across
+///   successive executing states, and `finishedOperations` never exceeds
+///   `totalOperations`.
+/// - `currentOperationID` is the operation the executor last reported
+///   started and not yet finished, nil between operations.
+public struct CleanupExecutionProgress: Sendable, Equatable {
+    public let planID: UUID
+    public let totalOperations: UInt32
+    public let finishedOperations: UInt32
+    public let bytesReclaimed: UInt64
+    public let currentOperationID: UUID?
+}
+
+/// The execution report (C7) summarised for the result screen. Everything
+/// that screen renders is here, so the screen is testable without SwiftUI.
+///
+/// Guarantees:
+/// - Derived from exactly one ExecutionReport and consistent with it:
+///   `bytesReclaimed` equals the report's total, and the per category
+///   counts sum to one entry per operation in the plan.
+/// - `categoryOutcomes` appear in the review's category order, only for
+///   categories the plan touched.
+/// - `failures` carries one plain sentence per failed operation, in plan
+///   order: what failed and what was and was not done, never a code. A
+///   cancelled run's untouched operations count as `notStartedCount`, which
+///   is how the partial result screen says exactly which is which.
+/// - `skippedDenylistedNames` carries the last path component of each
+///   operation skipped by the denylist, in plan order. A skip is reported
+///   as the safety system working, distinct from failure (C7).
+public struct CleanupResultSummary: Sendable, Equatable {
+    public let bytesReclaimed: UInt64
+    public let categoryOutcomes: [CleanupCategoryOutcome]
+    public let failures: [String]
+    public let skippedDenylistedNames: [String]
+}
+
+public struct CleanupCategoryOutcome: Sendable, Equatable {
+    public let category: FindingCategory
+    public let completedCount: UInt32
+    public let failedCount: UInt32
+    public let skippedCount: UInt32
+    public let notStartedCount: UInt32
+    public let bytesReclaimed: UInt64
+}
+
+/// The exact permanent scope of the current selection under the current
+/// deletion mode: what a PermanentDeletionConfirmation must name. Nil scope
+/// means no confirmation is needed.
+public struct PermanentDeletionScope: Sendable, Equatable {
+    public let fileCount: UInt32
+    public let byteTotal: UInt64
+}
+
+/// Why executeSelection did not start. Returned, never thrown, so the thin
+/// view branches on it directly; the state is unchanged in every case.
+public enum CleanupCommandRefusal: Sendable, Equatable {
+    case notReviewing
+    case emptySelection
+    /// The selection plans permanent deletions and no confirmation was
+    /// passed. Carries the scope the confirmation must name (C6).
+    case permanentDeletionUnconfirmed(required: PermanentDeletionScope)
+    /// A confirmation was passed but its counts do not match the scope.
+    case confirmationMismatch(required: PermanentDeletionScope)
+}
+
+/// The cleanup module view model, on the macOS 14 Observation framework.
+/// A thin SwiftUI view renders this and adds no state of its own. The
+/// module's whole behaviour is this class driven against fakes of its five
+/// injected protocols.
+///
+/// Guarantees:
+///
+/// State transitions are total and deterministic. Every command in every
+/// state either performs its named transition or leaves the state
+/// identical; equal command and event sequences produce equal state
+/// sequences. The full table, everything else being the identity:
+/// - `startScan`: idle, reviewing, result or cleanSweep to scanning.
+///   Ignored while scanning or executing. From reviewing it discards the
+///   current findings and selection and begins a fresh session (reviewing
+///   would otherwise be a trap state, since escape preserves module state
+///   per C37).
+/// - Stream driven, while scanning: the engine's events update
+///   `scanning`; a completed scan with findings moves to reviewing, with
+///   none to cleanSweep carrying the final filesSeen; a thrown scan stream
+///   moves to idle with `failureNotice` set to a plain sentence.
+/// - `toggleFinding`, `toggleCategory`: reviewing only, selection change
+///   only, never a lifecycle change. An unknown finding identifier is
+///   ignored. `toggleCategory` selects every finding in the category when
+///   at least one is unselected, otherwise deselects every one.
+/// - `executeSelection`: reviewing to executing when admitted; a non nil
+///   refusal is returned and nothing changes otherwise.
+/// - `cancelScan`: scanning to idle, partial findings discarded. Safe by
+///   construction: a cancelled scan has no side effects on disk (C4, C13).
+///   The confirmation prompt is the view's job; this command is the
+///   confirmed cancellation.
+/// - `cancelExecution`: cancels the running plan. Cancellation takes
+///   effect between operations, never mid item (C17); the state remains
+///   executing until the executor's report arrives, then moves to result,
+///   whose summary is the partial result screen.
+/// - `acknowledgeResult`: result or cleanSweep to idle.
+///
+/// Scanning:
+/// - `startScan` reads current settings from the store, current degraded
+///   state from the provider, mints one scan context through the session
+///   provider and consumes the engine's stream. One session at a time, by
+///   the transition table.
+/// - `degradedNotices` is replaced at each `startScan` with the provider's
+///   `unavailable` sentences, and every distinct ScanEvent.degraded
+///   sentence appends in arrival order. It never contains duplicates or
+///   empty strings, and is empty exactly when nothing was skipped. This is
+///   the honest banner's content (C32, DESIGN.md permission states).
+///
+/// Review and selection:
+/// - On entering reviewing, exactly the findings with `isPreselected` true
+///   are selected. Risky findings are never preselected by the engine
+///   (C20), and this model additionally never defaults a finding whose
+///   risk is not `.safe` to selected, whatever the finding claims. Defence
+///   in depth, same shape as the engine's own conjunction rule.
+/// - `permanentDeletionScope()` returns, while reviewing, the exact file
+///   count and byte total of the operations the current selection would
+///   plan as `deletePermanently` under the current deletion mode: every
+///   selected finding when the mode is permanent, and trash bin findings
+///   always, whatever the mode (C20: trash bin contents always plan
+///   permanent). Nil when reviewing with no permanent operations, and nil
+///   in every other state. The view uses it to put the exact counts in
+///   the confirmation it shows (C6).
+///
+/// Execution:
+/// - `executeSelection` builds the plan through the engine's `plan` method
+///   with a plan context for the review session and the store's current
+///   settings, so the deletion mode is honoured at the moment of the
+///   command (C15, C12). The model attaches the caller's confirmation to
+///   the plan; it never constructs one itself, because the confirmation is
+///   evidence the user saw the counts (C6).
+/// - When `permanentDeletionScope()` is non nil, a nil confirmation
+///   returns `permanentDeletionUnconfirmed` and a confirmation whose
+///   counts differ from the scope returns `confirmationMismatch`. Both
+///   refuse before the engine or executor is touched.
+/// - A `plan` throw leaves the state reviewing and sets `failureNotice`
+///   to a plain sentence.
+/// - The executor's stream drives executing; its terminal report (C17
+///   guarantees exactly one, whatever happened) moves to result with the
+///   summary derived from it. An ExecutionRefusal surfaces as a failure
+///   sentence in the summary, never a crash and never a silent drop.
+///
+/// The figure the hub card shows:
+/// - `hubEstimateBytes` is zero before the first scan and in cleanSweep;
+///   the monotonic `bytesReclaimable` counter while scanning; exactly
+///   `selectedByteTotal` while reviewing (it moves with every toggle); the
+///   ticking `bytesReclaimed` while executing; and the report's reclaimed
+///   total in result and after `acknowledgeResult`, until the next scan
+///   revises it. Within any one scan or execution it never decreases.
+///
+/// Purity and isolation:
+/// - The model holds only its five injected protocols. It never touches
+///   the file system, which the wiring makes structural: nothing here
+///   imports or receives FileSystemReading or FileSystemMutating (C13,
+///   C14); the disk is reachable only through the engine's scan stream and
+///   the executor.
+/// - No clock reads. The model never calls Date(); every date it holds
+///   arrived in an input (the caller's confirmation, the executor's
+///   report).
+/// - `failureNotice` is always a plain sentence, set only by a failed scan
+///   stream or a failed plan build, and cleared by the next `startScan`.
+/// - Construction traps unless `engine.module == .cleanup`.
+@MainActor @Observable
+public final class CleanupModuleModel {
+    public private(set) var state: CleanupModuleState
+    public private(set) var degradedNotices: [String]
+    public private(set) var failureNotice: String?
+    public private(set) var hubEstimateBytes: UInt64
+
+    public init(
+        engine: any GleamEngine,
+        executor: any PlanExecuting,
+        settings: any SettingsStoring,
+        sessions: any CleanupSessionProviding,
+        degraded: any CleanupDegradedStateProviding
+    )
+
+    public func startScan()
+    public func toggleFinding(_ findingID: UUID)
+    public func toggleCategory(_ category: FindingCategory)
+    public func permanentDeletionScope() -> PermanentDeletionScope?
+    @discardableResult
+    public func executeSelection(
+        permanentConfirmation: PermanentDeletionConfirmation?
+    ) -> CleanupCommandRefusal?
+    public func cancelScan()
+    public func cancelExecution()
+    public func acknowledgeResult()
 }
 ```
 

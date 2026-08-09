@@ -42,6 +42,16 @@ let package = Package(
             path: "Tests/CleanupEngineTests"
         ),
         .target(
+            name: "CleanupModule",
+            dependencies: ["GleamCore", "CleanupEngine"],
+            path: "Sources/CleanupModule"
+        ),
+        .testTarget(
+            name: "CleanupModuleTests",
+            dependencies: ["CleanupModule", "CleanupEngine", "GleamCore"],
+            path: "Tests/CleanupModuleTests"
+        ),
+        .target(
             name: "GleamHub",
             dependencies: ["GleamDesign"],
             path: "Sources/GleamHub"
@@ -58,7 +68,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "MacGleam",
-            dependencies: ["GleamHub", "GleamDesign"],
+            dependencies: ["GleamHub", "GleamDesign", "GleamCore", "CleanupEngine", "CleanupModule"],
             path: "Sources/MacGleam"
         )
     ]
