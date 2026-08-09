@@ -1,0 +1,17 @@
+{
+  "project": "macgleam",
+  "codename_note": "MacGleam, chosen 2026-08-09 for search legibility; trademark search before launch still gates the shipping name",
+  "org": "atlantic-blue",
+  "mode": "greenfield",
+  "platform": "macOS only",
+  "stack": {
+    "language": "Swift 6",
+    "ui": "SwiftUI (AppKit interop where SwiftUI falls short)",
+    "min_os": "macOS 14 Sonoma (proposed, to confirm in design)",
+    "privileged_ops": "SMAppService helper + XPC",
+    "distribution": "Developer ID + notarization, direct download (not App Store)",
+    "ci": "GitHub Actions on a macOS runner"
+  },
+  "model_profile": "quality",
+  "created": "2026-08-09"
+}
