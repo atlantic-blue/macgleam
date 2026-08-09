@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint
+        run: swift format lint --recursive Sources Tests --strict
+
+      - name: Test
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tee test-output.log
+
+      - name: Fail on an empty test run
+        run: |
+          count=$(sed -E 's/\x1b\[[0-9;]*m//g' test-output.log | grep -Eo 'Test run with [0-9]+ tests' | grep -Eo '[0-9]+' | tail -1)
+          if [ -z "$count" ] || [ "$count" -eq 0 ]; then
+            echo "No tests executed: refusing to call this green."
+            exit 1
+          fi
+          echo "Executed $count tests."
