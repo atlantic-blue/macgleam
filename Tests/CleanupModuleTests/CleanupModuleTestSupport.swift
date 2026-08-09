@@ -126,6 +126,20 @@ enum ModuleFixture {
     )
   }
 
+  /// One file, 500 bytes, safe and preselected. A third user cache finding, so
+  /// the category group holds the several findings a batched scan leaves it
+  /// with (C15).
+  static func extraCacheFinding(sessionID: UUID = sessionA) -> Finding {
+    finding(
+      id: uuid(0x07),
+      sessionID: sessionID,
+      category: .userCache,
+      paths: ["/Users/test/Library/Caches/com.example.app/bulk/blob.cache"],
+      byteSize: 500,
+      isPreselected: true
+    )
+  }
+
   /// Review risk yet claiming preselection: the hostile input C38's defence
   /// in depth rule exists for.
   static func riskyPreselectedFinding(sessionID: UUID = sessionA) -> Finding {
@@ -169,13 +183,16 @@ enum ModuleFixture {
   }
 }
 
+/// The third argument counts path entries across the findings emitted so far,
+/// never findings (C4, amended in s2e). A script sending one finding of two
+/// paths reports two here.
 func makeCounters(
-  _ filesSeen: UInt64, _ bytesReclaimable: UInt64, _ findingCount: UInt32
+  _ filesSeen: UInt64, _ bytesReclaimable: UInt64, _ itemCount: UInt32
 ) -> ScanCounters {
   var counters = ScanCounters.zero
   counters.filesSeen = filesSeen
   counters.bytesReclaimable = bytesReclaimable
-  counters.findingCount = findingCount
+  counters.itemCount = itemCount
   return counters
 }
 
@@ -680,7 +697,7 @@ func reachReviewing(
   for finding in findings {
     counters.filesSeen += 10
     counters.bytesReclaimable += finding.byteSize
-    counters.findingCount += 1
+    counters.itemCount += UInt32(finding.paths.count)
     feed.send(.finding(finding), .progress(counters))
   }
   counters.filesSeen = max(counters.filesSeen, filesSeen)

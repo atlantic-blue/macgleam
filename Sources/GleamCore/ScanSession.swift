@@ -4,17 +4,23 @@ public enum GleamModule: String, Codable, Sendable, CaseIterable {
   case smartCare, cleanup, protection, performance, applications, clutter, spaceLens
 }
 
+/// The live figures of one scan. `itemCount` counts path entries across the
+/// findings emitted so far, not findings: a streaming scan emits a category as
+/// several findings, so a count of findings would move with the engine's batch
+/// size and mean nothing to the person reading the progress line.
 public struct ScanCounters: Codable, Sendable, Equatable {
   public var filesSeen: UInt64
   public var bytesReclaimable: UInt64
-  public var findingCount: UInt32
+  /// Path entries across the findings emitted so far. Rises by a finding's
+  /// entry count in the same step that emits that finding.
+  public var itemCount: UInt32
 
-  public static let zero = ScanCounters(filesSeen: 0, bytesReclaimable: 0, findingCount: 0)
+  public static let zero = ScanCounters(filesSeen: 0, bytesReclaimable: 0, itemCount: 0)
 
-  public init(filesSeen: UInt64, bytesReclaimable: UInt64, findingCount: UInt32) {
+  public init(filesSeen: UInt64, bytesReclaimable: UInt64, itemCount: UInt32) {
     self.filesSeen = filesSeen
     self.bytesReclaimable = bytesReclaimable
-    self.findingCount = findingCount
+    self.itemCount = itemCount
   }
 }
 
@@ -63,7 +69,7 @@ public struct ScanSession: Identifiable, Codable, Sendable, Equatable {
       counters = ScanCounters(
         filesSeen: max(oldValue.filesSeen, counters.filesSeen),
         bytesReclaimable: max(oldValue.bytesReclaimable, counters.bytesReclaimable),
-        findingCount: max(oldValue.findingCount, counters.findingCount)
+        itemCount: max(oldValue.itemCount, counters.itemCount)
       )
     }
   }

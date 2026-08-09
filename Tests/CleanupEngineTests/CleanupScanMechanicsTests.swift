@@ -56,7 +56,7 @@ struct CleanupScanMechanicsTests {
 
     let final = try #require(outcome.counters.last)
     #expect(final.bytesReclaimable == outcome.reclaimableByteTotal)
-    #expect(final.findingCount == UInt32(outcome.findings.count))
+    #expect(final.itemCount == UInt32(outcome.entryCount))
     #expect(final.filesSeen >= UInt64(outcome.itemisedPaths.count))
   }
 

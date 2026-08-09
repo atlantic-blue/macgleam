@@ -118,14 +118,30 @@ extension SpaceLensEngine {
       guard case .record(let record) = event else { continue }
       walk.absorb(record)
     }
+    walk.finish()
   }
 
   fileprivate struct MapWalk {
+    /// Every file grows the total of every directory above it, so revising
+    /// on each one costs an event per ancestor per file. Revisions are
+    /// accumulated and flushed every this many records instead: totals still
+    /// only grow, still converge, and the map redraws in batches rather than
+    /// once per byte counted.
+    private static let flushInterval = 4_096
+
+    /// What is known about one path: the running allocated total of its
+    /// subtree, and the total the stream has already reported for it.
+    private struct Subtree {
+      var total: UInt64
+      var streamed: UInt64
+    }
+
     private let volume: AbsolutePath
     private let denylist: Denylist
     private let yield: @Sendable (SpaceLensUpdate) -> Void
-    private var totals: [AbsolutePath: UInt64] = [:]
-    private var emitted: Set<AbsolutePath> = []
+    private var subtrees: [AbsolutePath: Subtree] = [:]
+    private var pending: Set<AbsolutePath> = []
+    private var absorbedSinceFlush = 0
 
     init(
       volume: AbsolutePath,
@@ -138,79 +154,82 @@ extension SpaceLensEngine {
     }
 
     mutating func emitRoot(_ record: FileRecord) {
-      totals[volume] = record.allocatedBytes
-      emitted.insert(volume)
-      yield(
-        .node(
-          SpaceLensNode(
-            path: volume,
-            parent: nil,
-            isDirectory: record.isDirectory,
-            subtreeBytes: record.allocatedBytes,
-            isSelectable: !denylist.blocks(volume))))
+      emit(
+        SpaceLensNode(
+          path: volume,
+          parent: nil,
+          isDirectory: record.isDirectory,
+          subtreeBytes: record.allocatedBytes,
+          isSelectable: !denylist.blocks(volume)))
     }
 
     mutating func absorb(_ record: FileRecord) {
-      guard record.path.isDescendant(of: volume) else { return }
-      emitMissingAncestors(of: record.path)
-      if emitted.insert(record.path).inserted {
-        totals[record.path] = record.allocatedBytes
-        yield(
-          .node(
-            SpaceLensNode(
-              path: record.path,
-              parent: parentPath(of: record.path),
-              isDirectory: record.isDirectory,
-              subtreeBytes: record.allocatedBytes,
-              isSelectable: !denylist.blocks(record.path))))
+      let ancestors = record.path.ancestors(downTo: volume)
+      guard !ancestors.isEmpty else { return }
+      emitMissingAncestors(ancestors)
+      if subtrees[record.path] == nil {
+        emit(
+          SpaceLensNode(
+            path: record.path,
+            parent: ancestors.first,
+            isDirectory: record.isDirectory,
+            subtreeBytes: record.allocatedBytes,
+            isSelectable: !denylist.blocks(record.path)))
       } else if record.allocatedBytes > 0 {
         grow(record.path, by: record.allocatedBytes)
       }
-      guard record.allocatedBytes > 0 else { return }
-      var ancestor = parentPath(of: record.path)
-      while let current = ancestor {
-        grow(current, by: record.allocatedBytes)
-        guard current != volume else { break }
-        ancestor = parentPath(of: current)
+      if record.allocatedBytes > 0 {
+        for ancestor in ancestors {
+          grow(ancestor, by: record.allocatedBytes)
+        }
       }
+      absorbedSinceFlush += 1
+      if absorbedSinceFlush >= Self.flushInterval { flush() }
+    }
+
+    /// Reports every total that grew since it was last reported, so the
+    /// stream ends on the true allocated subtree totals.
+    mutating func finish() {
+      flush()
     }
 
     /// Synthesises any directory between the volume root and the record that
     /// has not streamed yet, top down, so a child never precedes its parent.
-    private mutating func emitMissingAncestors(of path: AbsolutePath) {
-      var chain: [AbsolutePath] = []
-      var ancestor = parentPath(of: path)
-      while let current = ancestor, current != volume {
-        chain.append(current)
-        ancestor = parentPath(of: current)
+    /// The chain arrives nearest first, so it is walked in reverse.
+    private mutating func emitMissingAncestors(_ ancestors: [AbsolutePath]) {
+      for index in ancestors.indices.reversed() where subtrees[ancestors[index]] == nil {
+        emit(
+          SpaceLensNode(
+            path: ancestors[index],
+            parent: index + 1 < ancestors.count ? ancestors[index + 1] : nil,
+            isDirectory: true,
+            subtreeBytes: 0,
+            isSelectable: !denylist.blocks(ancestors[index])))
       }
-      for directory in chain.reversed() where !emitted.contains(directory) {
-        emitted.insert(directory)
-        totals[directory] = totals[directory] ?? 0
-        yield(
-          .node(
-            SpaceLensNode(
-              path: directory,
-              parent: parentPath(of: directory),
-              isDirectory: true,
-              subtreeBytes: totals[directory] ?? 0,
-              isSelectable: !denylist.blocks(directory))))
-      }
+    }
+
+    private mutating func emit(_ node: SpaceLensNode) {
+      subtrees[node.path] = Subtree(total: node.subtreeBytes, streamed: node.subtreeBytes)
+      pending.remove(node.path)
+      yield(.node(node))
     }
 
     private mutating func grow(_ path: AbsolutePath, by bytes: UInt64) {
-      let next = (totals[path] ?? 0) + bytes
-      totals[path] = next
-      yield(.sizeRevision(path: path, subtreeBytes: next))
+      subtrees[path, default: Subtree(total: 0, streamed: 0)].total += bytes
+      pending.insert(path)
     }
 
-    /// The containing directory, computed on the normalised value because
-    /// the walk never leaves the volume. Nil at the file system root.
-    private func parentPath(of path: AbsolutePath) -> AbsolutePath? {
-      guard path.value != "/" else { return nil }
-      let components = path.value.split(separator: "/").dropLast()
-      guard !components.isEmpty else { return AbsolutePath(normalising: "/") }
-      return AbsolutePath(normalising: "/" + components.joined(separator: "/"))
+    /// Nearest the root first, so a parent's revision never trails its
+    /// child's within a batch.
+    private mutating func flush() {
+      absorbedSinceFlush = 0
+      guard !pending.isEmpty else { return }
+      for path in pending.sorted() {
+        guard let subtree = subtrees[path], subtree.total > subtree.streamed else { continue }
+        subtrees[path]?.streamed = subtree.total
+        yield(.sizeRevision(path: path, subtreeBytes: subtree.total))
+      }
+      pending.removeAll(keepingCapacity: true)
     }
   }
 }

@@ -33,7 +33,7 @@ struct DuplicatesSessionMechanicsTests {
     for snapshot in outcome.counters {
       #expect(snapshot.filesSeen >= previous.filesSeen)
       #expect(snapshot.bytesReclaimable >= previous.bytesReclaimable)
-      #expect(snapshot.findingCount >= previous.findingCount)
+      #expect(snapshot.itemCount >= previous.itemCount)
       previous = snapshot
     }
   }

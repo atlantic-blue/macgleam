@@ -33,7 +33,16 @@ public struct CleanupScanProgress: Sendable, Equatable {
   }
 }
 
-/// One category group in review, in the order its first finding streamed.
+/// One category group in review: every finding of one category, in the order
+/// they streamed. The group, not the finding, is what the review screen shows
+/// as a category, which is what makes a streaming scan invisible to the person
+/// reading the list. A category appears exactly once, so the group is
+/// Identifiable by its category.
+///
+/// `byteTotal` and `pathCount` are the category's own figures, summed across
+/// its findings. They exist because after batching no single finding carries
+/// them, and a consumer deriving them separately is exactly the drift this
+/// model exists to prevent.
 public struct CleanupReviewCategory: Sendable, Equatable, Identifiable {
   public let category: FindingCategory
   public let findings: [Finding]
@@ -42,6 +51,14 @@ public struct CleanupReviewCategory: Sendable, Equatable, Identifiable {
   public init(category: FindingCategory, findings: [Finding]) {
     self.category = category
     self.findings = findings
+  }
+
+  public var byteTotal: UInt64 {
+    findings.reduce(0) { $0 + $1.byteSize }
+  }
+
+  public var pathCount: UInt32 {
+    UInt32(findings.reduce(0) { $0 + $1.paths.count })
   }
 }
 

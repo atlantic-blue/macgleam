@@ -14,10 +14,10 @@ struct CleanupModuleCancellationTests {
     feed.send(
       .phase(.indeterminate),
       .finding(ModuleFixture.cacheFinding()),
-      .progress(makeCounters(10, 1_000, 1))
+      .progress(makeCounters(10, 1_000, 2))
     )
-    await expectEventually("the model is scanning with a finding") {
-      scanProgress(harness.model)?.counters.findingCount == 1
+    await expectEventually("the model is scanning with the finding's two entries") {
+      scanProgress(harness.model)?.counters.itemCount == 2
     }
 
     harness.model.cancelScan()
@@ -41,7 +41,7 @@ struct CleanupModuleCancellationTests {
 
     feed.send(
       .finding(ModuleFixture.cacheFinding()),
-      .progress(makeCounters(50, 9_000, 2)),
+      .progress(makeCounters(50, 9_000, 3)),
       .phase(.settling)
     )
     feed.finish()

@@ -9,7 +9,7 @@ struct ScanCountersTests {
   func zeroHasEveryCounterAtZero() {
     #expect(ScanCounters.zero.filesSeen == 0)
     #expect(ScanCounters.zero.bytesReclaimable == 0)
-    #expect(ScanCounters.zero.findingCount == 0)
+    #expect(ScanCounters.zero.itemCount == 0)
   }
 
   @Test("round trips losslessly at the extremes")
@@ -19,7 +19,7 @@ struct ScanCountersTests {
       makeScanCounters(
         filesSeen: UInt64.max,
         bytesReclaimable: UInt64.max,
-        findingCount: UInt32.max
+        itemCount: UInt32.max
       )
     )
   }
@@ -31,46 +31,46 @@ struct ScanSessionCounterMonotonicityTests {
   @Test("increasing counters apply to a running session")
   func increasingCountersApply() {
     var session = makeScanSession(counters: ScanCounters.zero)
-    let increased = makeScanCounters(filesSeen: 10, bytesReclaimable: 2048, findingCount: 3)
+    let increased = makeScanCounters(filesSeen: 10, bytesReclaimable: 2048, itemCount: 3)
     session.counters = increased
     #expect(session.counters == increased)
   }
 
   @Test("counters never decrease when a wholly lower update arrives")
   func countersNeverDecreaseOnLowerUpdate() {
-    let before = makeScanCounters(filesSeen: 100, bytesReclaimable: 4096, findingCount: 5)
+    let before = makeScanCounters(filesSeen: 100, bytesReclaimable: 4096, itemCount: 5)
     var session = makeScanSession(counters: before)
-    session.counters = makeScanCounters(filesSeen: 10, bytesReclaimable: 512, findingCount: 1)
+    session.counters = makeScanCounters(filesSeen: 10, bytesReclaimable: 512, itemCount: 1)
     #expect(session.counters.filesSeen >= before.filesSeen)
     #expect(session.counters.bytesReclaimable >= before.bytesReclaimable)
-    #expect(session.counters.findingCount >= before.findingCount)
+    #expect(session.counters.itemCount >= before.itemCount)
   }
 
   @Test("no counter decreases under a mixed update")
   func noCounterDecreasesUnderMixedUpdate() {
-    let before = makeScanCounters(filesSeen: 100, bytesReclaimable: 4096, findingCount: 5)
+    let before = makeScanCounters(filesSeen: 100, bytesReclaimable: 4096, itemCount: 5)
     var session = makeScanSession(counters: before)
-    session.counters = makeScanCounters(filesSeen: 50, bytesReclaimable: 8192, findingCount: 2)
+    session.counters = makeScanCounters(filesSeen: 50, bytesReclaimable: 8192, itemCount: 2)
     #expect(session.counters.filesSeen >= before.filesSeen)
     #expect(session.counters.bytesReclaimable >= before.bytesReclaimable)
-    #expect(session.counters.findingCount >= before.findingCount)
+    #expect(session.counters.itemCount >= before.itemCount)
   }
 
   @Test("no counter decreases across a sequence of updates")
   func noCounterDecreasesAcrossSequence() {
     var session = makeScanSession(counters: ScanCounters.zero)
     let updates: [ScanCounters] = [
-      makeScanCounters(filesSeen: 5, bytesReclaimable: 100, findingCount: 1),
-      makeScanCounters(filesSeen: 3, bytesReclaimable: 900, findingCount: 0),
-      makeScanCounters(filesSeen: 40, bytesReclaimable: 400, findingCount: 9),
-      makeScanCounters(filesSeen: 40, bytesReclaimable: 400, findingCount: 9),
+      makeScanCounters(filesSeen: 5, bytesReclaimable: 100, itemCount: 1),
+      makeScanCounters(filesSeen: 3, bytesReclaimable: 900, itemCount: 0),
+      makeScanCounters(filesSeen: 40, bytesReclaimable: 400, itemCount: 9),
+      makeScanCounters(filesSeen: 40, bytesReclaimable: 400, itemCount: 9),
     ]
     for update in updates {
       let before = session.counters
       session.counters = update
       #expect(session.counters.filesSeen >= before.filesSeen)
       #expect(session.counters.bytesReclaimable >= before.bytesReclaimable)
-      #expect(session.counters.findingCount >= before.findingCount)
+      #expect(session.counters.itemCount >= before.itemCount)
     }
   }
 }

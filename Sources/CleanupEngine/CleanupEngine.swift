@@ -56,17 +56,33 @@ extension CleanupEngine {
     for sentence in partition.unavailable {
       yield(.degraded(unavailable: sentence))
     }
-    var counters = ScanCounters.zero
-    let files = try await collectFileRecords(context, counters: &counters, yield: yield)
-    yield(.phase(.determinate(estimatedTotalFiles: counters.filesSeen)))
-    for finding in buildFindings(rules: partition.active, files: files, context: context) {
-      try Task.checkCancellation()
-      counters.findingCount += 1
-      counters.bytesReclaimable += finding.byteSize
-      yield(.finding(finding))
-      yield(.progress(counters))
-    }
+    var batches = FindingBatches(rules: partition.active, sessionID: context.sessionID)
+    try await walk(context, batches: &batches, yield: yield)
+    yield(.phase(.determinate(estimatedTotalFiles: batches.filesSeen)))
+    batches.flushRemaining(yield: yield)
     yield(.phase(.settling))
+  }
+
+  /// One pass over the tree, testing every rule against each record as it
+  /// arrives. Nothing proportional to files seen is retained: a matched record
+  /// lands in its rule's open batch and the batch leaves as a finding the
+  /// moment it fills, so live memory is the open batches and nothing else.
+  private static func walk(
+    _ context: ScanContext,
+    batches: inout FindingBatches,
+    yield: (ScanEvent) -> Void
+  ) async throws {
+    let options = EnumerationOptions(
+      includesHiddenFiles: true,
+      descendsIntoPackages: true,
+      skipSubtrees: [])
+    let root = AbsolutePath(normalising: "/")
+    for try await event in context.fileSystem.enumerate(root: root, options: options) {
+      try Task.checkCancellation()
+      guard case .record(let record) = event, !record.isDirectory else { continue }
+      batches.match(record, denylist: context.rules.denylist, yield: yield)
+      batches.countFile(yield: yield)
+    }
   }
 
   private struct RulePartition {
@@ -93,77 +109,14 @@ extension CleanupEngine {
     return RulePartition(active: active, unavailable: unavailable)
   }
 
-  private static func collectFileRecords(
-    _ context: ScanContext,
-    counters: inout ScanCounters,
-    yield: (ScanEvent) -> Void
-  ) async throws -> [FileRecord] {
-    let options = EnumerationOptions(
-      includesHiddenFiles: true,
-      descendsIntoPackages: true,
-      skipSubtrees: [])
-    var files: [FileRecord] = []
-    let root = AbsolutePath(normalising: "/")
-    for try await event in context.fileSystem.enumerate(root: root, options: options) {
-      try Task.checkCancellation()
-      guard case .record(let record) = event, !record.isDirectory else { continue }
-      files.append(record)
-      counters.filesSeen += 1
-      yield(.progress(counters))
-    }
-    return files
-  }
-
-  private static func buildFindings(
-    rules: [CleanupRule],
-    files: [FileRecord],
-    context: ScanContext
-  ) -> [Finding] {
-    var findings: [Finding] = []
-    for rule in rules {
-      let matched =
-        files
-        .filter { !context.rules.denylist.blocks($0.path) && matches(rule: rule, path: $0.path) }
-        .sorted { $0.path < $1.path }
-      guard !matched.isEmpty else { continue }
-      if isTrashBinCategory(rule.category) {
-        findings.append(
-          contentsOf: trashBinFindings(rule: rule, records: matched, sessionID: context.sessionID))
-      } else {
-        findings.append(
-          makeFinding(
-            FindingSeed(
-              sessionID: context.sessionID, rule: rule, category: rule.category, records: matched)))
-      }
-    }
-    return findings
-  }
-
-  /// One finding per volume, so the review shows where each bin lives.
-  private static func trashBinFindings(
-    rule: CleanupRule,
-    records: [FileRecord],
-    sessionID: UUID
-  ) -> [Finding] {
-    let byVolume = Dictionary(grouping: records) { volume(containing: $0.path) }
-    return byVolume.keys.sorted().map { volume in
-      makeFinding(
-        FindingSeed(
-          sessionID: sessionID,
-          rule: rule,
-          category: .trashBin(volume: volume),
-          records: byVolume[volume] ?? []))
-    }
-  }
-
-  private struct FindingSeed {
+  fileprivate struct FindingSeed {
     let sessionID: UUID
     let rule: CleanupRule
     let category: FindingCategory
     let records: [FileRecord]
   }
 
-  private static func makeFinding(_ seed: FindingSeed) -> Finding {
+  fileprivate static func makeFinding(_ seed: FindingSeed) -> Finding {
     Finding(
       id: UUID(),
       sessionID: seed.sessionID,
@@ -191,25 +144,13 @@ extension CleanupEngine {
   /// A file matches a rule when the file's path, or any ancestor directory of
   /// it, matches one of the rule's patterns. A rule naming a directory
   /// therefore itemises the files beneath it, never the directory.
-  private static func matches(rule: CleanupRule, path: AbsolutePath) -> Bool {
-    ancestorsIncludingSelf(of: path).contains { candidate in
-      rule.pathPatterns.contains { $0.matches(candidate) }
-    }
-  }
-
-  private static func ancestorsIncludingSelf(of path: AbsolutePath) -> [AbsolutePath] {
-    var components = path.value.split(separator: "/").map(String.init)
-    var result = [path]
-    while !components.isEmpty {
-      components.removeLast()
-      result.append(AbsolutePath(normalising: "/" + components.joined(separator: "/")))
-    }
-    return result
+  fileprivate static func matches(rule: CleanupRule, pathComponents: [String]) -> Bool {
+    rule.pathPatterns.contains { $0.matchesPathOrAncestor(of: pathComponents) }
   }
 
   /// The volume a trash bin lives on: /Volumes/Name for an external bin,
   /// the root volume for everything else.
-  private static func volume(containing path: AbsolutePath) -> AbsolutePath {
+  fileprivate static func volume(containing path: AbsolutePath) -> AbsolutePath {
     let components = path.value.split(separator: "/").map(String.init)
     guard components.count >= 2, components[0] == "Volumes" else {
       return AbsolutePath(normalising: "/")
@@ -236,9 +177,130 @@ extension CleanupEngine {
     category == .mailAttachmentLocalCopy
   }
 
-  private static func isTrashBinCategory(_ category: FindingCategory) -> Bool {
+  fileprivate static func isTrashBinCategory(_ category: FindingCategory) -> Bool {
     if case .trashBin = category { return true }
     return false
+  }
+}
+
+// MARK: - Batching
+
+/// The open batches of one Cleanup scan, one per rule and category, plus the
+/// scan's counters. A batch leaves as a finding when it reaches the entry cap,
+/// when the walk ends, or, for a rule that has emitted nothing yet, at the
+/// first file checkpoint at or after its first match, so a sparse category
+/// streams a row early instead of waiting for the end of the walk. Every
+/// trigger is a count of files or entries, so where the boundaries fall does
+/// not move with how fast the disk answers.
+private struct FindingBatches {
+  private struct BinKey: Hashable {
+    let ruleIndex: Int
+    let volume: AbsolutePath
+  }
+
+  /// One rule and category's open records. Batches live in an array in order
+  /// of first match. Every rule but a trash bin rule has exactly one category,
+  /// so its batch is reached by rule index alone and a matched file costs an
+  /// array append and nothing else; only a bin, whose category carries its
+  /// volume, needs a lookup by volume.
+  private struct Batch {
+    let ruleIndex: Int
+    let category: FindingCategory
+    var records: [FileRecord] = []
+    var hasEmitted = false
+  }
+
+  private let rules: [CleanupRule]
+  private let sessionID: UUID
+  private var batches: [Batch] = []
+  private var slotOfRule: [Int?]
+  private var slotOfBin: [BinKey: Int] = [:]
+  private var counters = ScanCounters.zero
+
+  var filesSeen: UInt64 { counters.filesSeen }
+
+  init(rules: [CleanupRule], sessionID: UUID) {
+    self.rules = rules
+    self.sessionID = sessionID
+    self.slotOfRule = Array(repeating: nil, count: rules.count)
+  }
+
+  /// Files a record into the batch of every rule it matches. The path is split
+  /// into components once and both the rule patterns and the denylist read
+  /// those components, so the cost per file is a handful of string comparisons
+  /// rather than a rebuilt ancestor chain per rule.
+  mutating func match(_ record: FileRecord, denylist: Denylist, yield: (ScanEvent) -> Void) {
+    let components = record.path.components
+    var isBlocked: Bool?
+    for index in rules.indices
+    where CleanupEngine.matches(rule: rules[index], pathComponents: components) {
+      if isBlocked == nil { isBlocked = denylist.blocks(pathComponents: components) }
+      guard isBlocked == false else { return }
+      let slot = slot(forRule: index, at: record.path)
+      batches[slot].records.append(record)
+      guard batches[slot].records.count >= ScanStreamPolicy.maximumFindingEntries else { continue }
+      flush(slot, yield: yield)
+    }
+  }
+
+  /// Counts the file and, at each checkpoint boundary, streams the first batch
+  /// of every rule that has emitted nothing yet, however few entries it holds.
+  mutating func countFile(yield: (ScanEvent) -> Void) {
+    counters.filesSeen += 1
+    yield(.progress(counters))
+    guard counters.filesSeen.isMultiple(of: ScanStreamPolicy.firstFindingCheckpointFiles) else {
+      return
+    }
+    for slot in batches.indices where !batches[slot].hasEmitted {
+      flush(slot, yield: yield)
+    }
+  }
+
+  mutating func flushRemaining(yield: (ScanEvent) -> Void) {
+    for slot in batches.indices {
+      flush(slot, yield: yield)
+    }
+  }
+
+  /// The batch a matched file belongs to. A trash bin's volume is part of its
+  /// category, so a bin gets one batch series per volume and every batch of it
+  /// carries its own volume however many batches the bin takes.
+  private mutating func slot(forRule index: Int, at path: AbsolutePath) -> Int {
+    guard CleanupEngine.isTrashBinCategory(rules[index].category) else {
+      if let existing = slotOfRule[index] { return existing }
+      let slot = openBatch(ruleIndex: index, category: rules[index].category)
+      slotOfRule[index] = slot
+      return slot
+    }
+    let key = BinKey(ruleIndex: index, volume: CleanupEngine.volume(containing: path))
+    if let existing = slotOfBin[key] { return existing }
+    let slot = openBatch(ruleIndex: index, category: .trashBin(volume: key.volume))
+    slotOfBin[key] = slot
+    return slot
+  }
+
+  private mutating func openBatch(ruleIndex: Int, category: FindingCategory) -> Int {
+    batches.append(Batch(ruleIndex: ruleIndex, category: category))
+    return batches.count - 1
+  }
+
+  /// Emits one batch as a finding, entries sorted by path, and adds its
+  /// entries and bytes to the counters in the same step.
+  private mutating func flush(_ slot: Int, yield: (ScanEvent) -> Void) {
+    guard !batches[slot].records.isEmpty else { return }
+    let records = batches[slot].records
+    batches[slot].records = []
+    batches[slot].hasEmitted = true
+    let finding = CleanupEngine.makeFinding(
+      CleanupEngine.FindingSeed(
+        sessionID: sessionID,
+        rule: rules[batches[slot].ruleIndex],
+        category: batches[slot].category,
+        records: records.sorted { $0.path < $1.path }))
+    counters.itemCount += UInt32(finding.entries.count)
+    counters.bytesReclaimable += finding.byteSize
+    yield(.finding(finding))
+    yield(.progress(counters))
   }
 }
 
