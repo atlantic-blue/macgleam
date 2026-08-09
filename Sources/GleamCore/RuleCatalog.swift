@@ -129,4 +129,52 @@ public struct RuleCatalog: Codable, Sendable, Equatable {
     self.adwareRules = adwareRules
     self.denylist = denylist
   }
+
+  /// Decodes a catalogue from its manifest bytes. Throws
+  /// `RuleCatalogError.malformedCatalog` for anything that is not a
+  /// well formed manifest; a malformed manifest is never partially read.
+  public init(manifestData: Data) throws {
+    let decoder = JSONDecoder()
+    do {
+      self = try decoder.decode(RuleCatalog.self, from: manifestData)
+    } catch {
+      throw RuleCatalogError.malformedCatalog(
+        description: "The manifest bytes do not decode as a rule catalogue."
+      )
+    }
+  }
+
+  /// The complete manifest bytes for this catalogue, including the
+  /// signature. `init(manifestData:)` of these bytes returns an equal
+  /// catalogue.
+  public func manifestData() throws -> Data {
+    try Self.canonicalEncoder().encode(self)
+  }
+
+  /// The canonical bytes the Ed25519 signature covers: every field of the
+  /// catalogue except the signature itself, in a deterministic encoding.
+  /// Equal catalogue content always produces identical bytes.
+  public func canonicalContentEncoding() throws -> Data {
+    let content = RuleCatalogContent(
+      version: version,
+      cleanupRules: cleanupRules,
+      adwareRules: adwareRules,
+      denylist: denylist
+    )
+    return try Self.canonicalEncoder().encode(content)
+  }
+
+  private static func canonicalEncoder() -> JSONEncoder {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    return encoder
+  }
+}
+
+/// The signed portion of a catalogue: everything except the signature.
+private struct RuleCatalogContent: Codable {
+  let version: RuleCatalogVersion
+  let cleanupRules: [CleanupRule]
+  let adwareRules: [AdwareRule]
+  let denylist: Denylist
 }
