@@ -10,7 +10,9 @@ import SwiftUI
 struct HubView: View {
   let model: HubModel
   let cleanup: CleanupDependencies
+  let spaceLens: SpaceLensDependencies
   @State private var navigation = HubNavigationState.initial
+  @State private var isSpaceLensOpen = false
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Namespace private var zoomNamespace
@@ -23,10 +25,18 @@ struct HubView: View {
   var body: some View {
     ZStack {
       hubScene
-        .scaleEffect(openModule == nil ? 1 : Self.backgroundScaleWhileOpen)
-        .blur(radius: openModule == nil ? 0 : Self.backgroundBlurWhileOpen)
+        .scaleEffect(isChromeOrModuleOpen ? Self.backgroundScaleWhileOpen : 1)
+        .blur(radius: isChromeOrModuleOpen ? Self.backgroundBlurWhileOpen : 0)
       if let module = openModule {
         openModuleView(module)
+      }
+      if isSpaceLensOpen {
+        spaceLensSurface
+      }
+    }
+    .overlay(alignment: .topTrailing) {
+      if !isSpaceLensOpen && openModule == nil {
+        spaceLensControl
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -119,6 +129,56 @@ struct HubView: View {
     return nil
   }
 
+  private var isChromeOrModuleOpen: Bool {
+    openModule != nil || isSpaceLensOpen
+  }
+
+  /// Space Lens lives outside the six cards, as hub chrome: a corner
+  /// control that zooms the map surface over the hub with the same zoom
+  /// language the cards use.
+  private var spaceLensControl: some View {
+    Button {
+      withAnimation(zoomAnimation(for: .zoomIn)) {
+        isSpaceLensOpen = true
+      }
+    } label: {
+      HStack(spacing: GleamSpacing.points(1) / 2) {
+        Image(systemName: "circle.grid.2x2")
+        Text("Space Lens")
+      }
+      .font(GleamTypeToken.caption.font)
+      .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
+      .padding(.horizontal, GleamSpacing.points(2))
+      .padding(.vertical, GleamSpacing.points(1))
+      .background(
+        Capsule().fill(GleamColorToken.surface.color(for: colorScheme))
+      )
+    }
+    .buttonStyle(.plain)
+    .padding(GleamSpacing.points(2))
+    .help("The disk map: see where your space went.")
+  }
+
+  @ViewBuilder
+  private var spaceLensSurface: some View {
+    let surface = SpaceLensView(
+      model: spaceLens.model,
+      executor: spaceLens.executor,
+      onClose: { closeSpaceLens() }
+    )
+    if reduceMotion {
+      surface.transition(.opacity)
+    } else {
+      surface.transition(.scale(scale: 0.94).combined(with: .opacity))
+    }
+  }
+
+  private func closeSpaceLens() {
+    withAnimation(zoomAnimation(for: .zoomOut)) {
+      isSpaceLensOpen = false
+    }
+  }
+
   private var focusedModule: HubModule? {
     if case .hub(let focus) = navigation.position { return focus }
     return nil
@@ -134,6 +194,10 @@ struct HubView: View {
   }
 
   private func handle(_ key: HubKeyEvent) -> KeyPress.Result {
+    if isSpaceLensOpen {
+      if key == .escape { closeSpaceLens() }
+      return .handled
+    }
     perform(
       HubNavigationResolver.transition(
         navigation,

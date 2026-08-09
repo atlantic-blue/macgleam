@@ -96,8 +96,7 @@ struct SimilarPhotosKeptPathTests {
       id: UUID(),
       sessionID: victim.sessionID,
       category: victim.category,
-      paths: victim.paths.filter { $0 != keptPath },
-      byteSize: victim.byteSize,
+      entries: victim.entries.filter { $0.path != keptPath },
       risk: victim.risk,
       explanation: victim.explanation,
       isPreselected: victim.isPreselected
@@ -127,8 +126,8 @@ struct SimilarPhotosKeptPathTests {
       id: UUID(),
       sessionID: victim.sessionID,
       category: victim.category,
-      paths: victim.paths.filter { $0 != keptPath } + [foreign],
-      byteSize: victim.byteSize,
+      entries: victim.entries.filter { $0.path != keptPath }
+        + [PathEntry(path: foreign, allocatedBytes: 64)],
       risk: victim.risk,
       explanation: victim.explanation,
       isPreselected: victim.isPreselected
@@ -155,8 +154,7 @@ struct SimilarPhotosKeptPathTests {
       id: UUID(),
       sessionID: victim.sessionID,
       category: victim.category,
-      paths: victim.paths.filter { $0 != keptPath },
-      byteSize: victim.byteSize,
+      entries: victim.entries.filter { $0.path != keptPath },
       risk: victim.risk,
       explanation: victim.explanation,
       isPreselected: victim.isPreselected

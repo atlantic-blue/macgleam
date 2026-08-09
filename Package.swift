@@ -62,6 +62,26 @@ let package = Package(
             path: "Tests/CleanupModuleTests"
         ),
         .target(
+            name: "SpaceLensEngine",
+            dependencies: ["GleamCore"],
+            path: "Sources/SpaceLensEngine"
+        ),
+        .testTarget(
+            name: "SpaceLensEngineTests",
+            dependencies: ["SpaceLensEngine", "GleamCore"],
+            path: "Tests/SpaceLensEngineTests"
+        ),
+        .target(
+            name: "SpaceLensModule",
+            dependencies: ["GleamCore", "SpaceLensEngine", "GleamHub"],
+            path: "Sources/SpaceLensModule"
+        ),
+        .testTarget(
+            name: "SpaceLensModuleTests",
+            dependencies: ["SpaceLensModule", "SpaceLensEngine", "GleamCore", "GleamHub", "GleamDesign"],
+            path: "Tests/SpaceLensModuleTests"
+        ),
+        .target(
             name: "GleamHub",
             dependencies: ["GleamDesign"],
             path: "Sources/GleamHub"
@@ -78,7 +98,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "MacGleam",
-            dependencies: ["GleamHub", "GleamDesign", "GleamCore", "CleanupEngine", "CleanupModule"],
+            dependencies: [
+        "GleamHub", "GleamDesign", "GleamCore", "CleanupEngine", "CleanupModule",
+        "SpaceLensEngine", "SpaceLensModule",
+      ],
             path: "Sources/MacGleam"
         )
     ]

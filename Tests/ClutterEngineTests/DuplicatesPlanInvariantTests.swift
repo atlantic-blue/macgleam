@@ -54,8 +54,7 @@ struct DuplicatesPlanInvariantTests {
       id: UUID(),
       sessionID: sessionID,
       category: .duplicateSet(keptPath: strangerPath),
-      paths: set.paths.filter { $0 != strangerPath },
-      byteSize: set.byteSize,
+      entries: set.entries.filter { $0.path != strangerPath },
       risk: set.risk,
       explanation: set.explanation,
       isPreselected: set.isPreselected
@@ -75,12 +74,12 @@ struct DuplicatesPlanInvariantTests {
     let files = threeCopies()
     let set = try await scannedSet(sessionID: sessionID, files: files)
     let kept = try #require(duplicatesKeptPath(of: set))
+    let keptEntry = try #require(set.entries.first { $0.path == kept })
     let tampered = Finding(
       id: UUID(),
       sessionID: sessionID,
       category: set.category,
-      paths: set.paths + [kept],
-      byteSize: set.byteSize,
+      entries: set.entries + [keptEntry],
       risk: set.risk,
       explanation: set.explanation,
       isPreselected: set.isPreselected

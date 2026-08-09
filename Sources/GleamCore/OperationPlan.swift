@@ -15,6 +15,19 @@ public struct PermanentDeletionConfirmation: Codable, Sendable, Equatable {
   }
 }
 
+/// The exact permanent scope of a selection under the current deletion mode:
+/// what a PermanentDeletionConfirmation must name. Nil scope means no
+/// confirmation is needed.
+public struct PermanentDeletionScope: Sendable, Equatable {
+  public let fileCount: UInt32
+  public let byteTotal: UInt64
+
+  public init(fileCount: UInt32, byteTotal: UInt64) {
+    self.fileCount = fileCount
+    self.byteTotal = byteTotal
+  }
+}
+
 /// An ordered, executable description of destructive work, derived from the
 /// user's reviewed selection. The only input the executor accepts. Plans are
 /// immutable once built; deselecting in the UI builds a new plan.

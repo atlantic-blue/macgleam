@@ -34,7 +34,7 @@ enum CleanupComposition {
 
   /// A baseline that fails to load leaves an empty catalogue: scans find
   /// nothing rather than crash, and the failure is logged for diagnosis.
-  private static func loadRules() -> RuleCatalog {
+  static func loadRules() -> RuleCatalog {
     do {
       return try RuleCatalogBaseline.load()
     } catch {
@@ -50,7 +50,7 @@ enum CleanupComposition {
     }
   }
 
-  private static func settingsDirectory() -> URL {
+  static func settingsDirectory() -> URL {
     let base =
       FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
       ?? FileManager.default.temporaryDirectory

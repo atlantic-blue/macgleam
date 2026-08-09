@@ -58,6 +58,8 @@ enum ModuleFixture {
     denylist: Denylist(patterns: [])
   )
 
+  /// Distributes the byte total over the paths as entries, remainder on the
+  /// first entry, so the derived byteSize is exactly the requested total.
   static func finding(
     id: UUID,
     sessionID: UUID = sessionA,
@@ -67,12 +69,17 @@ enum ModuleFixture {
     risk: RiskLevel = .safe,
     isPreselected: Bool
   ) -> Finding {
-    Finding(
+    let targets = paths.map(path)
+    let count = UInt64(targets.count)
+    let share = count == 0 ? 0 : byteSize / count
+    let remainder = count == 0 ? 0 : byteSize % count
+    return Finding(
       id: id,
       sessionID: sessionID,
       category: category,
-      paths: paths.map(path),
-      byteSize: byteSize,
+      entries: targets.enumerated().map { index, target in
+        PathEntry(path: target, allocatedBytes: index == 0 ? share + remainder : share)
+      },
       risk: risk,
       explanation: "A cleanup finding scripted for the module tests.",
       isPreselected: isPreselected

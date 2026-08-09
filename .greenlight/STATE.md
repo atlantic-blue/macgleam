@@ -2,7 +2,7 @@
 stage:    implement
 updated:  2026-08-09
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     M2 slice s2d, space lens
+next:     M2 slice s2e, performance gates
 blocked:  none
 prs:      atlantic-blue/macgleam#1
           atlantic-blue/macgleam#2
@@ -19,7 +19,8 @@ steps:
   - [x] s1g cleanup module (atlantic-blue/macgleam#10)
   - [x] s2a large and old files (atlantic-blue/macgleam#11)
   - [x] s2b duplicates (atlantic-blue/macgleam#12)
-  - [ ] s2c similar photos (this branch)
+  - [x] s2c similar photos (atlantic-blue/macgleam#13)
+  - [ ] s2d space lens (this branch)
 
   - [ ] M2 to M7 per .greenlight/GRAPH.md
 ```
@@ -88,5 +89,5 @@ Julian judges them on a running app. Open items:
   to plan through a process wide ScannedAllocationCache, because Finding
   carries no per path byte sizes and plan is synchronous without a file
   system. The clean fix is per path sizes on Finding (a C5 contract change),
-  which would also make denylist byte apportioning exact. Architect it
-  before or with s2d, which reuses the same pattern for Space Lens.
+  which would also make denylist byte apportioning exact. RETIRED in s2d:
+  Finding now carries per path entries and the cache is deleted.

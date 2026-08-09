@@ -150,13 +150,11 @@ extension ClutterEngine {
   ) -> Finding {
     let members = group.sorted { $0.path < $1.path }
     let keptPath = members[0].path
-    ScannedAllocationCache.shared.record(members)
     return Finding(
       id: UUID(),
       sessionID: context.sessionID,
       category: .similarPhotoSet(keptPath: keptPath),
-      paths: members.map(\.path),
-      byteSize: members.reduce(0) { $0 + $1.allocatedBytes },
+      entries: members.map { PathEntry(path: $0.path, allocatedBytes: $0.allocatedBytes) },
       risk: .review,
       explanation:
         "These \(members.count) photos look like versions of the same scene. "

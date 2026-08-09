@@ -63,11 +63,14 @@ func makeScanSession(
   )
 }
 
+func makeEntry(_ path: String, allocatedBytes: UInt64) -> PathEntry {
+  PathEntry(path: Fixture.path(path), allocatedBytes: allocatedBytes)
+}
+
 func makeFinding(
   id: UUID = Fixture.findingID,
   category: FindingCategory = .userCache,
-  paths: [AbsolutePath] = [Fixture.path("/Users/test/Library/Caches/example")],
-  byteSize: UInt64 = 1024,
+  entries: [PathEntry] = [makeEntry("/Users/test/Library/Caches/example", allocatedBytes: 1024)],
   risk: RiskLevel = .safe,
   explanation: String = "This cache is safe to remove and the app rebuilds it.",
   isPreselected: Bool = false
@@ -76,8 +79,7 @@ func makeFinding(
     id: id,
     sessionID: Fixture.sessionID,
     category: category,
-    paths: paths,
-    byteSize: byteSize,
+    entries: entries,
     risk: risk,
     explanation: explanation,
     isPreselected: isPreselected
