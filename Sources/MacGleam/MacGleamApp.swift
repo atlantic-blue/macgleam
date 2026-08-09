@@ -1,9 +1,27 @@
+import AppKit
 import GleamDesign
 import GleamHub
 import SwiftUI
 
+/// An executable launched straight from the build directory carries no
+/// bundle identity, so macOS starts it as an accessory: the window is
+/// created but never takes focus and no Dock icon appears, which reads as
+/// the app doing nothing at all. Claiming the regular activation policy at
+/// launch makes a plain `swift run MacGleam` behave like a shipped app.
+final class MacGleamAppDelegate: NSObject, NSApplicationDelegate {
+  func applicationDidFinishLaunching(_ notification: Notification) {
+    NSApplication.shared.setActivationPolicy(.regular)
+    NSApplication.shared.activate(ignoringOtherApps: true)
+  }
+
+  func applicationShouldTerminateAfterLastWindowClosed(_ application: NSApplication) -> Bool {
+    true
+  }
+}
+
 @main
 struct MacGleamApp: App {
+  @NSApplicationDelegateAdaptor(MacGleamAppDelegate.self) private var appDelegate
   @State private var hubModel = HubModel(state: .firstRun(now: Date()))
   @State private var onboardingModel: DiskAccessOnboardingModel
   @State private var cleanup: CleanupDependencies
