@@ -2,7 +2,7 @@
 stage:    implement
 updated:  2026-08-09
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     M2 slice s2a, large and old files
+next:     M2 slice s2b, duplicates
 blocked:  none
 prs:      atlantic-blue/macgleam#1
           atlantic-blue/macgleam#2
@@ -16,7 +16,8 @@ steps:
   - [x] s1d cleanup scan (atlantic-blue/macgleam#7)
   - [x] s1e executor (atlantic-blue/macgleam#8)
   - [x] s1f disk access onboarding (atlantic-blue/macgleam#9)
-  - [ ] s1g cleanup module (this branch)
+  - [x] s1g cleanup module (atlantic-blue/macgleam#10)
+  - [ ] s2a large and old files (this branch)
 
   - [ ] M2 to M7 per .greenlight/GRAPH.md
 ```
