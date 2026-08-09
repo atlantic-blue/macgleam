@@ -44,7 +44,7 @@ func makeEnabledVariants() -> [Set<HubModule>] {
   [
     [],
     Set(HubModule.allCases),
-    [.smartCare, .protection, .myClutter]
+    [.smartCare, .protection, .myClutter],
   ]
 }
 

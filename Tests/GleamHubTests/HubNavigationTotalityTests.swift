@@ -76,9 +76,10 @@ struct HubNavigationTotalityTests {
   ) {
     var state = makeNavigationState(position: .hub(focus: start), slots: makeFullSlots())
     for _ in 0..<3 {
-      state = HubNavigationResolver.transition(
-        state, applying: key, enabledModules: allModulesEnabled
-      ).next
+      state =
+        HubNavigationResolver.transition(
+          state, applying: key, enabledModules: allModulesEnabled
+        ).next
     }
     let fourth = HubNavigationResolver.transition(
       state, applying: key, enabledModules: allModulesEnabled

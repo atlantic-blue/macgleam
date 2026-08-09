@@ -114,12 +114,13 @@ struct HubEnterAndLeaveTests {
       enabledModules: allModulesEnabled
     ).next
     let keysInsideTheModule: [HubKeyEvent] = [
-      .arrowUp, .arrowDown, .arrowLeft, .arrowRight, .return
+      .arrowUp, .arrowDown, .arrowLeft, .arrowRight, .return,
     ]
     for key in keysInsideTheModule {
-      state = HubNavigationResolver.transition(
-        state, applying: key, enabledModules: allModulesEnabled
-      ).next
+      state =
+        HubNavigationResolver.transition(
+          state, applying: key, enabledModules: allModulesEnabled
+        ).next
     }
     let left = HubNavigationResolver.transition(
       state, applying: .escape, enabledModules: allModulesEnabled

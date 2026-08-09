@@ -75,9 +75,10 @@ struct ModuleStateSlotTests {
       position: .hub(focus: module), slots: seeded.moduleStateSlots
     )
     for key in [HubKeyEvent.return, .escape, .return] {
-      state = HubNavigationResolver.transition(
-        state, applying: key, enabledModules: allModulesEnabled
-      ).next
+      state =
+        HubNavigationResolver.transition(
+          state, applying: key, enabledModules: allModulesEnabled
+        ).next
     }
     #expect(state.position == .module(module))
     #expect(state.moduleStateSlots[module]?.payload == payload)
@@ -91,9 +92,10 @@ struct ModuleStateSlotTests {
     let slots = makeFullSlots()
     var state = makeNavigationState(slots: slots)
     for key in makeKeySequence(seed: seed, length: 200, drawnFrom: HubKeyEvent.allCases) {
-      state = HubNavigationResolver.transition(
-        state, applying: key, enabledModules: allModulesEnabled
-      ).next
+      state =
+        HubNavigationResolver.transition(
+          state, applying: key, enabledModules: allModulesEnabled
+        ).next
       #expect(state.moduleStateSlots == slots)
     }
   }
