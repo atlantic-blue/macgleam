@@ -42,6 +42,11 @@ let package = Package(
             path: "Tests/GleamHubTests"
         ),
         .executableTarget(
+            name: "GleamBaselineGenerator",
+            dependencies: ["GleamCore"],
+            path: "Sources/GleamBaselineGenerator"
+        ),
+        .executableTarget(
             name: "MacGleam",
             dependencies: ["GleamHub", "GleamDesign"],
             path: "Sources/MacGleam"
