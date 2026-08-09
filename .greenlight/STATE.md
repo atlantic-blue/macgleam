@@ -2,7 +2,7 @@
 stage:    implement
 updated:  2026-08-09
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     M1 slice s1f, disk access onboarding
+next:     M1 slice s1g, the cleanup module
 blocked:  none
 prs:      atlantic-blue/macgleam#1
           atlantic-blue/macgleam#2
@@ -14,7 +14,8 @@ steps:
   - [x] s1b file system (atlantic-blue/macgleam#5)
   - [x] s1c rules baseline (atlantic-blue/macgleam#6)
   - [x] s1d cleanup scan (atlantic-blue/macgleam#7)
-  - [ ] s1e executor (this branch)
+  - [x] s1e executor (atlantic-blue/macgleam#8)
+  - [ ] s1f disk access onboarding (this branch)
   - [ ] M1 s1a to s1g, the first clean
   - [ ] M2 to M7 per .greenlight/GRAPH.md
 ```
@@ -41,6 +42,16 @@ Julian judges them on a running app. Open items:
   capture; reproduce with swift run MacGleam). Screen capture of the live
   window was not possible: the terminal lacks the Screen Recording
   permission, which only Julian can grant.
+- s1f disk access onboarding: grant Full Disk Access in System Settings and
+  watch the flow advance without touching the app; also flip it off and watch
+  the degraded banner return. Self check done: 386 tests green including the
+  flow model driven by a fake monitor, mutation on the grant advancement
+  watched both ways, app launches with the onboarding card over the hub.
+  Two things only a live run can judge: the probe paths (~/Library/Mail,
+  ~/Library/Safari) behaving on real hardware, and the unofficial System
+  Settings pane URL opening the right pane. Note: macOS commonly kills a
+  process when it is granted Full Disk Access, so the self advancing flow
+  may in practice be a relaunch that lands granted.
 - s0c hub zoom: the zoom is one continuous motion with no crossfade seams
   and no dropped frames on a 60 hertz display; the hexagon reads as a
   hexagon; hover breathing feels alive not busy. Self check done: 101 tests
