@@ -2,7 +2,7 @@
 stage:    implement
 updated:  2026-08-09
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     M1 slice s1e, the executor
+next:     M1 slice s1f, disk access onboarding
 blocked:  none
 prs:      atlantic-blue/macgleam#1
           atlantic-blue/macgleam#2
@@ -13,7 +13,8 @@ steps:
   - [x] s1a domain model (atlantic-blue/macgleam#4)
   - [x] s1b file system (atlantic-blue/macgleam#5)
   - [x] s1c rules baseline (atlantic-blue/macgleam#6)
-  - [ ] s1d cleanup scan (this branch)
+  - [x] s1d cleanup scan (atlantic-blue/macgleam#7)
+  - [ ] s1e executor (this branch)
   - [ ] M1 s1a to s1g, the first clean
   - [ ] M2 to M7 per .greenlight/GRAPH.md
 ```
