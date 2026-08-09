@@ -14,7 +14,7 @@ How to read this file:
 - All code is Swift 6 with strict concurrency. Every crossing type is Sendable.
   Types that cross the process boundary to GleamHelper are additionally Codable
   and Equatable.
-- Contracts are numbered C1 to C35. GRAPH.md maps contracts to slices and
+- Contracts are numbered C1 to C36. GRAPH.md maps contracts to slices and
   carries each slice's verification tier.
 - Nothing here says how. Enumeration strategy, hashing algorithm choice, shader
   code and storage engines are implementation, except where DESIGN.md locked a
@@ -22,7 +22,7 @@ How to read this file:
 
 Package layout, restated from DESIGN.md: GleamDesign (C1, C2), GleamCore
 (C3 to C19), engine packages (C20 to C29), GleamHelperCore (C30, C31), app
-services (C32 to C35).
+services (C32 to C35), hub interface (C36).
 
 ---
 
@@ -1517,6 +1517,166 @@ public protocol SettingsStoring: Sendable {
     func load() async -> Settings
     func save(_ settings: Settings) async throws
     func updates() -> AsyncStream<Settings>
+}
+```
+
+---
+
+## Hub interface
+
+### C36. Hub shell model
+
+```swift
+import Foundation
+import Observation
+import GleamDesign
+
+/// The orb's five moods. The complete set from DESIGN.md, closed from the
+/// start so the appearance mapping below is total. s0b reaches only the two
+/// idle moods through HubModel; scanning, result and cleanSweep become
+/// reachable when Smart Care wires in (s6b), by extending the derivation
+/// inputs, never by adding cases.
+public enum OrbMood: String, CaseIterable, Sendable, Equatable {
+    case idleHealthy
+    case idleAttention
+    case scanning
+    case result
+    case cleanSweep
+}
+
+/// The six hub cards in their fixed hexagonal order. The order of
+/// `allCases` is the layout order and is part of the contract: a test
+/// asserts this exact sequence and the hub never reorders at runtime.
+/// `myClutter` presents the `GleamModule.clutter` engine (C4). Space Lens
+/// and Settings are hub chrome, not cards, and have no case here.
+public enum HubModule: String, CaseIterable, Sendable, Equatable {
+    case smartCare
+    case cleanup
+    case protection
+    case performance
+    case applications
+    case myClutter
+}
+
+/// One module card on the hub.
+///
+/// Guarantees:
+/// - `figure` is the card's live figure line (for example a reclaimable
+///   estimate or a last scan time). Empty is allowed while the module is a
+///   placeholder; it is never filler text.
+/// - `isEnabled` false means the card renders but does not enter its module.
+public struct HubCard: Sendable, Equatable, Identifiable {
+    public var id: HubModule { module }
+    public let module: HubModule
+    public let figure: String
+    public let isEnabled: Bool
+}
+
+/// Everything the hub shell derives its presentation from. A plain value so
+/// tests construct any machine condition directly.
+///
+/// Guarantees:
+/// - `now` is the instant all recency wording is reckoned against. It is
+///   always an input; nothing downstream of this type reads a clock.
+/// - `attentionReason`, when present, is one plain sentence naming the top
+///   issue, suitable for display as the status line.
+public struct HubMachineState: Sendable, Equatable {
+    public let lastScanFinishedAt: Date?
+    public let reclaimableEstimateBytes: UInt64?
+    public let attentionReason: String?
+    public let cardFigures: [HubModule: String]
+    public let enabledModules: Set<HubModule>
+    public let now: Date
+}
+
+/// The hub view model, on the macOS 14 Observation framework. The SwiftUI
+/// hub renders this and adds no state of its own.
+///
+/// Guarantees:
+/// - Mood derivation is deterministic and total over its inputs:
+///   `mood(for:)` returns a value for every HubMachineState and equal
+///   states always give equal moods. In s0b the range is the idle pair:
+///   `idleAttention` exactly when `attentionReason` is present,
+///   `idleHealthy` otherwise.
+/// - Derivation is pure: no timers, no clock reads, no hidden state. `now`
+///   arrives in the input, never from `Date()` inside, so a test can pin
+///   any instant.
+/// - The status line is never empty. With an attention reason it is exactly
+///   that sentence. Otherwise it names the last scan recency (reckoned
+///   against `now`) and the reclaimable estimate; before any scan exists it
+///   is a plain sentence inviting the first scan.
+/// - `cards` always holds exactly six entries, one per HubModule, in
+///   `HubModule.allCases` order, whatever the state says. A module missing
+///   from `cardFigures` gets an empty figure. The card order never changes
+///   at runtime.
+/// - `apply` is the only mutation path, and after it `orbMood`,
+///   `statusLine` and `cards` equal the pure functions of the applied
+///   state.
+/// - The static functions are nonisolated so tests drive them without a
+///   view or a main actor hop.
+@MainActor @Observable
+public final class HubModel {
+    public private(set) var orbMood: OrbMood
+    public private(set) var statusLine: String
+    public private(set) var cards: [HubCard]
+
+    public init(state: HubMachineState)
+    public func apply(_ state: HubMachineState)
+
+    public nonisolated static func mood(for state: HubMachineState) -> OrbMood
+    public nonisolated static func statusLine(for state: HubMachineState) -> String
+    public nonisolated static func cards(for state: HubMachineState) -> [HubCard]
+}
+
+/// The orb's surface tint. Exactly two cases and neither is the dangerous
+/// colour: an alarmed orb is unrepresentable by construction, which is how
+/// the design's "never red, never alarmist" survives every refactor.
+public enum OrbSheen: String, Sendable, Equatable {
+    case iridescent        // healthy
+    case warmedToReview    // attention: the review colour token
+}
+
+/// What the orb does for a mood, as data. Views interpret this; tests
+/// assert on it directly, which is what makes the Reduce Motion guarantee a
+/// unit test rather than a screenshot.
+public enum OrbAppearance: Sendable, Equatable {
+    /// Idle, full motion: breathing scale at `period` with a C2 spring.
+    case breathing(spring: GleamSpring, period: Duration, sheen: OrbSheen)
+    /// Reduce Motion for every mood except scanning: a static gradient
+    /// whose mood changes crossfade with a C2 fade token.
+    case staticGradient(sheen: OrbSheen, moodChangeFade: GleamFade)
+    /// Scanning, full motion: the shimmer band orbits the orb.
+    case shimmerBand
+    /// Scanning under Reduce Motion: a determinate progress ring.
+    case determinateRing
+    /// Result, full motion: one pulse with the given spring.
+    case resultPulse(spring: GleamSpring)
+    /// Clean sweep, full motion: the calm lustre bloom.
+    case lustreBloom
+}
+
+/// Pure mapping from mood and Reduce Motion flag to appearance.
+///
+/// Guarantees:
+/// - Total: every (mood, reduceMotion) pair returns an appearance. All ten
+///   combinations are asserted in one table test.
+/// - With reduceMotion false: idleHealthy is breathing with a period of
+///   exactly 6 seconds and the iridescent sheen; idleAttention is breathing
+///   with a strictly shorter period and the warmedToReview sheen (the
+///   breathing quickens, the sheen warms, nothing turns dangerous);
+///   scanning is shimmerBand; result is resultPulse with the lively spring
+///   (the hub shell's only lively use); cleanSweep is lustreBloom.
+/// - With reduceMotion true the result never contains a spring: scanning
+///   is determinateRing, every other mood is staticGradient with the
+///   standard fade. There is no input for which reduceMotion true yields
+///   breathing or resultPulse.
+/// - Every animation named in a returned appearance is a C2 token. No raw
+///   curve or duration appears anywhere in this mapping.
+public enum OrbAppearanceResolver {
+    public static func appearance(
+        for mood: OrbMood,
+        reduceMotion: Bool
+    ) -> OrbAppearance { fatalError("contract") }
 }
 ```
 
