@@ -2,8 +2,8 @@ import CryptoKit
 import Foundation
 import GleamCore
 
-/// Storage declutter: large files, old files, downloads triage and duplicate
-/// sets.
+/// Storage declutter: large files, old files, downloads triage, duplicate
+/// sets and similar photo sets.
 ///
 /// Large files are files at or above the Settings threshold, strictly inside
 /// the user home. Old files are files last opened at or beyond the Settings
@@ -13,8 +13,11 @@ import GleamCore
 /// bands so each file appears in exactly one triage finding. Duplicate sets
 /// group byte identical files by full content hash, with size as a prefilter
 /// so unique sizes never read content; the lexicographically smallest member
-/// is the kept copy and no plan ever targets it. A denylisted path is never a
-/// finding and never an operation.
+/// is the kept copy and no plan ever targets it. Similar photo sets group
+/// near identical photos by a downsampled grayscale fingerprint with the
+/// same kept copy mechanics, and never claim a photo that another photo
+/// duplicates byte for byte. A denylisted path is never a finding and never
+/// an operation.
 public struct ClutterEngine: GleamEngine {
   public var module: GleamModule { .clutter }
 
@@ -112,7 +115,11 @@ extension ClutterEngine {
     findings.append(contentsOf: largeFileFindings(permitted, context: context))
     findings.append(contentsOf: oldFileFindings(permitted, context: context))
     findings.append(contentsOf: downloadsTriageFindings(permitted, context: context))
-    findings.append(contentsOf: try await duplicateSetFindings(permitted, context: context))
+    let duplicates = try await duplicateSetFindings(permitted, context: context)
+    findings.append(contentsOf: duplicates)
+    findings.append(
+      contentsOf: try await similarPhotoSetFindings(
+        permitted, duplicates: duplicates, context: context))
     return findings
   }
 }
@@ -337,13 +344,13 @@ extension ClutterEngine {
 
 // MARK: - Scanned allocation cache
 
-/// Allocated sizes of duplicate set members, recorded when a scan builds a
-/// set and consulted at plan time so the plan's total reflects each removed
-/// member's real allocation rather than an even share. Planning has no file
-/// system access by contract and may run on a different engine value than
-/// the one that scanned, so this registry is process wide. It holds only
-/// duplicate members, and a rescan overwrites a path's entry.
-private final class ScannedAllocationCache: @unchecked Sendable {
+/// Allocated sizes of duplicate and similar set members, recorded when a
+/// scan builds a set and consulted at plan time so the plan's total reflects
+/// each removed member's real allocation rather than an even share. Planning
+/// has no file system access by contract and may run on a different engine
+/// value than the one that scanned, so this registry is process wide. It
+/// holds only set members, and a rescan overwrites a path's entry.
+final class ScannedAllocationCache: @unchecked Sendable {
   static let shared = ScannedAllocationCache()
 
   private let lock = NSLock()
@@ -387,11 +394,12 @@ extension ClutterEngine {
     }
 
     mutating func add(_ finding: Finding) throws {
-      guard case .duplicateSet(let keptPath) = finding.category else {
+      switch finding.category {
+      case .duplicateSet(let keptPath), .similarPhotoSet(let keptPath):
+        try addKeptPathSet(finding, keeping: keptPath)
+      default:
         addUniformFinding(finding)
-        return
       }
-      try addDuplicateSet(finding, keeping: keptPath)
     }
 
     /// A finding whose paths all plan for removal. When the denylist
@@ -411,7 +419,7 @@ extension ClutterEngine {
     /// however the selection was assembled, and no operation ever targets
     /// it. Members are deduplicated first so a tampered selection listing a
     /// path twice cannot inflate the plan.
-    private mutating func addDuplicateSet(
+    private mutating func addKeptPathSet(
       _ finding: Finding,
       keeping keptPath: AbsolutePath
     ) throws {
@@ -427,13 +435,13 @@ extension ClutterEngine {
       append(
         included,
         of: finding,
-        bytes: duplicateRemovalBytes(of: included, in: finding, memberCount: members.count))
+        bytes: removalBytes(of: included, in: finding, memberCount: members.count))
     }
 
-    /// The bytes a duplicate removal reclaims: the scanned allocated bytes
-    /// of each removed member, never the kept copy's. A path the scan never
+    /// The bytes a set removal reclaims: the scanned allocated bytes of
+    /// each removed member, never the kept copy's. A path the scan never
     /// recorded falls back to an even share of the finding's total.
-    private func duplicateRemovalBytes(
+    private func removalBytes(
       of included: [AbsolutePath],
       in finding: Finding,
       memberCount: Int
