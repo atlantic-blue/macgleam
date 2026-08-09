@@ -3,7 +3,7 @@
 Companion to CONTRACTS.md. Slices are thin vertical paths of user value,
 mapped onto milestones M0 to M7 from ROADMAP.md. Each slice is sized so one
 agent completes it within half a fresh context window. Contract numbers (C1 to
-C37) refer to CONTRACTS.md.
+C38) refer to CONTRACTS.md.
 
 Reading a slice entry:
 
@@ -224,9 +224,9 @@ s7a can start in parallel the moment the workspace exists.
   watch the flow advance without touching the app.
 
 ### s1g. cleanup module
-- Contracts: wires C15, C17, C20, C32, C35 into the interface. Also
-  implements C35 (settings store) since deletion mode is first exercised
-  here.
+- Contracts: C38 (cleanup module model), wiring C15, C17, C20, C32, C35
+  into the interface. Also implements C35 (settings store) since deletion
+  mode is first exercised here.
 - Depends on: s1d, s1e, s1f.
 - Verification: the full first clean end to end against a fixture home:
   scan, review down to file paths, deselect, execute, result screen naming

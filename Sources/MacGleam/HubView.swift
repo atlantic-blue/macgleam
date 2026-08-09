@@ -9,6 +9,7 @@ import SwiftUI
 /// the hub scaling and blurring behind it.
 struct HubView: View {
   let model: HubModel
+  let cleanup: CleanupDependencies
   @State private var navigation = HubNavigationState.initial
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -96,11 +97,20 @@ struct HubView: View {
 
   @ViewBuilder
   private func openModuleView(_ module: HubModule) -> some View {
-    let view = ModulePlaceholderView(card: card(for: module))
+    let view = moduleSurface(module)
     if reduceMotion {
       view.transition(.opacity)
     } else {
       view.matchedGeometryEffect(id: module, in: zoomNamespace)
+    }
+  }
+
+  @ViewBuilder
+  private func moduleSurface(_ module: HubModule) -> some View {
+    if module == .cleanup {
+      CleanupModuleView(model: cleanup.model, executor: cleanup.executor)
+    } else {
+      ModulePlaceholderView(card: card(for: module))
     }
   }
 
