@@ -3,7 +3,7 @@
 Companion to CONTRACTS.md. Slices are thin vertical paths of user value,
 mapped onto milestones M0 to M7 from ROADMAP.md. Each slice is sized so one
 agent completes it within half a fresh context window. Contract numbers (C1 to
-C38) refer to CONTRACTS.md.
+C39) refer to CONTRACTS.md.
 
 Reading a slice entry:
 
@@ -269,12 +269,17 @@ s7a can start in parallel the moment the workspace exists.
   useful rather than noisy.
 
 ### s2d. space lens
-- Contracts: C22.
+- Contracts: C22, C39 (space lens module model). Amends C5 (per path byte
+  sizes on Finding) and the C6 and C21 wording that followed, retiring the
+  s2b ScannedAllocationCache.
 - Depends on: s1g.
 - Verification: the map streams and node totals only ever grow, converging
   to true allocated totals; denylisted nodes render but cannot be selected;
   deleting from the map follows the Trash default through the shared
-  executor; drill in uses the shared zoom grammar.
+  executor; drill in uses the shared zoom grammar (the C37 appearance
+  types); finding byte totals derive from the finding's own entries with no
+  process wide cache; the s1a Finding pins named in C5's migration note are
+  updated deliberately in this slice.
 - Tier: verify. Human check: the map builds outward from the root while
   scanning and drilling in feels identical to the hub zoom.
 

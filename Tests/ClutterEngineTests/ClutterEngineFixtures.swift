@@ -369,6 +369,18 @@ func makePlanContext(
   )
 }
 
+/// Distributes a finding's byte total over its paths as entries, remainder on
+/// the first entry, so the derived byteSize is exactly the requested total.
+func distributedPathEntries(paths: [AbsolutePath], byteSize: UInt64) -> [PathEntry] {
+  guard !paths.isEmpty else { return [] }
+  let count = UInt64(paths.count)
+  let share = byteSize / count
+  let remainder = byteSize % count
+  return paths.enumerated().map { index, path in
+    PathEntry(path: path, allocatedBytes: index == 0 ? share + remainder : share)
+  }
+}
+
 func makeClutterFinding(
   id: UUID = ClutterFixture.uuid(0xD1),
   sessionID: UUID = ClutterFixture.sessionID,
@@ -382,8 +394,7 @@ func makeClutterFinding(
     id: id,
     sessionID: sessionID,
     category: category,
-    paths: paths.map(ClutterFixture.path),
-    byteSize: byteSize,
+    entries: distributedPathEntries(paths: paths.map(ClutterFixture.path), byteSize: byteSize),
     risk: risk,
     explanation: "A reviewable clutter finding used by the plan tests.",
     isPreselected: isPreselected

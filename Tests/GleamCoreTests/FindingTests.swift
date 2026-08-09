@@ -47,18 +47,25 @@ struct FindingTests {
   func findingRoundTripsFullyPopulated() throws {
     let finding = makeFinding(
       category: .malware(signatureIdentifier: "XProtect.MACOS.EXAMPLE"),
-      paths: [Fixture.path("/Library/LaunchAgents/com.adware.agent.plist")],
-      byteSize: UInt64.max,
+      entries: [
+        makeEntry("/Library/LaunchAgents/com.adware.agent.plist", allocatedBytes: UInt64.max)
+      ],
       risk: .dangerous,
       explanation: "This launch agent matches a known malware signature.",
       isPreselected: true
     )
     try expectLosslessRoundTrip(finding)
+    #expect(finding.byteSize == UInt64.max)
+    #expect(finding.paths == [Fixture.path("/Library/LaunchAgents/com.adware.agent.plist")])
   }
 
   @Test("a zero byte finding round trips losslessly")
   func zeroByteFindingRoundTrips() throws {
-    try expectLosslessRoundTrip(makeFinding(byteSize: 0))
+    let finding = makeFinding(
+      entries: [makeEntry("/Users/test/Library/Caches/example", allocatedBytes: 0)]
+    )
+    try expectLosslessRoundTrip(finding)
+    #expect(finding.byteSize == 0)
   }
 
   @Test("a duplicate set finding keeps its kept path and members through coding")
@@ -66,8 +73,10 @@ struct FindingTests {
     let member = Fixture.path("/Users/test/Downloads/copy.jpg")
     let finding = makeFinding(
       category: .duplicateSet(keptPath: Self.keptPath),
-      paths: [Self.keptPath, member],
-      byteSize: 2048,
+      entries: [
+        PathEntry(path: Self.keptPath, allocatedBytes: 1024),
+        PathEntry(path: member, allocatedBytes: 1024),
+      ],
       risk: .safe
     )
     let encoded = try JSONEncoder().encode(finding)
@@ -75,20 +84,34 @@ struct FindingTests {
     #expect(decoded == finding)
     #expect(decoded.category == .duplicateSet(keptPath: Self.keptPath))
     #expect(decoded.paths.contains(Self.keptPath))
-    #expect(decoded.paths.count >= 2)
+    #expect(decoded.entries.count >= 2)
+    #expect(decoded.byteSize == 2048)
   }
 
   @Test("a multi path finding preserves path order through coding")
   func multiPathFindingPreservesOrder() throws {
-    let paths = [
-      Fixture.path("/Users/test/Library/Caches/b"),
-      Fixture.path("/Users/test/Library/Caches/a"),
-      Fixture.path("/Users/test/Library/Caches/c"),
+    let entries = [
+      makeEntry("/Users/test/Library/Caches/b", allocatedBytes: 10),
+      makeEntry("/Users/test/Library/Caches/a", allocatedBytes: 20),
+      makeEntry("/Users/test/Library/Caches/c", allocatedBytes: 30),
     ]
-    let finding = makeFinding(paths: paths)
+    let finding = makeFinding(entries: entries)
     let encoded = try JSONEncoder().encode(finding)
     let decoded = try JSONDecoder().decode(Finding.self, from: encoded)
-    #expect(decoded.paths == paths)
+    #expect(decoded.entries == entries)
+    #expect(decoded.paths == entries.map(\.path))
+  }
+
+  @Test("paths and byte size derive from the entries and nothing else")
+  func pathsAndByteSizeDeriveFromEntries() {
+    let entries = [
+      makeEntry("/Users/test/Documents/reports", allocatedBytes: 4_096),
+      makeEntry("/Users/test/Documents/notes.txt", allocatedBytes: 1_000),
+      makeEntry("/Users/test/Pictures/photo.heic", allocatedBytes: 8_000),
+    ]
+    let finding = makeFinding(entries: entries)
+    #expect(finding.paths == entries.map(\.path))
+    #expect(finding.byteSize == 13_096)
   }
 
   @Test("risk levels use their contract raw values")

@@ -50,10 +50,7 @@ public struct ClutterEngine: GleamEngine {
     for finding in selection where finding.sessionID != context.sessionID {
       throw PlanningError.findingFromDifferentSession(finding.id)
     }
-    var builder = PlanBuilder(
-      context: context,
-      userHome: userHome,
-      allocatedBytes: ScannedAllocationCache.shared.allocatedBytes(of:))
+    var builder = PlanBuilder(context: context, userHome: userHome)
     for finding in selection {
       try builder.add(finding)
     }
@@ -135,8 +132,7 @@ extension ClutterEngine {
           id: UUID(),
           sessionID: context.sessionID,
           category: .largeFile,
-          paths: [record.path],
-          byteSize: record.allocatedBytes,
+          entries: [PathEntry(path: record.path, allocatedBytes: record.allocatedBytes)],
           risk: .review,
           explanation:
             "This file takes \(record.allocatedBytes) bytes on disk, "
@@ -158,8 +154,7 @@ extension ClutterEngine {
         id: UUID(),
         sessionID: context.sessionID,
         category: .oldFile,
-        paths: [record.path],
-        byteSize: record.allocatedBytes,
+        entries: [PathEntry(path: record.path, allocatedBytes: record.allocatedBytes)],
         risk: .review,
         explanation: oldFileExplanation(for: age),
         isPreselected: false)
@@ -234,8 +229,7 @@ extension ClutterEngine {
         id: UUID(),
         sessionID: context.sessionID,
         category: .downloadsTriage,
-        paths: records.map(\.path),
-        byteSize: records.reduce(0) { $0 + $1.allocatedBytes },
+        entries: records.map { PathEntry(path: $0.path, allocatedBytes: $0.allocatedBytes) },
         risk: .review,
         explanation: band.explanation,
         isPreselected: false)
@@ -326,13 +320,11 @@ extension ClutterEngine {
   private func duplicateSetFinding(for group: [FileRecord], context: ScanContext) -> Finding {
     let members = group.sorted { $0.path < $1.path }
     let keptPath = members[0].path
-    ScannedAllocationCache.shared.record(members)
     return Finding(
       id: UUID(),
       sessionID: context.sessionID,
       category: .duplicateSet(keptPath: keptPath),
-      paths: members.map(\.path),
-      byteSize: members.reduce(0) { $0 + $1.allocatedBytes },
+      entries: members.map { PathEntry(path: $0.path, allocatedBytes: $0.allocatedBytes) },
       risk: .review,
       explanation:
         "These \(members.count) files are byte for byte identical. "
@@ -342,55 +334,20 @@ extension ClutterEngine {
   }
 }
 
-// MARK: - Scanned allocation cache
-
-/// Allocated sizes of duplicate and similar set members, recorded when a
-/// scan builds a set and consulted at plan time so the plan's total reflects
-/// each removed member's real allocation rather than an even share. Planning
-/// has no file system access by contract and may run on a different engine
-/// value than the one that scanned, so this registry is process wide. It
-/// holds only set members, and a rescan overwrites a path's entry.
-final class ScannedAllocationCache: @unchecked Sendable {
-  static let shared = ScannedAllocationCache()
-
-  private let lock = NSLock()
-  private var bytesByPath: [AbsolutePath: UInt64] = [:]
-
-  func record(_ records: [FileRecord]) {
-    lock.lock()
-    defer { lock.unlock() }
-    for record in records {
-      bytesByPath[record.path] = record.allocatedBytes
-    }
-  }
-
-  func allocatedBytes(of path: AbsolutePath) -> UInt64? {
-    lock.lock()
-    defer { lock.unlock() }
-    return bytesByPath[path]
-  }
-}
-
 // MARK: - Planning
 
 extension ClutterEngine {
   fileprivate struct PlanBuilder {
     private let context: PlanContext
     private let environment: OwnershipEnvironment
-    private let allocatedBytes: @Sendable (AbsolutePath) -> UInt64?
     private var operations: [GleamCore.Operation] = []
     private var totalBytes: UInt64 = 0
     private var permanentFileCount: UInt32 = 0
     private var permanentByteTotal: UInt64 = 0
 
-    init(
-      context: PlanContext,
-      userHome: AbsolutePath,
-      allocatedBytes: @escaping @Sendable (AbsolutePath) -> UInt64?
-    ) {
+    init(context: PlanContext, userHome: AbsolutePath) {
       self.context = context
       self.environment = OwnershipEnvironment(currentUserHome: userHome, currentUserID: getuid())
-      self.allocatedBytes = allocatedBytes
     }
 
     mutating func add(_ finding: Finding) throws {
@@ -402,72 +359,51 @@ extension ClutterEngine {
       }
     }
 
-    /// A finding whose paths all plan for removal. When the denylist
-    /// excludes some of its paths the finding's bytes are apportioned by
-    /// path count.
+    /// A finding whose paths all plan for removal. The plan's total is the
+    /// exact sum of the allocated bytes of the entries its operations
+    /// target: a denylist exclusion removes exactly that entry's bytes.
     private mutating func addUniformFinding(_ finding: Finding) {
-      let included = permitted(finding.paths)
+      let included = permitted(finding.entries)
       guard !included.isEmpty else { return }
-      let bytes =
-        included.count == finding.paths.count
-        ? finding.byteSize
-        : finding.byteSize * UInt64(included.count) / UInt64(finding.paths.count)
-      append(included, of: finding, bytes: bytes)
+      append(included, of: finding)
     }
 
     /// The keep one invariant: the kept path must be a member of the set,
     /// however the selection was assembled, and no operation ever targets
     /// it. Members are deduplicated first so a tampered selection listing a
-    /// path twice cannot inflate the plan.
+    /// path twice cannot inflate the plan. Each removed member contributes
+    /// exactly its own allocated bytes; the kept copy's are never counted.
     private mutating func addKeptPathSet(
       _ finding: Finding,
       keeping keptPath: AbsolutePath
     ) throws {
-      var members: [AbsolutePath] = []
-      for path in finding.paths where !members.contains(path) {
-        members.append(path)
+      var members: [PathEntry] = []
+      for entry in finding.entries where !members.contains(where: { $0.path == entry.path }) {
+        members.append(entry)
       }
-      guard members.contains(keptPath) else {
+      guard members.contains(where: { $0.path == keptPath }) else {
         throw PlanningError.keptCopyMissing(findingID: finding.id)
       }
-      let included = permitted(members.filter { $0 != keptPath })
+      let included = permitted(members.filter { $0.path != keptPath })
       guard !included.isEmpty else { return }
-      append(
-        included,
-        of: finding,
-        bytes: removalBytes(of: included, in: finding, memberCount: members.count))
+      append(included, of: finding)
     }
 
-    /// The bytes a set removal reclaims: the scanned allocated bytes of
-    /// each removed member, never the kept copy's. A path the scan never
-    /// recorded falls back to an even share of the finding's total.
-    private func removalBytes(
-      of included: [AbsolutePath],
-      in finding: Finding,
-      memberCount: Int
-    ) -> UInt64 {
-      included.reduce(0) { total, path in
-        total + (allocatedBytes(path) ?? finding.byteSize / UInt64(memberCount))
-      }
+    private func permitted(_ entries: [PathEntry]) -> [PathEntry] {
+      entries.filter { !context.rules.denylist.blocks($0.path) }
     }
 
-    private func permitted(_ paths: [AbsolutePath]) -> [AbsolutePath] {
-      paths.filter { !context.rules.denylist.blocks($0) }
-    }
-
-    private mutating func append(
-      _ included: [AbsolutePath],
-      of finding: Finding,
-      bytes: UInt64
-    ) {
+    private mutating func append(_ included: [PathEntry], of finding: Finding) {
       let isPermanent = context.settings.deletionMode == .permanent
+      let bytes = included.reduce(UInt64(0)) { $0 + $1.allocatedBytes }
       totalBytes += bytes
       if isPermanent {
         permanentFileCount += UInt32(included.count)
         permanentByteTotal += bytes
       }
-      for path in included {
-        operations.append(operation(for: path, findingID: finding.id, isPermanent: isPermanent))
+      for entry in included {
+        operations.append(
+          operation(for: entry.path, findingID: finding.id, isPermanent: isPermanent))
       }
     }
 

@@ -168,8 +168,7 @@ extension CleanupEngine {
       id: UUID(),
       sessionID: seed.sessionID,
       category: seed.category,
-      paths: seed.records.map(\.path),
-      byteSize: seed.records.reduce(0) { $0 + $1.allocatedBytes },
+      entries: seed.records.map { PathEntry(path: $0.path, allocatedBytes: $0.allocatedBytes) },
       risk: seed.rule.risk,
       explanation: explanation(for: seed.rule),
       isPreselected: seed.rule.preselectable && seed.rule.risk == .safe)
@@ -256,13 +255,6 @@ extension CleanupEngine {
     return mode == .permanent
   }
 
-  /// The bytes a finding contributes to the plan. When the denylist excludes
-  /// some of its paths the finding's bytes are apportioned by path count.
-  fileprivate static func attributedBytes(of finding: Finding, includedCount: Int) -> UInt64 {
-    guard includedCount < finding.paths.count else { return finding.byteSize }
-    return finding.byteSize * UInt64(includedCount) / UInt64(finding.paths.count)
-  }
-
   fileprivate struct PlanBuilder {
     private let context: PlanContext
     private let environment = OwnershipEnvironment.current
@@ -275,18 +267,22 @@ extension CleanupEngine {
       self.context = context
     }
 
+    /// The plan's total is the exact sum of the allocated bytes of the
+    /// entries its operations target: a denylist exclusion removes exactly
+    /// that entry's bytes, nothing is apportioned or estimated.
     mutating func add(_ finding: Finding) {
-      let included = finding.paths.filter { !context.rules.denylist.blocks($0) }
+      let included = finding.entries.filter { !context.rules.denylist.blocks($0.path) }
       guard !included.isEmpty else { return }
       let isPermanent = plansPermanently(finding.category, mode: context.settings.deletionMode)
-      let bytes = attributedBytes(of: finding, includedCount: included.count)
+      let bytes = included.reduce(UInt64(0)) { $0 + $1.allocatedBytes }
       totalBytes += bytes
       if isPermanent {
         permanentFileCount += UInt32(included.count)
         permanentByteTotal += bytes
       }
-      for path in included {
-        operations.append(operation(for: path, findingID: finding.id, isPermanent: isPermanent))
+      for entry in included {
+        operations.append(
+          operation(for: entry.path, findingID: finding.id, isPermanent: isPermanent))
       }
     }
 

@@ -14,7 +14,7 @@ How to read this file:
 - All code is Swift 6 with strict concurrency. Every crossing type is Sendable.
   Types that cross the process boundary to GleamHelper are additionally Codable
   and Equatable.
-- Contracts are numbered C1 to C38. GRAPH.md maps contracts to slices and
+- Contracts are numbered C1 to C39. GRAPH.md maps contracts to slices and
   carries each slice's verification tier.
 - Nothing here says how. Enumeration strategy, hashing algorithm choice, shader
   code and storage engines are implementation, except where DESIGN.md locked a
@@ -22,7 +22,8 @@ How to read this file:
 
 Package layout, restated from DESIGN.md: GleamDesign (C1, C2), GleamCore
 (C3 to C19), engine packages (C20 to C29), GleamHelperCore (C30, C31), app
-services (C32 to C35), hub interface (C36, C37), cleanup module interface (C38).
+services (C32 to C35), hub interface (C36, C37), module interfaces (C38,
+C39).
 
 ---
 
@@ -212,15 +213,31 @@ public enum GleamModule: String, Codable, Sendable, CaseIterable {
 
 ### C5. Finding
 
+Amended 2026-08-09 in s2d: findings carry per path allocated byte sizes.
+This retires the s2b ScannedAllocationCache pattern and is a breaking
+change to the Finding initialiser and its Codable encoding. The migration
+note after this contract lists the existing test pins that change.
+
 ```swift
 /// The unit of user review. Everything a user can select, inspect and act on
 /// is a Finding.
 ///
 /// Guarantees:
-/// - `paths` is never empty. Every path is inspectable in the UI down to the
-///   full path string (mono type token).
-/// - `byteSize` is the allocated (on disk) byte total across `paths`, because
-///   it feeds the reclaimable estimate. See GRAPH.md open questions.
+/// - `entries` is never empty. Every entry's path is inspectable in the UI
+///   down to the full path string (mono type token).
+/// - `PathEntry.allocatedBytes` is the allocated (on disk) byte total that
+///   removing the entry's path reclaims: the allocated size of a file, the
+///   subtree allocated total of a directory. Allocated, never logical, so
+///   sparse and cloned files do not inflate the promise (GRAPH.md open
+///   question 9).
+/// - `byteSize` and `paths` are pure derivations of `entries`: byteSize is
+///   the sum of allocatedBytes over entries, paths is the entries' paths in
+///   entry order. There are no stored copies to drift.
+/// - Byte totals derive from the finding's own entries, at scan, review and
+///   plan time alike. A finding is self contained; no process wide cache
+///   carries sizes from scan to plan. (Retired invariant: the s2b
+///   ScannedAllocationCache, which existed only because paths carried no
+///   sizes.)
 /// - `explanation` is a plain sentence saying what this is and why it is
 ///   safe, reviewable or dangerous. Never empty.
 /// - Preselection rules by module are binding:
@@ -229,17 +246,27 @@ public enum GleamModule: String, Codable, Sendable, CaseIterable {
 ///   (quarantine is reversible). Privacy cleanup findings are never
 ///   preselected. Leftover sweep findings are never preselected.
 /// - For `duplicateSet` and `similarPhotoSet`, `keptPath` is a member of
-///   `paths` and `paths.count >= 2`. The kept copy is shown before anything
-///   moves and no plan ever targets it (see C21).
+///   `paths` and `entries.count >= 2`. The kept copy is shown before
+///   anything moves and no plan ever targets it (see C21).
 public struct Finding: Identifiable, Codable, Sendable, Equatable {
     public let id: UUID
     public let sessionID: UUID
     public let category: FindingCategory
-    public let paths: [AbsolutePath]
-    public let byteSize: UInt64
+    public let entries: [PathEntry]
     public let risk: RiskLevel
     public let explanation: String
     public let isPreselected: Bool
+
+    /// Derived: the entries' paths in entry order.
+    public var paths: [AbsolutePath] { get }
+    /// Derived: the sum of allocatedBytes over entries.
+    public var byteSize: UInt64 { get }
+}
+
+/// One path a finding covers, with the allocated bytes its removal reclaims.
+public struct PathEntry: Codable, Sendable, Equatable, Hashable {
+    public let path: AbsolutePath
+    public let allocatedBytes: UInt64
 }
 
 public enum RiskLevel: String, Codable, Sendable, Equatable {
@@ -274,6 +301,34 @@ public enum FindingCategory: Codable, Sendable, Equatable, Hashable {
 }
 ```
 
+Migration note for the C5 amendment (s2d). Findings are session scoped:
+nothing persists them across launches and no helper message carries one
+(C30), so no stored data migrates. The cost is source level: the memberwise
+initialiser loses `paths:` and `byteSize:` and gains `entries:`, and the
+Codable encoding replaces the `paths` and `byteSize` keys with `entries`.
+The s1a pins that change, for the test writer to update deliberately in
+s2d:
+
+- Tests/GleamCoreTests/DomainFixtures.swift, the `makeFinding` factory: its
+  `paths:` and `byteSize:` parameters become `entries:`.
+- Tests/GleamCoreTests/FindingTests.swift, "a finding round trips
+  losslessly with every field populated".
+- Tests/GleamCoreTests/FindingTests.swift, "a zero byte finding round trips
+  losslessly".
+- Tests/GleamCoreTests/FindingTests.swift, "a duplicate set finding keeps
+  its kept path and members through coding".
+- Tests/GleamCoreTests/FindingTests.swift, "a multi path finding preserves
+  path order through coding".
+
+Later suites construct findings through their own factories and break at
+compile time, not behaviourally: CleanupEngineTests (makeCleanupFinding and
+CleanupPlanTests), ClutterEngineTests (makeClutterFinding, plus the hostile
+findings built directly in SimilarPhotosKeptPathTests and
+DuplicatesPlanInvariantTests), CleanupModuleTests
+(CleanupModuleTestSupport). Their assertions stand; only construction
+changes, and DuplicatesPlanInvariantTests' totalBytes assertion becomes
+exact by construction rather than by cache.
+
 ### C6. OperationPlan
 
 ```swift
@@ -282,8 +337,10 @@ public enum FindingCategory: Codable, Sendable, Equatable, Hashable {
 ///
 /// Guarantees:
 /// - `operations` preserves order and executes in order (C17).
-/// - `totalBytes` equals the sum of the byte sizes of all operations that
-///   reclaim space.
+/// - `totalBytes` equals the sum, over the operations that reclaim space,
+///   of the `allocatedBytes` of the finding entry each operation targets
+///   (C5). When plan time denylist filtering excludes an entry, its bytes
+///   are excluded exactly; nothing is apportioned or estimated.
 /// - A plan containing any `deletePermanently` operation must carry a
 ///   `permanentDeletionConfirmation` whose fileCount and byteTotal exactly
 ///   match the permanent operations in the plan. The executor refuses the
@@ -1000,6 +1057,11 @@ public struct CleanupEngine: GleamEngine { /* module == .cleanup */ }
 ///   path of any set, and throws `PlanningError.keptCopyMissing` if a
 ///   selection somehow excludes it. At least one copy always survives, by
 ///   construction, and a test attacks this with hostile selections.
+/// - Member byte sizes ride on the finding itself: a duplicate or similar
+///   photo set finding carries one entry per member with that member's
+///   allocated bytes (C5). Plan totals for any selection are exact sums of
+///   the entries its operations target; the kept path's entry is never
+///   counted; no scan state outlives the finding.
 /// - Similar photo sets carry the same kept path mechanics. Similarity
 ///   grouping is implementation; the contract is only that every member is
 ///   an image file and sets never overlap.
@@ -2127,6 +2189,323 @@ public final class CleanupModuleModel {
         permanentConfirmation: PermanentDeletionConfirmation?
     ) -> CleanupCommandRefusal?
     public func cancelScan()
+    public func cancelExecution()
+    public func acknowledgeResult()
+}
+```
+
+### C39. Space Lens module model
+
+```swift
+import Foundation
+import Observation
+import GleamHub   // HubZoomDirection, HubZoomResolver, HubZoomAppearance (C37)
+
+/// The narrow engine seam the module model consumes, so tests script the
+/// streaming map and the plan without the real engine. SpaceLensEngine
+/// (C22) is the one production conformance; this protocol adds nothing to
+/// C22 and takes nothing from it: `map` and `plan` carry C22's guarantees
+/// verbatim.
+public protocol SpaceLensMapProviding: Sendable {
+    var module: GleamModule { get }
+    func map(
+        volume: AbsolutePath,
+        context: ScanContext
+    ) -> AsyncThrowingStream<SpaceLensUpdate, Error>
+    func plan(selection: [Finding], context: PlanContext) throws -> OperationPlan
+}
+
+/// Mints the per session contexts of C15 for Space Lens. Same shape and
+/// guarantees as CleanupSessionProviding (C38): every makeScanContext call
+/// mints a fresh session identifier, and plan contexts are bound to exactly
+/// their session. A deliberate duplicate of the C38 protocol rather than a
+/// shared abstraction; the third module surface extracts the pattern.
+public protocol SpaceLensSessionProviding: Sendable {
+    func makeScanContext(settings: Settings, hasFullDiskAccess: Bool) async -> ScanContext
+    func makePlanContext(sessionID: UUID, settings: Settings) async -> PlanContext
+}
+
+/// One node of the streaming tree the thin view renders.
+///
+/// Guarantees:
+/// - `allocatedBytesSoFar` never decreases across successive published
+///   trees: the model level mirror of C22's sizeRevision monotonicity, so
+///   the rendered map only ever grows.
+/// - `hasConverged` flips false to true at most once and never back. When
+///   the stream completes every node has converged and
+///   `allocatedBytesSoFar` equals the engine's final total for the path.
+/// - `isSelectable` is false for every denylisted path (C22) and always
+///   false for the volume root, whatever the denylist says: the map never
+///   offers deleting the volume it is mapping.
+/// - `children` is sorted by allocatedBytesSoFar descending, ties broken
+///   lexicographically by path, so the rendered map is a pure, reproducible
+///   function of the tree.
+public struct SpaceLensTreeNode: Sendable, Equatable, Identifiable {
+    public var id: AbsolutePath { path }
+    public let path: AbsolutePath
+    public let isDirectory: Bool
+    public let allocatedBytesSoFar: UInt64
+    public let hasConverged: Bool
+    public let isSelectable: Bool
+    public let children: [SpaceLensTreeNode]
+}
+
+/// The map as the view renders it: the tree, where the user has drilled to,
+/// and what they have selected.
+///
+/// Guarantees:
+/// - `root` is nil only before the first node arrives; from then on it is
+///   the volume root's node.
+/// - In browsing, `focusPath` is always the volume root or a directory
+///   node present in the tree. While mapping it may name a drill
+///   intention: a directory path accepted before its node streamed,
+///   reconciled onto the node when it arrives, pruned at completion if
+///   it never did (see the model's drillIn).
+/// - `selectedPaths` is an antichain under `isDescendant(of:)` (C3) at
+///   all times: it never contains a path and a descendant of that path,
+///   so no byte is ever counted twice. Every member whose node has
+///   streamed is a selectable node; while mapping the set may
+///   additionally hold selection intentions for paths not yet streamed
+///   (see the model's toggleSelection). In browsing every member is a
+///   selectable node present in the tree: unmatched intentions were
+///   pruned at completion.
+/// - `selectedByteTotal` is exactly the sum of `allocatedBytesSoFar` over
+///   the selected paths whose nodes are present in the tree; an
+///   unresolved intention contributes nothing until it resolves. A pure
+///   derivation, no stored copy to drift.
+public struct SpaceLensMapState: Sendable, Equatable {
+    public let sessionID: UUID
+    public let volume: AbsolutePath
+    public let root: SpaceLensTreeNode?
+    public let focusPath: AbsolutePath
+    public let selectedPaths: Set<AbsolutePath>
+    public var selectedByteTotal: UInt64 { get }
+}
+
+/// Where the Space Lens module is. Space Lens is hub chrome, not a card:
+/// HubModule (C36) has no case for it and C37's module state slots do not
+/// apply. Entry and exit of the surface is chrome wiring; this model owns
+/// everything inside it.
+public enum SpaceLensModuleState: Sendable, Equatable {
+    /// No map this session: the entry state, and the state after a result
+    /// is acknowledged, a mapping fails or is cancelled. A result
+    /// acknowledgement always lands here, never back on the old map: an
+    /// executed plan means the tree no longer matches the disk, and a
+    /// stale map is worse than no map.
+    case idle
+    /// The stream is running. The map grows, drill and selection work,
+    /// execution is refused until completion.
+    case mapping(SpaceLensMapState)
+    /// The stream completed: every total converged and true (C22). The
+    /// only state that admits executeSelection, so every byte figure a
+    /// confirmation names is a true allocated total, never an estimate.
+    case browsing(SpaceLensMapState)
+    case executing(SpaceLensExecutionProgress)
+    case result(SpaceLensResultSummary)
+}
+
+/// One drill step, as data, for the view to animate. Reuses the C37 zoom
+/// grammar: the view resolves `direction` through HubZoomResolver, so
+/// drilling into a folder uses exactly the animation tokens the hub zoom
+/// uses (snappy matched geometry, crossfade under Reduce Motion) and the
+/// whole app keeps one navigation language. HubZoom itself is not reused:
+/// it names a HubModule, and a folder is not a module.
+public struct SpaceLensDrill: Sendable, Equatable {
+    public let target: AbsolutePath
+    public let direction: HubZoomDirection
+}
+
+/// Execution progress, same shape and monotonicity guarantees as C38's
+/// CleanupExecutionProgress: finishedOperations and bytesReclaimed never
+/// decrease across successive executing states, finishedOperations never
+/// exceeds totalOperations, and currentOperationID is the operation the
+/// executor last reported started and not yet finished, nil between
+/// operations.
+public struct SpaceLensExecutionProgress: Sendable, Equatable {
+    public let planID: UUID
+    public let totalOperations: UInt32
+    public let finishedOperations: UInt32
+    public let bytesReclaimed: UInt64
+    public let currentOperationID: UUID?
+}
+
+/// The result screen's whole content, derived from exactly one
+/// ExecutionReport (C7) and consistent with it, C38 style.
+///
+/// Guarantees:
+/// - `bytesReclaimed` equals the report's total, and completedCount,
+///   failedCount, skipped and notStartedCount sum to one entry per
+///   operation in the plan.
+/// - `failures` carries one plain sentence per failed operation, in plan
+///   order: what failed and what was and was not done, never a code.
+/// - `skippedDenylistedNames` carries the last path component of each
+///   denylist skip, in plan order, reported as the safety system working,
+///   distinct from failure (C7).
+/// - `notStartedCount` counts a cancelled run's untouched operations,
+///   which is how the partial result says exactly which is which.
+public struct SpaceLensResultSummary: Sendable, Equatable {
+    public let bytesReclaimed: UInt64
+    public let completedCount: UInt32
+    public let failedCount: UInt32
+    public let notStartedCount: UInt32
+    public let failures: [String]
+    public let skippedDenylistedNames: [String]
+}
+
+/// Why executeSelection did not start. Returned, never thrown; the state
+/// is unchanged in every case (C38 precedent).
+public enum SpaceLensCommandRefusal: Sendable, Equatable {
+    case notBrowsing
+    /// The stream is still running: totals are not yet true, so no
+    /// confirmation could name honest counts.
+    case mappingStillRunning
+    case emptySelection
+    case permanentDeletionUnconfirmed(required: PermanentDeletionScope)
+    case confirmationMismatch(required: PermanentDeletionScope)
+}
+```
+
+PermanentDeletionScope moves from the cleanup module to GleamCore beside
+PermanentDeletionConfirmation (C6) in this slice, shared by C38 and C39,
+unchanged in shape. Every CleanupModuleTests file already imports GleamCore,
+so the move breaks no test source.
+
+```swift
+/// The Space Lens module view model, on the macOS 14 Observation framework.
+/// A thin SwiftUI view renders this and adds no state of its own; the
+/// module's whole behaviour is this class driven against fakes of its five
+/// injected protocols.
+///
+/// Guarantees:
+///
+/// State transitions are total and deterministic; every command in every
+/// state either performs its named transition or leaves the state
+/// identical. The table, everything else being the identity:
+/// - `startMapping(volume:)`: idle, browsing or result to mapping with a
+///   fresh session and an empty map state focused on the volume root.
+///   Ignored while mapping or executing.
+/// - Stream driven, while mapping: `node` and `sizeRevision` updates grow
+///   the tree under the node guarantees above; `completed` prunes any
+///   unmatched intentions and moves mapping to browsing with the map
+///   state otherwise identical (tree, focus and every resolved
+///   selection survive the transition); a thrown stream moves to idle
+///   with `failureNotice` set to a plain sentence.
+/// - `drillIn(to:)`: mapping or browsing. When the target is a directory
+///   child of the current focus present in the tree, focus moves there
+///   and the returned drill carries zoomIn. While mapping, a target
+///   whose node has not yet streamed is also accepted, as a drill
+///   intention: the drill is returned, the model reconciles the
+///   intention onto the node when it arrives, and prunes it at
+///   completion if no node matched, with focus falling back to the
+///   deepest streamed ancestor (the volume root at worst). In browsing,
+///   anything else returns nil and changes nothing.
+/// - `drillOut()`: mapping or browsing, when focus is not the volume root:
+///   focus moves to its parent and the returned drill carries zoomOut. At
+///   the root it returns nil and changes nothing; leaving the module is
+///   the chrome's job, not this model's.
+/// - `toggleSelection(_:)`: mapping or browsing, selection change only. A
+///   selected path deselects. An unselected selectable path selects, first
+///   removing any selected descendants (the ancestor covers them). While
+///   mapping, a path whose node has not yet streamed is accepted as a
+///   selection intention rather than ignored: the model reconciles it as
+///   nodes arrive and prunes it at completion if no node matched.
+///   Denylisted nodes and the volume root are never selectable whenever
+///   an intention resolves: such an intention is dropped at resolution,
+///   never selected. A path that is unselectable, covered by a selected
+///   ancestor, or unknown in browsing is the identity, which keeps the
+///   antichain and the denylist rule true by construction.
+/// - `executeSelection`: browsing to executing when admitted; otherwise
+///   the named refusal is returned and nothing changes: mappingStillRunning
+///   while mapping, notBrowsing in every other non browsing state, then
+///   emptySelection, then the confirmation refusals.
+/// - `cancelMapping`: mapping to idle, the partial map discarded. Safe by
+///   construction: mapping is read only (C13, C15, C22) and a cancelled
+///   map has no side effects on disk.
+/// - `cancelExecution`: cancels the running plan; cancellation takes
+///   effect between operations, never mid item (C17). The state remains
+///   executing until the executor's terminal report arrives, then moves to
+///   result, whose summary is the partial result screen.
+/// - `acknowledgeResult`: result to idle. Never back to a map: see
+///   SpaceLensModuleState.idle.
+///
+/// Deletion, the C38 path exactly:
+/// - `executeSelection` mints one Finding per selected node: category
+///   `spaceLensSelection`, risk `review`, never preselected (C22), the
+///   map's session identifier, and exactly one entry carrying the node's
+///   path and its converged `allocatedBytesSoFar` (C5). Byte totals
+///   therefore derive from the finding's own entries; no cache, no second
+///   source of truth.
+/// - The plan is built through the engine's `plan` with a plan context for
+///   the map session and the settings store's current settings, so the
+///   deletion mode is honoured at the moment of the command (C15, C12):
+///   Trash by default, `deletePermanently` only when the user opted in,
+///   identical to Cleanup.
+/// - `permanentDeletionScope()` returns, while browsing, the exact
+///   operation count and byte total the current selection would plan as
+///   `deletePermanently` under the current mode: every selected node when
+///   the mode is permanent, nil when the mode is trash. Nil in every other
+///   state. The view puts these exact counts in the confirmation it shows
+///   (C6).
+/// - The model attaches the caller's confirmation to the plan and never
+///   constructs one itself; the confirmation is evidence the user saw the
+///   counts (C6). A nil confirmation against a non nil scope returns
+///   `permanentDeletionUnconfirmed`; mismatched counts return
+///   `confirmationMismatch`; both refuse before the engine or executor is
+///   touched.
+/// - A `plan` throw leaves the state browsing and sets `failureNotice` to
+///   a plain sentence.
+/// - The executor's stream drives executing; its terminal report (C17,
+///   exactly one, whatever happened) moves to result. An ExecutionRefusal
+///   surfaces as a failure sentence in the summary, never a crash and
+///   never a silent drop.
+///
+/// The hub:
+/// - There is no hub estimate interplay. Space Lens has no HubModule case
+///   (C36), contributes nothing to HubMachineState.cardFigures or
+///   reclaimableEstimateBytes, and its reclaimed bytes surface only on its
+///   own result screen. A test asserts the model exposes no hub figure.
+///
+/// Full Disk Access:
+/// - `startMapping` reads the store's current settings and the monitor's
+///   current grant (C32), and mints one scan context through the session
+///   provider. Without the grant the map covers what the user domain
+///   allows (C15). The cost is stated plainly: SpaceLensUpdate (C22)
+///   carries no degraded events, so s2d ships no degraded banner in this
+///   module; the honest banner arrives if C22 gains a degraded surface.
+///
+/// Purity and isolation:
+/// - The model holds only its five injected protocols and never touches
+///   the file system; the disk is reachable only through the engine's map
+///   stream and the executor (C13 and C14 never appear here).
+/// - No clock reads: every date the model holds arrived in an input.
+/// - `failureNotice` is always a plain sentence, set only by a failed map
+///   stream or a failed plan build, cleared by the next `startMapping`.
+/// - Construction traps unless `engine.module == .spaceLens`.
+@MainActor @Observable
+public final class SpaceLensModuleModel {
+    public private(set) var state: SpaceLensModuleState
+    public private(set) var failureNotice: String?
+
+    public init(
+        engine: any SpaceLensMapProviding,
+        executor: any PlanExecuting,
+        settings: any SettingsStoring,
+        sessions: any SpaceLensSessionProviding,
+        access: any FullDiskAccessMonitoring
+    )
+
+    public func startMapping(volume: AbsolutePath)
+    @discardableResult
+    public func drillIn(to path: AbsolutePath) -> SpaceLensDrill?
+    @discardableResult
+    public func drillOut() -> SpaceLensDrill?
+    public func toggleSelection(_ path: AbsolutePath)
+    public func permanentDeletionScope() -> PermanentDeletionScope?
+    @discardableResult
+    public func executeSelection(
+        permanentConfirmation: PermanentDeletionConfirmation?
+    ) -> SpaceLensCommandRefusal?
+    public func cancelMapping()
     public func cancelExecution()
     public func acknowledgeResult()
 }
