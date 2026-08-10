@@ -145,7 +145,7 @@ struct CleanupReviewView: View {
         .buttonStyle(.plain)
         .font(GleamTypeToken.caption.font)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
-      CleanupPrimaryButton(
+      PrimaryButton(
         title: "Clean",
         action: beginExecution,
         isEnabled: !review.selectedFindingIDs.isEmpty

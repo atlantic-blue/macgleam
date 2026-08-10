@@ -118,7 +118,7 @@ struct CleanupResultView: View {
         .padding(.vertical, GleamSpacing.points(1))
       }
       .frame(maxWidth: 480)
-      CleanupPrimaryButton(title: "Done", action: onDone)
+      PrimaryButton(title: "Done", action: onDone)
       Spacer(minLength: GleamSpacing.points(2))
     }
     .frame(maxWidth: .infinity)
@@ -210,7 +210,7 @@ struct CleanupCleanSweepView: View {
       Text(checkedLine)
         .font(GleamTypeToken.body.font)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
-      CleanupPrimaryButton(title: "Done", action: onDone)
+      PrimaryButton(title: "Done", action: onDone)
         .padding(.top, GleamSpacing.points(1))
       Spacer()
     }

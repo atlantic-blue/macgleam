@@ -111,11 +111,13 @@ private struct JobRow: View {
   }
 }
 
-/// The pane's one primary control: a filled accent button with the specified
-/// inner top highlight.
+/// The app's one primary control: filled with primary at the control radius,
+/// with the specified inner top highlight. The label is the canvas colour,
+/// which is what the design renders and what its component notes specify.
 struct PrimaryButton: View {
   let title: String
   let action: () -> Void
+  var isEnabled = true
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var isHovering = false
@@ -124,13 +126,15 @@ struct PrimaryButton: View {
     Button(action: action) {
       Text(title)
         .gleamType(.label)
-        .foregroundStyle(GleamColorToken.onPrimary.color(for: colorScheme))
+        .foregroundStyle(GleamColorToken.baseBackground.color(for: colorScheme))
         .padding(.horizontal, GleamSpacing.points(4))
         .padding(.vertical, GleamSpacing.half(3))
         .background(
           RoundedRectangle(cornerRadius: GleamRadius.control.value)
-            .fill(GleamColorToken.primary.color(for: colorScheme))
-            .brightness(isHovering ? 0.06 : 0)
+            .fill(
+              GleamColorToken.primary.color(for: colorScheme).opacity(isEnabled ? 1 : 0.4)
+            )
+            .brightness(isHovering && isEnabled ? 0.06 : 0)
         )
         .overlay(
           RoundedRectangle(cornerRadius: GleamRadius.control.value)
@@ -142,6 +146,7 @@ struct PrimaryButton: View {
         )
     }
     .buttonStyle(.plain)
+    .disabled(!isEnabled)
     .onHover { isHovering = $0 }
     .animation(GleamSpring.snappy.animation(reduceMotion: reduceMotion), value: isHovering)
   }

@@ -72,7 +72,8 @@ struct AppShellView: View {
     Group {
       switch navigation.selection {
       case .module(.cleanup) where content.action != nil:
-        CleanupModuleView(model: cleanup.model, executor: cleanup.executor)
+        CleanupModuleView(
+          model: cleanup.model, executor: cleanup.executor, idlePane: content)
       case .spaceLens:
         SpaceLensView(
           model: spaceLens.model,

@@ -133,7 +133,7 @@ struct SpaceLensView: View {
           .font(GleamTypeToken.caption.font)
           .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       }
-      CleanupPrimaryButton(
+      PrimaryButton(
         title: "Remove",
         action: beginExecution,
         isEnabled: !isStreaming && !map.selectedPaths.isEmpty
@@ -233,7 +233,7 @@ struct SpaceLensIdleView: View {
       .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       .multilineTextAlignment(.center)
       .frame(maxWidth: 460)
-      CleanupPrimaryButton(title: "Map This Mac", action: onMap)
+      PrimaryButton(title: "Map This Mac", action: onMap)
         .padding(.top, GleamSpacing.points(1))
       Spacer()
     }
@@ -491,7 +491,7 @@ struct SpaceLensResultView: View {
         )
         .frame(maxWidth: 460)
       }
-      CleanupPrimaryButton(title: "Done", action: onDone)
+      PrimaryButton(title: "Done", action: onDone)
         .padding(.top, GleamSpacing.points(1))
       Spacer()
     }

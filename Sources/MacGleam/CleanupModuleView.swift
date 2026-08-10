@@ -1,6 +1,7 @@
 import CleanupModule
 import GleamCore
 import GleamDesign
+import GleamHub
 import SwiftUI
 
 /// The cleanup module surface: one thin view over CleanupModuleModel, adding
@@ -10,32 +11,48 @@ import SwiftUI
 struct CleanupModuleView: View {
   let model: CleanupModuleModel
   let executor: CancellableCleanupExecutor
+  /// The standard pane this module shows before any work starts. Every
+  /// module opens on the same shape; the module's own screens take over once
+  /// a scan is running.
+  let idlePane: ModulePane
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var frozenReview: CleanupReviewState?
 
   var body: some View {
+    Group {
+      if isIdle && model.degradedNotices.isEmpty && model.failureNotice == nil {
+        ModulePaneView(pane: idlePane, onActivate: { model.startScan() })
+      } else {
+        working
+      }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .animation(GleamSpring.gentle.animation(reduceMotion: reduceMotion), value: stateShape)
+    .onChange(of: stateShape) { rememberReviewForExecution() }
+  }
+
+  private var isIdle: Bool {
+    if case .idle = model.state { return true }
+    return false
+  }
+
+  private var working: some View {
     VStack(alignment: .leading, spacing: GleamSpacing.points(2)) {
       header
       notices
       content
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    .padding(GleamSpacing.points(3))
+    .padding(.horizontal, GleamSpacing.points(6))
+    .padding(.vertical, GleamSpacing.points(5))
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(
-      RoundedRectangle(cornerRadius: GleamRadius.card.value)
-        .fill(GleamColorToken.surface.color(for: colorScheme))
-    )
-    .padding(GleamSpacing.points(2))
-    .animation(GleamSpring.gentle.animation(reduceMotion: reduceMotion), value: stateShape)
-    .onChange(of: stateShape) { rememberReviewForExecution() }
   }
 
   private var header: some View {
     HStack(alignment: .firstTextBaseline) {
       Text("Cleanup")
-        .font(GleamTypeToken.title.font)
+        .gleamType(.heading)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
       Spacer()
       if model.hubEstimateBytes > 0 {
@@ -71,7 +88,7 @@ struct CleanupModuleView: View {
   private var content: some View {
     switch model.state {
     case .idle:
-      CleanupIdleView(onScan: { model.startScan() })
+      CleanupIdleInvitation(onScan: { model.startScan() })
     case .scanning(let progress):
       CleanupScanProgressView(progress: progress, onCancel: { model.cancelScan() })
     case .reviewing(let review):
@@ -152,8 +169,9 @@ struct CleanupNoticeCard: View {
   }
 }
 
-/// The designed entry state: what a scan covers and the one action.
-struct CleanupIdleView: View {
+/// The entry state as it appears under a degraded or failure notice, where
+/// the standard pane would push the notice off the top of the screen.
+struct CleanupIdleInvitation: View {
   let onScan: () -> Void
   @Environment(\.colorScheme) private var colorScheme
 
@@ -161,7 +179,7 @@ struct CleanupIdleView: View {
     VStack(spacing: GleamSpacing.points(2)) {
       Spacer()
       Text("Reclaim space from system junk")
-        .font(GleamTypeToken.title.font)
+        .gleamType(.title)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
       Text(
         "Caches, logs, broken downloads, developer leftovers and every trash bin, itemised for your review before anything moves."
@@ -170,35 +188,10 @@ struct CleanupIdleView: View {
       .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       .multilineTextAlignment(.center)
       .frame(maxWidth: 420)
-      CleanupPrimaryButton(title: "Scan", action: onScan)
+      PrimaryButton(title: "Scan", action: onScan)
         .padding(.top, GleamSpacing.points(1))
       Spacer()
     }
     .frame(maxWidth: .infinity)
-  }
-}
-
-/// The one primary action style the module uses.
-struct CleanupPrimaryButton: View {
-  let title: String
-  let action: () -> Void
-  var isEnabled = true
-  @Environment(\.colorScheme) private var colorScheme
-
-  var body: some View {
-    Button(action: action) {
-      Text(title)
-        .font(GleamTypeToken.body.font.weight(.semibold))
-        .foregroundStyle(GleamColorToken.baseBackground.color(for: colorScheme))
-        .padding(.horizontal, GleamSpacing.points(3))
-        .padding(.vertical, GleamSpacing.points(1))
-        .background(
-          Capsule().fill(
-            GleamColorToken.accent.color(for: colorScheme).opacity(isEnabled ? 1 : 0.4)
-          )
-        )
-    }
-    .buttonStyle(.plain)
-    .disabled(!isEnabled)
   }
 }
