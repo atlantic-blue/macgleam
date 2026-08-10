@@ -76,10 +76,7 @@ struct AppShellView: View {
           model: cleanup.model, executor: cleanup.executor, idlePane: content)
       case .spaceLens:
         SpaceLensView(
-          model: spaceLens.model,
-          executor: spaceLens.executor,
-          onClose: { select(.module(.smartCare)) }
-        )
+          model: spaceLens.model, executor: spaceLens.executor, idlePane: content)
       default:
         ModulePaneView(pane: content, onActivate: {})
       }

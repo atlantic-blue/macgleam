@@ -14,7 +14,9 @@ import SwiftUI
 struct SpaceLensView: View {
   let model: SpaceLensModuleModel
   let executor: CancellableCleanupExecutor
-  let onClose: () -> Void
+  /// The standard pane this destination shows before a map exists. Every
+  /// destination opens on the same shape.
+  let idlePane: ModulePane
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var confirmingScope: PermanentDeletionScope?
@@ -22,24 +24,17 @@ struct SpaceLensView: View {
   private static let defaultVolume = AbsolutePath(normalising: "/")
 
   var body: some View {
-    VStack(alignment: .leading, spacing: GleamSpacing.points(2)) {
-      header
-      if let failure = model.failureNotice {
-        CleanupNoticeCard(
-          sentences: [failure],
-          tint: GleamColorToken.review.color(for: colorScheme)
+    Group {
+      if isIdle && model.failureNotice == nil {
+        ModulePaneView(
+          pane: idlePane,
+          onActivate: { model.startMapping(volume: Self.defaultVolume) }
         )
+      } else {
+        working
       }
-      content
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    .padding(GleamSpacing.points(3))
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(
-      RoundedRectangle(cornerRadius: GleamRadius.card.value)
-        .fill(GleamColorToken.surface.color(for: colorScheme))
-    )
-    .padding(GleamSpacing.points(2))
     .animation(GleamSpring.gentle.animation(reduceMotion: reduceMotion), value: stateShape)
     .confirmationDialog(
       "Delete permanently?",
@@ -63,24 +58,40 @@ struct SpaceLensView: View {
     }
   }
 
-  private var header: some View {
-    HStack(alignment: .firstTextBaseline) {
-      Text("Space Lens")
-        .font(GleamTypeToken.title.font)
-        .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
-      Spacer()
-      Button("Close") { onClose() }
-        .buttonStyle(.plain)
-        .font(GleamTypeToken.caption.font)
-        .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
+  private var isIdle: Bool {
+    if case .idle = model.state { return true }
+    return false
+  }
+
+  private var working: some View {
+    VStack(alignment: .leading, spacing: GleamSpacing.points(2)) {
+      header
+      if let failure = model.failureNotice {
+        CleanupNoticeCard(
+          sentences: [failure],
+          tint: GleamColorToken.review.color(for: colorScheme)
+        )
+      }
+      content
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+    .padding(.horizontal, GleamSpacing.points(6))
+    .padding(.vertical, GleamSpacing.points(5))
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+
+  /// The rail is how you leave, so the heading carries no close control.
+  private var header: some View {
+    Text("Space Lens")
+      .gleamType(.heading)
+      .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
   }
 
   @ViewBuilder
   private var content: some View {
     switch model.state {
     case .idle:
-      SpaceLensIdleView(onMap: { model.startMapping(volume: Self.defaultVolume) })
+      SpaceLensIdleInvitation(onMap: { model.startMapping(volume: Self.defaultVolume) })
     case .mapping(let map):
       mapScene(map, isStreaming: true)
     case .browsing(let map):
@@ -216,7 +227,7 @@ enum SpaceLensStateShape {
 }
 
 /// The designed entry state: what a map covers and the one action.
-struct SpaceLensIdleView: View {
+struct SpaceLensIdleInvitation: View {
   let onMap: () -> Void
   @Environment(\.colorScheme) private var colorScheme
 
