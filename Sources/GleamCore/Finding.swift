@@ -10,7 +10,7 @@ public enum FindingCategory: Codable, Sendable, Equatable, Hashable {
   case xcodeDerivedData, simulatorCache, browserCache, temporaryFile
   case mailAttachmentLocalCopy
   case trashBin(volume: AbsolutePath)
-  // Clutter
+  // Leftovers
   case largeFile, oldFile, downloadsTriage
   case duplicateSet(keptPath: AbsolutePath)
   case similarPhotoSet(keptPath: AbsolutePath)
@@ -27,8 +27,8 @@ public enum FindingCategory: Codable, Sendable, Equatable, Hashable {
   case applicationBundle(bundleID: String)
   case applicationLeftover(bundleID: String)
   case orphanedLeftover
-  // Space Lens
-  case spaceLensSelection
+  // Disk Map
+  case diskMapSelection
 }
 
 /// One path a finding covers, with the allocated bytes its removal reclaims:

@@ -34,11 +34,11 @@ flowchart TB
         s1f["s1f disk access onboarding"]
         s1g["s1g cleanup module"]
     end
-    subgraph m2["M2 clutter and space lens"]
+    subgraph m2["M2 leftovers and disk map"]
         s2a["s2a large and old files"]
         s2b["s2b duplicates"]
         s2c["s2c similar photos"]
-        s2d["s2d space lens"]
+        s2d["s2d disk map"]
         s2e["s2e performance gates"]
     end
     subgraph m3["M3 performance and helper"]
@@ -60,9 +60,9 @@ flowchart TB
         s5c["s5c privacy cleanup"]
         s5d["s5d rules channel"]
     end
-    subgraph m6["M6 smart care and menu bar"]
+    subgraph m6["M6 full sweep and menu bar"]
         s6a["s6a orchestrator"]
-        s6b["s6b smart care surface"]
+        s6b["s6b full sweep surface"]
         s6c["s6c menu bar"]
     end
     subgraph m7["M7 launch"]
@@ -238,7 +238,7 @@ s7a can start in parallel the moment the workspace exists.
   a file from the Trash, confirm the choreography (staggered rows, fly to
   summary, ticking counter) uses only token motion.
 
-## M2. Clutter and Space Lens
+## M2. Leftovers and Disk Map
 
 ### s2a. large and old files
 - Contracts: C21 (large, old, downloads triage portions).
@@ -247,7 +247,7 @@ s7a can start in parallel the moment the workspace exists.
   is not a finding); thresholds honour Settings; downloads triage groups by
   the review rules; end to end removal through the shared executor lands in
   Trash.
-- Tier: verify. Human check: the My Clutter module surface reads as the same
+- Tier: verify. Human check: the Leftovers module surface reads as the same
   design language as Cleanup.
 
 ### s2b. duplicates
@@ -268,8 +268,8 @@ s7a can start in parallel the moment the workspace exists.
 - Tier: verify. Human check: grouping quality on a real photo folder is
   useful rather than noisy.
 
-### s2d. space lens
-- Contracts: C22, C39 (space lens module model). Amends C5 (per path byte
+### s2d. disk map
+- Contracts: C22, C39 (disk map module model). Amends C5 (per path byte
   sizes on Finding) and the C6 and C21 wording that followed, retiring the
   s2b ScannedAllocationCache.
 - Depends on: s1g.
@@ -289,7 +289,7 @@ s7a can start in parallel the moment the workspace exists.
   enforces the performance and streaming clauses of C20 and C22.
 - Depends on: s2a, s2d.
 - Verification: on a generated fixture of typical shape, the full Cleanup
-  scan finishes under 60 seconds and the Space Lens map under 30 on Apple
+  scan finishes under 60 seconds and the Disk Map under 30 on Apple
   silicon; peak resident memory during the largest scan stays under 500
   megabytes; the first finding and the first map node each arrive within two
   seconds of their run starting and within the first half of it; no finding
@@ -439,7 +439,7 @@ s7a can start in parallel the moment the workspace exists.
   publish workflow signs with the rules key held only in that pipeline.
 - Tier: auto.
 
-## M6. Smart Care and the menu bar
+## M6. Full Sweep and the menu bar
 
 ### s6a. orchestrator
 - Contracts: C29.
@@ -451,7 +451,7 @@ s7a can start in parallel the moment the workspace exists.
   proof).
 - Tier: auto.
 
-### s6b. smart care surface
+### s6b. full sweep surface
 - Contracts: wires C29 to the hub; the orb's scanning, result and clean
   sweep states go live.
 - Depends on: s6a.
@@ -459,7 +459,7 @@ s7a can start in parallel the moment the workspace exists.
   the orb reflects scanning (shimmer, live byte counter, non scanned cards
   dimmed), result (single lively pulse, particles here and nowhere else)
   and clean sweep; Reduce Motion swaps the shimmer for a determinate ring.
-- Tier: verify. Human check: run Smart Care on a scratch account and judge
+- Tier: verify. Human check: run Full Sweep on a scratch account and judge
   the scene against the DESIGN.md choreography, including the empty result
   as a reward moment.
 
@@ -467,7 +467,7 @@ s7a can start in parallel the moment the workspace exists.
 - Contracts: C33, the menu bar scene.
 - Depends on: s6b.
 - Verification: storage, memory and processor figures stream and agree with
-  the hub's figures; the quick clean action opens the app onto Smart Care;
+  the hub's figures; the quick clean action opens the app onto Full Sweep;
   the scene honours the menu bar preferences in Settings.
 - Tier: verify. Human check: glanceability and footprint; the popover sizes
   correctly (the known AppKit interop seam).
@@ -549,9 +549,9 @@ is one edit, not an archaeology dig.
    user writable external volumes in the user domain. Edge cases (another
    user's home on the same machine, network volumes) follow the same rule
    but deserve a look.
-8. The menu bar quick clean action "opens the app on the Smart Care result".
+8. The menu bar quick clean action "opens the app on the Full Sweep result".
    Ambiguous between starting a scan and showing the last result. Typed:
-   the action starts a Smart Care scan and opens the window onto its
+   the action starts a Full Sweep scan and opens the window onto its
    progress, landing on the result (s6c).
 9. Byte size semantics. Reclaimable estimates need allocated (on disk)
    bytes; the design never says logical or physical. Typed: allocated bytes

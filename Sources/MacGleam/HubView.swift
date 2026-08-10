@@ -10,9 +10,9 @@ import SwiftUI
 struct HubView: View {
   let model: HubModel
   let cleanup: CleanupDependencies
-  let spaceLens: SpaceLensDependencies
+  let diskMap: DiskMapDependencies
   @State private var navigation = HubNavigationState.initial
-  @State private var isSpaceLensOpen = false
+  @State private var isDiskMapOpen = false
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Namespace private var zoomNamespace
@@ -30,13 +30,13 @@ struct HubView: View {
       if let module = openModule {
         openModuleView(module)
       }
-      if isSpaceLensOpen {
-        spaceLensSurface
+      if isDiskMapOpen {
+        diskMapSurface
       }
     }
     .overlay(alignment: .topTrailing) {
-      if !isSpaceLensOpen && openModule == nil {
-        spaceLensControl
+      if !isDiskMapOpen && openModule == nil {
+        diskMapControl
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -130,21 +130,21 @@ struct HubView: View {
   }
 
   private var isChromeOrModuleOpen: Bool {
-    openModule != nil || isSpaceLensOpen
+    openModule != nil || isDiskMapOpen
   }
 
-  /// Space Lens lives outside the six cards, as hub chrome: a corner
+  /// Disk Map lives outside the six cards, as hub chrome: a corner
   /// control that zooms the map surface over the hub with the same zoom
   /// language the cards use.
-  private var spaceLensControl: some View {
+  private var diskMapControl: some View {
     Button {
       withAnimation(zoomAnimation(for: .zoomIn)) {
-        isSpaceLensOpen = true
+        isDiskMapOpen = true
       }
     } label: {
       HStack(spacing: GleamSpacing.points(1) / 2) {
         Image(systemName: "circle.grid.2x2")
-        Text("Space Lens")
+        Text("Disk Map")
       }
       .font(GleamTypeToken.caption.font)
       .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
@@ -160,11 +160,11 @@ struct HubView: View {
   }
 
   @ViewBuilder
-  private var spaceLensSurface: some View {
-    let surface = SpaceLensView(
-      model: spaceLens.model,
-      executor: spaceLens.executor,
-      onClose: { closeSpaceLens() }
+  private var diskMapSurface: some View {
+    let surface = DiskMapView(
+      model: diskMap.model,
+      executor: diskMap.executor,
+      onClose: { closeDiskMap() }
     )
     if reduceMotion {
       surface.transition(.opacity)
@@ -173,9 +173,9 @@ struct HubView: View {
     }
   }
 
-  private func closeSpaceLens() {
+  private func closeDiskMap() {
     withAnimation(zoomAnimation(for: .zoomOut)) {
-      isSpaceLensOpen = false
+      isDiskMapOpen = false
     }
   }
 
@@ -194,8 +194,8 @@ struct HubView: View {
   }
 
   private func handle(_ key: HubKeyEvent) -> KeyPress.Result {
-    if isSpaceLensOpen {
-      if key == .escape { closeSpaceLens() }
+    if isDiskMapOpen {
+      if key == .escape { closeDiskMap() }
       return .handled
     }
     perform(

@@ -47,4 +47,4 @@ a month. Version 5.5.x as of mid 2026.
   heuristics only for v1
 - Monetisation: one time licence versus subscription, trial shape
 - Update mechanism: Sparkle versus custom
-- How far Smart Care goes in v1 (which of the five jobs ship first)
+- How far Full Sweep goes in v1 (which of the five jobs ship first)

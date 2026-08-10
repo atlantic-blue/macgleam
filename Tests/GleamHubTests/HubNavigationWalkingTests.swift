@@ -6,7 +6,7 @@ import Testing
 struct HubArrowWalkingTests {
 
   @Test(
-    "the two columns follow the HubModule.allCases order: smartCare, cleanup, protection on the left, performance, applications, myClutter on the right"
+    "the two columns follow the HubModule.allCases order: fullSweep, cleanup, protection on the left, performance, applications, leftovers on the right"
   )
   func theTwoColumnsFollowTheAllCasesOrder() {
     #expect(HubModule.allCases == leftColumnTopToBottom + rightColumnTopToBottom)
@@ -15,8 +15,8 @@ struct HubArrowWalkingTests {
   @Test(
     "arrowDown moves focus one row down within the same column",
     arguments: zip(
-      [HubModule.smartCare, .cleanup, .performance, .applications],
-      [HubModule.cleanup, .protection, .applications, .myClutter]
+      [HubModule.fullSweep, .cleanup, .performance, .applications],
+      [HubModule.cleanup, .protection, .applications, .leftovers]
     )
   )
   func arrowDownMovesFocusOneRowDownWithinTheSameColumn(from: HubModule, to: HubModule) {
@@ -31,8 +31,8 @@ struct HubArrowWalkingTests {
   @Test(
     "arrowUp moves focus one row up within the same column",
     arguments: zip(
-      [HubModule.cleanup, .protection, .applications, .myClutter],
-      [HubModule.smartCare, .cleanup, .performance, .applications]
+      [HubModule.cleanup, .protection, .applications, .leftovers],
+      [HubModule.fullSweep, .cleanup, .performance, .applications]
     )
   )
   func arrowUpMovesFocusOneRowUpWithinTheSameColumn(from: HubModule, to: HubModule) {
@@ -46,7 +46,7 @@ struct HubArrowWalkingTests {
 
   @Test(
     "arrowDown at the bottom of a column leaves the state unchanged",
-    arguments: [HubModule.protection, .myClutter]
+    arguments: [HubModule.protection, .leftovers]
   )
   func arrowDownAtTheBottomOfAColumnLeavesTheStateUnchanged(bottom: HubModule) {
     let state = makeNavigationState(position: .hub(focus: bottom), slots: makeFullSlots())
@@ -59,7 +59,7 @@ struct HubArrowWalkingTests {
 
   @Test(
     "arrowUp at the top of a column leaves the state unchanged",
-    arguments: [HubModule.smartCare, .performance]
+    arguments: [HubModule.fullSweep, .performance]
   )
   func arrowUpAtTheTopOfAColumnLeavesTheStateUnchanged(top: HubModule) {
     let state = makeNavigationState(position: .hub(focus: top), slots: makeFullSlots())

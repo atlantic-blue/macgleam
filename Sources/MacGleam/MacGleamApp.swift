@@ -25,13 +25,13 @@ struct MacGleamApp: App {
   @State private var hubModel = HubModel(state: .firstRun(now: Date()))
   @State private var onboardingModel: DiskAccessOnboardingModel
   @State private var cleanup: CleanupDependencies
-  @State private var spaceLens: SpaceLensDependencies
+  @State private var diskMap: DiskMapDependencies
 
   init() {
     let onboarding = DiskAccessOnboardingModel(monitor: RealFullDiskAccessMonitor())
     _onboardingModel = State(initialValue: onboarding)
     _cleanup = State(initialValue: CleanupComposition.make(onboarding: onboarding))
-    _spaceLens = State(initialValue: SpaceLensComposition.make())
+    _diskMap = State(initialValue: DiskMapComposition.make())
   }
 
   var body: some Scene {
@@ -40,7 +40,7 @@ struct MacGleamApp: App {
         hubModel: hubModel,
         onboardingModel: onboardingModel,
         cleanup: cleanup,
-        spaceLens: spaceLens
+        diskMap: diskMap
       )
       .frame(minWidth: 980, minHeight: 700)
     }
@@ -58,14 +58,14 @@ struct RootView: View {
   let hubModel: HubModel
   let onboardingModel: DiskAccessOnboardingModel
   let cleanup: CleanupDependencies
-  let spaceLens: SpaceLensDependencies
+  let diskMap: DiskMapDependencies
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   private static let hubBlurWhileOnboarding: CGFloat = 8
 
   var body: some View {
     ZStack {
-      HubView(model: hubModel, cleanup: cleanup, spaceLens: spaceLens)
+      HubView(model: hubModel, cleanup: cleanup, diskMap: diskMap)
         .blur(radius: showsExplanation ? Self.hubBlurWhileOnboarding : 0)
         .allowsHitTesting(!showsExplanation)
       if let sentence = degradedSentence {

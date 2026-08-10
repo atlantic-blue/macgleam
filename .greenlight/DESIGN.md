@@ -11,20 +11,20 @@ the design session of 2026-08-09.
 
 **Hub (the signature surface)**
 - One window. A living status scene (the orb) in the centre, six module cards
-  arranged around it: Smart Care, Cleanup, Protection, Performance, Applications,
-  My Clutter. Space Lens and Settings reachable from the hub chrome.
+  arranged around it: Full Sweep, Cleanup, Protection, Performance, Applications,
+  Leftovers. Disk Map and Settings reachable from the hub chrome.
 - Selecting a card zooms into the module with a matched geometry transition. Escape
   or the back control zooms out. The hub is never more than one gesture away.
 - The status scene reflects real machine state: last scan time, reclaimable space
   estimate, threat state, and it changes visibly with each app state (see the
   Interaction and Motion section).
 
-**Smart Care (v1 ships three of five jobs)**
-- One scan runs deep clean (Cleanup), storage declutter (My Clutter large and old
+**Full Sweep (v1 ships three of five jobs)**
+- One scan runs deep clean (Cleanup), storage declutter (Leftovers large and old
   files) and performance boost (Performance maintenance) concurrently and presents
   one combined result with per job detail.
-- Threat scan and software updates join Smart Care in later milestones once the
-  Protection and Applications modules exist. Smart Care never shows a stub job.
+- Threat scan and software updates join Full Sweep in later milestones once the
+  Protection and Applications modules exist. Full Sweep never shows a stub job.
 - The combined result screen lets the user review and deselect before running, and
   shows one summary number (space to reclaim, issues found).
 
@@ -66,21 +66,21 @@ the design session of 2026-08-09.
 - Uninstall archives everything to the SafetyNet store before deletion so an
   uninstall is reversible for 30 days.
 - Leftover sweep finds orphaned files from apps already deleted.
-- Updater ships in a later milestone (it feeds Smart Care's fifth job).
+- Updater ships in a later milestone (it feeds Full Sweep's fifth job).
 
-**My Clutter**
+**Leftovers**
 - Duplicate finder by content hash, similar photo detection, large and old files
   (size and last opened thresholds, user tunable), downloads triage.
 - Duplicate resolution always keeps at least one copy; the kept copy is shown
   before anything moves.
 
-**Space Lens**
+**Disk Map**
 - Visual disk map, drill in by folder size, scan of any volume the app can read.
   Delete from the map obeys the same Trash default as Cleanup.
 
 **Menu bar monitor (v1 minimal)**
 - Storage, memory and processor load at a glance, one quick clean action that
-  opens the app on the Smart Care result. Battery and network stats deferred.
+  opens the app on the Full Sweep result. Battery and network stats deferred.
 
 **Onboarding**
 - First run explains and requests Full Disk Access with a guided flow: an in app
@@ -101,7 +101,7 @@ the design session of 2026-08-09.
 ### Non Functional
 
 - Scan performance: a full Cleanup scan of a typical 512 GB system disk completes
-  in under 60 seconds; Space Lens maps a full volume in under 30 seconds on Apple
+  in under 60 seconds; Disk Map maps a full volume in under 30 seconds on Apple
   silicon. Directory enumeration uses getattrlistbulk with 4 to 8 concurrent
   readers per volume (APFS serialises directory reads past that).
 - Animation: no dropped frames during the hub zoom and scan progress on a 60 Hz
@@ -139,7 +139,7 @@ the design session of 2026-08-09.
 ### Out of Scope (v1)
 
 - Cloud Cleanup module (cloud storage analysis).
-- Application updater and the Smart Care software updates job.
+- Application updater and the Full Sweep software updates job.
 - Assistant and suggestions layer beyond the per scan summary.
 - Battery and network stats in the menu bar.
 - iOS device backups cleanup, Time Machine snapshot thinning.
@@ -165,7 +165,7 @@ Each decision as: what was decided, what was rejected, and why.
 - **Sparkle 2 for updates.** Rejected: custom updater (undifferentiated effort,
   high risk surface). EdDSA signed appcast over HTTPS, delta updates, standard
   for Developer ID direct distribution.
-- **Smart Care ships three of five jobs.** Rejected: shipping all five with
+- **Full Sweep ships three of five jobs.** Rejected: shipping all five with
   stubbed threat scan and updater. Jobs appear only when their backing module is
   real.
 - **Hub with zoom navigation, no sidebar.** Rejected: CleanMyMac style sidebar
@@ -221,7 +221,7 @@ Internal structure is a Swift Package workspace:
   the FileSystem protocol, the enumeration engine, the SafetyNet store.
 - **Engines**, one package target each, all depending only on GleamCore:
   CleanupEngine, ProtectionEngine (wraps YARA), PerformanceEngine,
-  ApplicationsEngine, ClutterEngine, SpaceLensEngine, and SmartCareOrchestrator
+  ApplicationsEngine, LeftoversEngine, DiskMapEngine, and FullSweepOrchestrator
   which composes the others.
 - **GleamHelperCore**: the XPC contract types and the helper's operation policy,
   shared by app and helper so the contract cannot drift.
@@ -341,7 +341,7 @@ crossfades; the shimmer becomes a determinate ring.
   figure as they complete (keyframeAnimator, capped particle count), the
   reclaimed number ticks up in real time. Failures stay in place with the
   review colour and a plain sentence saying why.
-- **Space Lens**: the disk map builds outward from the root as data streams,
+- **Disk Map**: the disk map builds outward from the root as data streams,
   blocks growing with the gentle spring; drilling in is the same zoom grammar
   as the hub so the whole app has one navigation language.
 - **Uninstall**: the app icon and its leftover rows gather into a single stack
@@ -362,7 +362,7 @@ crossfades; the shimmer becomes a determinate ring.
 Every destructive operation is reversible or explicitly confirmed. The
 mechanisms, by operation:
 
-- **Junk, clutter and Space Lens deletions**: default destination is the macOS
+- **Junk, clutter and Disk Map deletions**: default destination is the macOS
   Trash, restorable by the user with tools they already know. The permanent
   delete setting is off by default and every permanent run confirms with file
   count and byte total.
@@ -422,7 +422,7 @@ mechanisms, by operation:
 
 - Cloud Cleanup module: needs provider integrations, none of the scan engine
   work is wasted; revisit after launch.
-- Application updater and Smart Care jobs four and five: needs a version
+- Application updater and Full Sweep jobs four and five: needs a version
   metadata source; design when Applications module is live.
 - Assistant and suggestions layer: needs usage patterns to suggest from.
 - Commercial malware signature feed: revisit if the XProtect plus curated list
@@ -441,7 +441,7 @@ Locked with Julian, 2026-08-09:
 - macOS 14 floor.
 - Malware v1 is XProtect YARA rules plus a curated adware list, quarantine only.
 - Sparkle 2 for updates.
-- Smart Care ships three of five jobs; the remaining two arrive with their
+- Full Sweep ships three of five jobs; the remaining two arrive with their
   modules.
 - MacGleam remains the name through development; trademark search before launch.
 - Menu bar monitor ships minimal in v1: storage, memory, processor, one action.

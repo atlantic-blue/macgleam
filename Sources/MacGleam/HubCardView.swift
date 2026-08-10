@@ -50,12 +50,12 @@ struct HubCardView: View {
 extension HubModule {
   var title: String {
     switch self {
-    case .smartCare: return "Smart Care"
+    case .fullSweep: return "Full Sweep"
     case .cleanup: return "Cleanup"
     case .protection: return "Protection"
     case .performance: return "Performance"
     case .applications: return "Applications"
-    case .myClutter: return "My Clutter"
+    case .leftovers: return "Leftovers"
     }
   }
 }
