@@ -7,14 +7,14 @@ let allModulesEnabled = Set(HubModule.allCases)
 /// The spatial card layout from the contract: two columns of three flanking
 /// the orb, in HubModule.allCases order. Left column top to bottom, then
 /// right column top to bottom.
-let leftColumnTopToBottom: [HubModule] = [.smartCare, .cleanup, .protection]
-let rightColumnTopToBottom: [HubModule] = [.performance, .applications, .myClutter]
+let leftColumnTopToBottom: [HubModule] = [.fullSweep, .cleanup, .protection]
+let rightColumnTopToBottom: [HubModule] = [.performance, .applications, .leftovers]
 
 /// The four arrow keys, for tests that walk without entering or leaving.
 let arrowKeys: [HubKeyEvent] = [.arrowUp, .arrowDown, .arrowLeft, .arrowRight]
 
 func makeNavigationState(
-  position: HubNavigationState.Position = .hub(focus: .smartCare),
+  position: HubNavigationState.Position = .hub(focus: .fullSweep),
   slots: [HubModule: ModuleStateSlot] = [:]
 ) -> HubNavigationState {
   HubNavigationState(position: position, moduleStateSlots: slots)
@@ -44,7 +44,7 @@ func makeEnabledVariants() -> [Set<HubModule>] {
   [
     [],
     Set(HubModule.allCases),
-    [.smartCare, .protection, .myClutter],
+    [.fullSweep, .protection, .leftovers],
   ]
 }
 

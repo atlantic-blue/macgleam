@@ -20,7 +20,7 @@ steps:
   - [x] s2a large and old files (atlantic-blue/macgleam#11)
   - [x] s2b duplicates (atlantic-blue/macgleam#12)
   - [x] s2c similar photos (atlantic-blue/macgleam#13)
-  - [ ] s2d space lens (this branch)
+  - [ ] s2d disk map (this branch)
 
   - [ ] M2 to M7 per .greenlight/GRAPH.md
 ```

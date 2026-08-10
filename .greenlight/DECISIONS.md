@@ -6,7 +6,7 @@ gets its own entry pointing at the one it supersedes.
 
 - 2026-08-09. Hub with zoom navigation, no sidebar. The signature interaction:
   status scene centre, six module cards, matched geometry zoom with one shared
-  navigation grammar across hub and Space Lens. Rejected the CleanMyMac style
+  navigation grammar across hub and Disk Map. Rejected the CleanMyMac style
   sidebar as safer but undifferentiated. Status: locked.
 - 2026-08-09. macOS 14 (Sonoma) floor. The animation stack (phaseAnimator,
   keyframeAnimator, shader view effects, Observation) requires 14; SMAppService
@@ -28,7 +28,7 @@ gets its own entry pointing at the one it supersedes.
   SafetyNet before removal. Reversibility is a trust feature. Status: locked.
 - 2026-08-09. Sparkle 2 for updates, EdDSA signed appcast, beta and stable
   channels. Rejected a custom updater as undifferentiated risk. Status: locked.
-- 2026-08-09. Smart Care ships three of five jobs (deep clean, storage
+- 2026-08-09. Full Sweep ships three of five jobs (deep clean, storage
   declutter, performance boost). Threat scan and software updates join when
   Protection and Applications exist; no stub jobs ever. Status: locked.
 - 2026-08-09. Privileged operations via an SMAppService root daemon with a
@@ -84,3 +84,20 @@ gets its own entry pointing at the one it supersedes.
   verifies its own rule catalogue and updates never shrink the denylist,
   external volumes are user domain when mutable without escalation, menu bar
   quick clean starts a scan, byte figures are allocated bytes). Status: locked.
+- 2026-08-10. Renamed three modules away from the competitor's own product
+  names: Smart Care becomes Full Sweep, My Clutter becomes Leftovers, and
+  Space Lens becomes Disk Map. Those three were taken verbatim from
+  CleanMyMac 5 and are coined product names rather than ordinary English, so
+  they carried trademark exposure and made the product read as a clone; the
+  repository is public, so the names sat in the code as well as on screen.
+  The other four module names, Cleanup, Protection, Performance and
+  Applications, are ordinary descriptive English and stay exactly as they
+  are. The rename is mechanical with no behaviour change: targets, types,
+  directories, file names, test names and documents move together, and the
+  test count is unchanged at 628 in 145 suites. The interview brief keeps the
+  competitor's names where it records their module list, which is the one
+  place those names are correct. Earlier entries in this file were updated to
+  the new names so the documents stay consistent; the decisions they record
+  are unchanged. Branding is not settled by this: the trademark search before
+  launch remains a separate M7 gate on the MacGleam name itself.
+  Status: locked.

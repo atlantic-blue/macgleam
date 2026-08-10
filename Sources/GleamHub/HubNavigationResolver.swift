@@ -2,9 +2,9 @@
 /// function, driven in tests without a view.
 ///
 /// The six cards form two columns of three flanking the orb, in
-/// `HubModule.allCases` order: left column top to bottom is smartCare,
+/// `HubModule.allCases` order: left column top to bottom is fullSweep,
 /// cleanup, protection; right column top to bottom is performance,
-/// applications, myClutter. Vertical moves clamp at column ends, horizontal
+/// applications, leftovers. Vertical moves clamp at column ends, horizontal
 /// moves swap to the same row of the other column and clamp when focus is
 /// already in the pressed direction's column. Return enters only enabled
 /// modules with a zoomIn; escape inside a module returns to the hub with

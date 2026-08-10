@@ -35,7 +35,7 @@ struct FindingTests {
     .applicationBundle(bundleID: "com.example.app"),
     .applicationLeftover(bundleID: "com.example.app"),
     .orphanedLeftover,
-    .spaceLensSelection,
+    .diskMapSelection,
   ]
 
   @Test("every category round trips losslessly", arguments: allCategories)

@@ -7,8 +7,8 @@ struct HubNavigationInitialStateTests {
 
   @Test("initial sits on the hub with focus on the first card in the layout order")
   func initialSitsOnTheHubWithFocusOnTheFirstCardInTheLayoutOrder() {
-    #expect(HubModule.allCases.first == .smartCare)
-    #expect(HubNavigationState.initial.position == .hub(focus: .smartCare))
+    #expect(HubModule.allCases.first == .fullSweep)
+    #expect(HubNavigationState.initial.position == .hub(focus: .fullSweep))
   }
 
   @Test("initial carries no stored module slots")

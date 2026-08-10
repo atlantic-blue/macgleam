@@ -42,14 +42,14 @@ let package = Package(
             path: "Tests/CleanupEngineTests"
         ),
         .target(
-            name: "ClutterEngine",
+            name: "LeftoversEngine",
             dependencies: ["GleamCore"],
-            path: "Sources/ClutterEngine"
+            path: "Sources/LeftoversEngine"
         ),
         .testTarget(
-            name: "ClutterEngineTests",
-            dependencies: ["ClutterEngine", "GleamCore"],
-            path: "Tests/ClutterEngineTests"
+            name: "LeftoversEngineTests",
+            dependencies: ["LeftoversEngine", "GleamCore"],
+            path: "Tests/LeftoversEngineTests"
         ),
         .target(
             name: "CleanupModule",
@@ -62,29 +62,29 @@ let package = Package(
             path: "Tests/CleanupModuleTests"
         ),
         .target(
-            name: "SpaceLensEngine",
+            name: "DiskMapEngine",
             dependencies: ["GleamCore"],
-            path: "Sources/SpaceLensEngine"
+            path: "Sources/DiskMapEngine"
         ),
         .testTarget(
-            name: "SpaceLensEngineTests",
-            dependencies: ["SpaceLensEngine", "GleamCore"],
-            path: "Tests/SpaceLensEngineTests"
+            name: "DiskMapEngineTests",
+            dependencies: ["DiskMapEngine", "GleamCore"],
+            path: "Tests/DiskMapEngineTests"
         ),
         .target(
-            name: "SpaceLensModule",
-            dependencies: ["GleamCore", "SpaceLensEngine", "GleamHub"],
-            path: "Sources/SpaceLensModule"
+            name: "DiskMapModule",
+            dependencies: ["GleamCore", "DiskMapEngine", "GleamHub"],
+            path: "Sources/DiskMapModule"
         ),
         .testTarget(
             name: "PerformanceGateTests",
-            dependencies: ["GleamCore", "CleanupEngine", "SpaceLensEngine"],
+            dependencies: ["GleamCore", "CleanupEngine", "DiskMapEngine"],
             path: "Tests/PerformanceGateTests"
         ),
         .testTarget(
-            name: "SpaceLensModuleTests",
-            dependencies: ["SpaceLensModule", "SpaceLensEngine", "GleamCore", "GleamHub", "GleamDesign"],
-            path: "Tests/SpaceLensModuleTests"
+            name: "DiskMapModuleTests",
+            dependencies: ["DiskMapModule", "DiskMapEngine", "GleamCore", "GleamHub", "GleamDesign"],
+            path: "Tests/DiskMapModuleTests"
         ),
         .target(
             name: "GleamHub",
@@ -109,7 +109,7 @@ let package = Package(
             name: "MacGleam",
             dependencies: [
         "GleamHub", "GleamDesign", "GleamCore", "CleanupEngine", "CleanupModule",
-        "SpaceLensEngine", "SpaceLensModule",
+        "DiskMapEngine", "DiskMapModule",
       ],
             path: "Sources/MacGleam"
         )

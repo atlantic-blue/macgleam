@@ -1,7 +1,7 @@
 import Foundation
 
 public enum GleamModule: String, Codable, Sendable, CaseIterable {
-  case smartCare, cleanup, protection, performance, applications, clutter, spaceLens
+  case fullSweep, cleanup, protection, performance, applications, leftovers, diskMap
 }
 
 /// The live figures of one scan. `itemCount` counts path entries across the

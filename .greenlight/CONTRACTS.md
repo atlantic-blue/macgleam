@@ -216,7 +216,7 @@ public enum ScanPhase: Codable, Sendable, Equatable {
 }
 
 public enum GleamModule: String, Codable, Sendable, CaseIterable {
-    case smartCare, cleanup, protection, performance, applications, clutter, spaceLens
+    case fullSweep, cleanup, protection, performance, applications, leftovers, diskMap
 }
 ```
 
@@ -260,7 +260,7 @@ note after this contract lists the existing test pins that change.
 /// - `explanation` is a plain sentence saying what this is and why it is
 ///   safe, reviewable or dangerous. Never empty.
 /// - Preselection rules by module are binding:
-///   Cleanup, Clutter and Space Lens findings may be preselected only when
+///   Cleanup, Leftovers and Disk Map findings may be preselected only when
 ///   risk is `.safe`. Protection malware and adware findings are preselected
 ///   (quarantine is reversible). Privacy cleanup findings are never
 ///   preselected. Leftover sweep findings are never preselected.
@@ -298,7 +298,7 @@ public enum FindingCategory: Codable, Sendable, Equatable, Hashable {
     case xcodeDerivedData, simulatorCache, browserCache, temporaryFile
     case mailAttachmentLocalCopy
     case trashBin(volume: AbsolutePath)
-    // Clutter
+    // Leftovers
     case largeFile, oldFile, downloadsTriage
     case duplicateSet(keptPath: AbsolutePath)
     case similarPhotoSet(keptPath: AbsolutePath)
@@ -315,8 +315,8 @@ public enum FindingCategory: Codable, Sendable, Equatable, Hashable {
     case applicationBundle(bundleID: String)
     case applicationLeftover(bundleID: String)
     case orphanedLeftover
-    // Space Lens
-    case spaceLensSelection
+    // Disk Map
+    case diskMapSelection
 }
 ```
 
@@ -341,7 +341,7 @@ s2d:
 
 Later suites construct findings through their own factories and break at
 compile time, not behaviourally: CleanupEngineTests (makeCleanupFinding and
-CleanupPlanTests), ClutterEngineTests (makeClutterFinding, plus the hostile
+CleanupPlanTests), LeftoversEngineTests (makeLeftoversFinding, plus the hostile
 findings built directly in SimilarPhotosKeptPathTests and
 DuplicatesPlanInvariantTests), CleanupModuleTests
 (CleanupModuleTestSupport). Their assertions stand; only construction
@@ -942,7 +942,7 @@ the following, stated rather than absorbed:
   order, not necessarily on where the batch boundaries fall.
 - `duplicateSet` and `similarPhotoSet` are exempt from the cap and stay
   unbounded, and duplicate grouping still indexes across the whole walk
-  (C21). Clutter therefore has no memory guarantee by construction, and no
+  (C21). Leftovers therefore has no memory guarantee by construction, and no
   gate covers it yet.
 
 The existing test pins this breaks, for the test writer to update
@@ -956,7 +956,7 @@ Behavioural, the assertion is wrong under the amended contract:
   `final.findingCount == UInt32(outcome.findings.count)`. Becomes
   `final.itemCount` equals the entry count across the yielded findings. The
   old equality is false by design once a category spans several findings.
-- Tests/ClutterEngineTests/ClutterScanMechanicsTests.swift, "counters only
+- Tests/LeftoversEngineTests/LeftoversScanMechanicsTests.swift, "counters only
   count up and the final counters equal the yielded findings": the same
   line, the same fix.
 - Tests/CleanupEngineTests/CleanupCategoryDiscoveryTests.swift, "scanning
@@ -980,11 +980,11 @@ under test is unchanged in every one:
   update arrives", "no counter decreases under a mixed update", "no counter
   decreases across a sequence of updates".
 - Tests/CleanupEngineTests/CleanupEngineFixtures.swift and
-  Tests/ClutterEngineTests/ClutterEngineFixtures.swift,
+  Tests/LeftoversEngineTests/LeftoversEngineFixtures.swift,
   `countersAreMonotonic`.
-- Tests/ClutterEngineTests/SimilarPhotosSessionAndDeterminismTests.swift,
+- Tests/LeftoversEngineTests/SimilarPhotosSessionAndDeterminismTests.swift,
   "progress counters never decrease during a similar photos scan".
-- Tests/ClutterEngineTests/DuplicatesSessionMechanicsTests.swift,
+- Tests/LeftoversEngineTests/DuplicatesSessionMechanicsTests.swift,
   "duplicate findings ride the scan session with advancing phases and
   counters that only count up".
 - Tests/CleanupModuleTests/CleanupModuleTestSupport.swift, `makeCounters`
@@ -1259,7 +1259,7 @@ engine tests run against an in memory `FileSystemReading` with fixture trees.
 public struct CleanupEngine: GleamEngine { /* module == .cleanup */ }
 ```
 
-### C21. ClutterEngine
+### C21. LeftoversEngine
 
 ```swift
 /// Large and old files, downloads triage, duplicates by content hash,
@@ -1282,8 +1282,8 @@ public struct CleanupEngine: GleamEngine { /* module == .cleanup */ }
 ///   construction, and duplicate grouping is also the one scan that must
 ///   index candidates across the whole walk, so C15's "retains nothing
 ///   proportional to files seen" does not hold here either. Neither is
-///   covered by the s2e gates, which cover Cleanup and Space Lens. A
-///   Clutter performance gate is separate work and these two are what it
+///   covered by the s2e gates, which cover Cleanup and Disk Map. A
+///   Leftovers performance gate is separate work and these two are what it
 ///   should measure.
 /// - Large file, old file and downloads triage findings carry one entry
 ///   each, far under the cap, and already stream as the walk runs. C15's
@@ -1304,10 +1304,10 @@ public struct CleanupEngine: GleamEngine { /* module == .cleanup */ }
 ///   an image file and sets never overlap.
 /// - Old file findings use last opened date where the volume records it,
 ///   falling back to modification date, and the explanation names which.
-public struct ClutterEngine: GleamEngine { /* module == .clutter */ }
+public struct LeftoversEngine: GleamEngine { /* module == .leftovers */ }
 ```
 
-### C22. SpaceLensEngine
+### C22. DiskMapEngine
 
 ```swift
 /// The streaming disk map. Scan of any volume the app can read.
@@ -1323,7 +1323,7 @@ public struct ClutterEngine: GleamEngine { /* module == .clutter */ }
 ///   and the first node arrives within two seconds of the map starting and
 ///   within the first half of the run. Enforced by gates in M2 (s2e).
 /// - Selecting nodes for deletion produces ordinary Findings with category
-///   `spaceLensSelection` and risk `review` (never preselected), one entry
+///   `diskMapSelection` and risk `review` (never preselected), one entry
 ///   per selected node. The category therefore spans as many findings as
 ///   the user selected nodes, and its totals are sums across them (C15);
 ///   each finding is already far under the entry cap, so nothing here
@@ -1331,21 +1331,21 @@ public struct ClutterEngine: GleamEngine { /* module == .clutter */ }
 ///   identical to Cleanup.
 /// - The map never offers selection of a denylisted path; such nodes render
 ///   but are not selectable.
-public struct SpaceLensEngine: GleamEngine {
+public struct DiskMapEngine: GleamEngine {
     /// In addition to GleamEngine.scan, the streaming map surface:
     public func map(
         volume: AbsolutePath,
         context: ScanContext
-    ) -> AsyncThrowingStream<SpaceLensUpdate, Error>
+    ) -> AsyncThrowingStream<DiskMapUpdate, Error>
 }
 
-public enum SpaceLensUpdate: Sendable, Equatable {
-    case node(SpaceLensNode)
+public enum DiskMapUpdate: Sendable, Equatable {
+    case node(DiskMapNode)
     case sizeRevision(path: AbsolutePath, subtreeBytes: UInt64)
     case completed
 }
 
-public struct SpaceLensNode: Sendable, Equatable {
+public struct DiskMapNode: Sendable, Equatable {
     public let path: AbsolutePath
     public let parent: AbsolutePath?
     public let isDirectory: Bool
@@ -1557,15 +1557,15 @@ public enum YaraError: Error, Sendable, Equatable {
 }
 ```
 
-### C29. SmartCareOrchestrating
+### C29. FullSweepOrchestrating
 
 ```swift
-/// One scan composing deep clean (Cleanup), storage declutter (Clutter large
+/// One scan composing deep clean (Cleanup), storage declutter (Leftovers large
 /// and old files plus downloads triage) and performance boost (Performance
 /// maintenance) concurrently, with one combined result and per job detail.
 ///
 /// Guarantees:
-/// - Exactly the jobs in `SmartCareJob` run. No stub jobs, ever: threat
+/// - Exactly the jobs in `FullSweepJob` run. No stub jobs, ever: threat
 ///   scan and software updates do not appear in any form until their
 ///   modules ship and this enum gains cases.
 /// - Jobs run concurrently; events interleave, each tagged with its job.
@@ -1578,35 +1578,35 @@ public enum YaraError: Error, Sendable, Equatable {
 /// - The combined review supports deselection per finding, and `plan`
 ///   produces one combined OperationPlan whose operations preserve each
 ///   underlying engine's plan invariants (C20, C21, C23).
-public protocol SmartCareOrchestrating: Sendable {
-    func scan(_ context: ScanContext) -> AsyncThrowingStream<SmartCareEvent, Error>
+public protocol FullSweepOrchestrating: Sendable {
+    func scan(_ context: ScanContext) -> AsyncThrowingStream<FullSweepEvent, Error>
     func plan(selection: [Finding], context: PlanContext) throws -> OperationPlan
 }
 
-public enum SmartCareJob: String, Codable, Sendable, CaseIterable, Equatable {
+public enum FullSweepJob: String, Codable, Sendable, CaseIterable, Equatable {
     case deepClean
     case storageDeclutter
     case performanceBoost
 }
 
-public enum SmartCareEvent: Sendable {
-    case job(SmartCareJob, ScanEvent)
-    case jobFailed(SmartCareJob, reason: String)
-    case summary(SmartCareSummary)
+public enum FullSweepEvent: Sendable {
+    case job(FullSweepJob, ScanEvent)
+    case jobFailed(FullSweepJob, reason: String)
+    case summary(FullSweepSummary)
 }
 
-public struct SmartCareSummary: Codable, Sendable, Equatable {
+public struct FullSweepSummary: Codable, Sendable, Equatable {
     public let bytesReclaimable: UInt64
     public let issueCount: UInt32
-    public let perJob: [SmartCareJobOutcome]
+    public let perJob: [FullSweepJobOutcome]
 }
 
-public struct SmartCareJobOutcome: Codable, Sendable, Equatable {
+public struct FullSweepJobOutcome: Codable, Sendable, Equatable {
     public enum Outcome: Codable, Sendable, Equatable {
         case completed(findingCount: UInt32, bytes: UInt64)
         case failed(reason: String)
     }
-    public let job: SmartCareJob
+    public let job: FullSweepJob
     public let outcome: Outcome
 }
 ```
@@ -1751,7 +1751,7 @@ public protocol FullDiskAccessMonitoring: Sendable {
 /// - `samples` streams at a cadence suitable for a glanceable display and
 ///   never blocks the main actor.
 /// - Storage figures agree with `VolumeInfo` (C13) for the boot volume; the
-///   menu bar and Space Lens never show contradictory numbers for the same
+///   menu bar and Disk Map never show contradictory numbers for the same
 ///   volume at the same instant of sampling.
 /// - Memory pressure buckets match the platform's own notion (normal,
 ///   warning, critical) so the hub card never invents a fourth state.
@@ -1838,7 +1838,7 @@ import GleamDesign
 /// The orb's five moods. The complete set from DESIGN.md, closed from the
 /// start so the appearance mapping below is total. s0b reaches only the two
 /// idle moods through HubModel; scanning, result and cleanSweep become
-/// reachable when Smart Care wires in (s6b), by extending the derivation
+/// reachable when Full Sweep wires in (s6b), by extending the derivation
 /// inputs, never by adding cases.
 public enum OrbMood: String, CaseIterable, Sendable, Equatable {
     case idleHealthy
@@ -1851,15 +1851,15 @@ public enum OrbMood: String, CaseIterable, Sendable, Equatable {
 /// The six hub cards in their fixed hexagonal order. The order of
 /// `allCases` is the layout order and is part of the contract: a test
 /// asserts this exact sequence and the hub never reorders at runtime.
-/// `myClutter` presents the `GleamModule.clutter` engine (C4). Space Lens
+/// `leftovers` presents the `GleamModule.leftovers` engine (C4). Disk Map
 /// and Settings are hub chrome, not cards, and have no case here.
 public enum HubModule: String, CaseIterable, Sendable, Equatable {
-    case smartCare
+    case fullSweep
     case cleanup
     case protection
     case performance
     case applications
-    case myClutter
+    case leftovers
 }
 
 /// One module card on the hub.
@@ -2023,7 +2023,7 @@ public struct ModuleStateSlot: Codable, Sendable, Equatable {
 ///   hub case carries a non optional HubModule and no unfocused hub state
 ///   is representable.
 /// - `initial` is the hub with focus on the first card in
-///   `HubModule.allCases` order (smartCare) and no stored slots.
+///   `HubModule.allCases` order (fullSweep) and no stored slots.
 /// - Values are immutable. `storingSlot` returns a copy with that module's
 ///   slot replaced and everything else identical; it is the only operation
 ///   anywhere that changes `moduleStateSlots`.
@@ -2073,8 +2073,8 @@ public enum HubZoomDirection: String, CaseIterable, Sendable, Equatable {
 ///   randomness, no hidden state.
 /// - Spatial order: the six cards form two columns of three flanking the
 ///   orb, in `HubModule.allCases` order (C36). Left column top to bottom is
-///   smartCare, cleanup, protection; right column top to bottom is
-///   performance, applications, myClutter.
+///   fullSweep, cleanup, protection; right column top to bottom is
+///   performance, applications, leftovers.
 /// - On the hub, arrowUp and arrowDown move within the focused card's
 ///   column and clamp at its ends; arrowLeft and arrowRight move to the
 ///   same row of the other column and clamp when focus is already in the
@@ -2481,7 +2481,7 @@ public final class CleanupModuleModel {
 }
 ```
 
-### C39. Space Lens module model
+### C39. Disk Map module model
 
 ```swift
 import Foundation
@@ -2489,25 +2489,25 @@ import Observation
 import GleamHub   // HubZoomDirection, HubZoomResolver, HubZoomAppearance (C37)
 
 /// The narrow engine seam the module model consumes, so tests script the
-/// streaming map and the plan without the real engine. SpaceLensEngine
+/// streaming map and the plan without the real engine. DiskMapEngine
 /// (C22) is the one production conformance; this protocol adds nothing to
 /// C22 and takes nothing from it: `map` and `plan` carry C22's guarantees
 /// verbatim.
-public protocol SpaceLensMapProviding: Sendable {
+public protocol DiskMapProviding: Sendable {
     var module: GleamModule { get }
     func map(
         volume: AbsolutePath,
         context: ScanContext
-    ) -> AsyncThrowingStream<SpaceLensUpdate, Error>
+    ) -> AsyncThrowingStream<DiskMapUpdate, Error>
     func plan(selection: [Finding], context: PlanContext) throws -> OperationPlan
 }
 
-/// Mints the per session contexts of C15 for Space Lens. Same shape and
+/// Mints the per session contexts of C15 for Disk Map. Same shape and
 /// guarantees as CleanupSessionProviding (C38): every makeScanContext call
 /// mints a fresh session identifier, and plan contexts are bound to exactly
 /// their session. A deliberate duplicate of the C38 protocol rather than a
 /// shared abstraction; the third module surface extracts the pattern.
-public protocol SpaceLensSessionProviding: Sendable {
+public protocol DiskMapSessionProviding: Sendable {
     func makeScanContext(settings: Settings, hasFullDiskAccess: Bool) async -> ScanContext
     func makePlanContext(sessionID: UUID, settings: Settings) async -> PlanContext
 }
@@ -2527,14 +2527,14 @@ public protocol SpaceLensSessionProviding: Sendable {
 /// - `children` is sorted by allocatedBytesSoFar descending, ties broken
 ///   lexicographically by path, so the rendered map is a pure, reproducible
 ///   function of the tree.
-public struct SpaceLensTreeNode: Sendable, Equatable, Identifiable {
+public struct DiskMapTreeNode: Sendable, Equatable, Identifiable {
     public var id: AbsolutePath { path }
     public let path: AbsolutePath
     public let isDirectory: Bool
     public let allocatedBytesSoFar: UInt64
     public let hasConverged: Bool
     public let isSelectable: Bool
-    public let children: [SpaceLensTreeNode]
+    public let children: [DiskMapTreeNode]
 }
 
 /// The map as the view renders it: the tree, where the user has drilled to,
@@ -2560,20 +2560,20 @@ public struct SpaceLensTreeNode: Sendable, Equatable, Identifiable {
 ///   the selected paths whose nodes are present in the tree; an
 ///   unresolved intention contributes nothing until it resolves. A pure
 ///   derivation, no stored copy to drift.
-public struct SpaceLensMapState: Sendable, Equatable {
+public struct DiskMapState: Sendable, Equatable {
     public let sessionID: UUID
     public let volume: AbsolutePath
-    public let root: SpaceLensTreeNode?
+    public let root: DiskMapTreeNode?
     public let focusPath: AbsolutePath
     public let selectedPaths: Set<AbsolutePath>
     public var selectedByteTotal: UInt64 { get }
 }
 
-/// Where the Space Lens module is. Space Lens is hub chrome, not a card:
+/// Where the Disk Map module is. Disk Map is hub chrome, not a card:
 /// HubModule (C36) has no case for it and C37's module state slots do not
 /// apply. Entry and exit of the surface is chrome wiring; this model owns
 /// everything inside it.
-public enum SpaceLensModuleState: Sendable, Equatable {
+public enum DiskMapModuleState: Sendable, Equatable {
     /// No map this session: the entry state, and the state after a result
     /// is acknowledged, a mapping fails or is cancelled. A result
     /// acknowledgement always lands here, never back on the old map: an
@@ -2582,13 +2582,13 @@ public enum SpaceLensModuleState: Sendable, Equatable {
     case idle
     /// The stream is running. The map grows, drill and selection work,
     /// execution is refused until completion.
-    case mapping(SpaceLensMapState)
+    case mapping(DiskMapState)
     /// The stream completed: every total converged and true (C22). The
     /// only state that admits executeSelection, so every byte figure a
     /// confirmation names is a true allocated total, never an estimate.
-    case browsing(SpaceLensMapState)
-    case executing(SpaceLensExecutionProgress)
-    case result(SpaceLensResultSummary)
+    case browsing(DiskMapState)
+    case executing(DiskMapExecutionProgress)
+    case result(DiskMapResultSummary)
 }
 
 /// One drill step, as data, for the view to animate. Reuses the C37 zoom
@@ -2597,7 +2597,7 @@ public enum SpaceLensModuleState: Sendable, Equatable {
 /// uses (snappy matched geometry, crossfade under Reduce Motion) and the
 /// whole app keeps one navigation language. HubZoom itself is not reused:
 /// it names a HubModule, and a folder is not a module.
-public struct SpaceLensDrill: Sendable, Equatable {
+public struct DiskMapDrill: Sendable, Equatable {
     public let target: AbsolutePath
     public let direction: HubZoomDirection
 }
@@ -2608,7 +2608,7 @@ public struct SpaceLensDrill: Sendable, Equatable {
 /// exceeds totalOperations, and currentOperationID is the operation the
 /// executor last reported started and not yet finished, nil between
 /// operations.
-public struct SpaceLensExecutionProgress: Sendable, Equatable {
+public struct DiskMapExecutionProgress: Sendable, Equatable {
     public let planID: UUID
     public let totalOperations: UInt32
     public let finishedOperations: UInt32
@@ -2630,7 +2630,7 @@ public struct SpaceLensExecutionProgress: Sendable, Equatable {
 ///   distinct from failure (C7).
 /// - `notStartedCount` counts a cancelled run's untouched operations,
 ///   which is how the partial result says exactly which is which.
-public struct SpaceLensResultSummary: Sendable, Equatable {
+public struct DiskMapResultSummary: Sendable, Equatable {
     public let bytesReclaimed: UInt64
     public let completedCount: UInt32
     public let failedCount: UInt32
@@ -2641,7 +2641,7 @@ public struct SpaceLensResultSummary: Sendable, Equatable {
 
 /// Why executeSelection did not start. Returned, never thrown; the state
 /// is unchanged in every case (C38 precedent).
-public enum SpaceLensCommandRefusal: Sendable, Equatable {
+public enum DiskMapCommandRefusal: Sendable, Equatable {
     case notBrowsing
     /// The stream is still running: totals are not yet true, so no
     /// confirmation could name honest counts.
@@ -2658,7 +2658,7 @@ unchanged in shape. Every CleanupModuleTests file already imports GleamCore,
 so the move breaks no test source.
 
 ```swift
-/// The Space Lens module view model, on the macOS 14 Observation framework.
+/// The Disk Map module view model, on the macOS 14 Observation framework.
 /// A thin SwiftUI view renders this and adds no state of its own; the
 /// module's whole behaviour is this class driven against fakes of its five
 /// injected protocols.
@@ -2713,11 +2713,11 @@ so the move breaks no test source.
 ///   executing until the executor's terminal report arrives, then moves to
 ///   result, whose summary is the partial result screen.
 /// - `acknowledgeResult`: result to idle. Never back to a map: see
-///   SpaceLensModuleState.idle.
+///   DiskMapModuleState.idle.
 ///
 /// Deletion, the C38 path exactly:
 /// - `executeSelection` mints one Finding per selected node: category
-///   `spaceLensSelection`, risk `review`, never preselected (C22), the
+///   `diskMapSelection`, risk `review`, never preselected (C22), the
 ///   map's session identifier, and exactly one entry carrying the node's
 ///   path and its converged `allocatedBytesSoFar` (C5). Byte totals
 ///   therefore derive from the finding's own entries; no cache, no second
@@ -2747,7 +2747,7 @@ so the move breaks no test source.
 ///   never a silent drop.
 ///
 /// The hub:
-/// - There is no hub estimate interplay. Space Lens has no HubModule case
+/// - There is no hub estimate interplay. Disk Map has no HubModule case
 ///   (C36), contributes nothing to HubMachineState.cardFigures or
 ///   reclaimableEstimateBytes, and its reclaimed bytes surface only on its
 ///   own result screen. A test asserts the model exposes no hub figure.
@@ -2756,7 +2756,7 @@ so the move breaks no test source.
 /// - `startMapping` reads the store's current settings and the monitor's
 ///   current grant (C32), and mints one scan context through the session
 ///   provider. Without the grant the map covers what the user domain
-///   allows (C15). The cost is stated plainly: SpaceLensUpdate (C22)
+///   allows (C15). The cost is stated plainly: DiskMapUpdate (C22)
 ///   carries no degraded events, so s2d ships no degraded banner in this
 ///   module; the honest banner arrives if C22 gains a degraded surface.
 ///
@@ -2767,31 +2767,31 @@ so the move breaks no test source.
 /// - No clock reads: every date the model holds arrived in an input.
 /// - `failureNotice` is always a plain sentence, set only by a failed map
 ///   stream or a failed plan build, cleared by the next `startMapping`.
-/// - Construction traps unless `engine.module == .spaceLens`.
+/// - Construction traps unless `engine.module == .diskMap`.
 @MainActor @Observable
-public final class SpaceLensModuleModel {
-    public private(set) var state: SpaceLensModuleState
+public final class DiskMapModuleModel {
+    public private(set) var state: DiskMapModuleState
     public private(set) var failureNotice: String?
 
     public init(
-        engine: any SpaceLensMapProviding,
+        engine: any DiskMapProviding,
         executor: any PlanExecuting,
         settings: any SettingsStoring,
-        sessions: any SpaceLensSessionProviding,
+        sessions: any DiskMapSessionProviding,
         access: any FullDiskAccessMonitoring
     )
 
     public func startMapping(volume: AbsolutePath)
     @discardableResult
-    public func drillIn(to path: AbsolutePath) -> SpaceLensDrill?
+    public func drillIn(to path: AbsolutePath) -> DiskMapDrill?
     @discardableResult
-    public func drillOut() -> SpaceLensDrill?
+    public func drillOut() -> DiskMapDrill?
     public func toggleSelection(_ path: AbsolutePath)
     public func permanentDeletionScope() -> PermanentDeletionScope?
     @discardableResult
     public func executeSelection(
         permanentConfirmation: PermanentDeletionConfirmation?
-    ) -> SpaceLensCommandRefusal?
+    ) -> DiskMapCommandRefusal?
     public func cancelMapping()
     public func cancelExecution()
     public func acknowledgeResult()

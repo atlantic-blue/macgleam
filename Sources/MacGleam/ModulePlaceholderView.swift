@@ -34,12 +34,12 @@ struct ModulePlaceholderView: View {
 extension HubModule {
   var shippingSliceLine: String {
     switch self {
-    case .smartCare: return "The Smart Care surface ships with slice s6b."
+    case .fullSweep: return "The Full Sweep surface ships with slice s6b."
     case .cleanup: return "The Cleanup module ships with slice s1g."
     case .protection: return "The Protection module ships with slice s5b."
     case .performance: return "The Performance module ships with slice s3c."
     case .applications: return "The Applications module ships with slice s4c."
-    case .myClutter: return "The My Clutter module ships with slice s2a."
+    case .leftovers: return "The Leftovers module ships with slice s2a."
     }
   }
 }

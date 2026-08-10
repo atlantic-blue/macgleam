@@ -11,7 +11,7 @@ struct CleanupModuleConstructionTests {
     await #expect(processExitsWith: .failure) {
       await MainActor.run {
         _ = CleanupModuleModel(
-          engine: FakeCleanupEngine(module: .clutter),
+          engine: FakeCleanupEngine(module: .leftovers),
           executor: FakePlanExecutor(),
           settings: FakeSettingsStore(initial: ModuleFixture.settings()),
           sessions: FakeCleanupSessionProvider(sessionIDs: [ModuleFixture.sessionA]),
