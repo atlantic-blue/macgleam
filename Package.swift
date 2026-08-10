@@ -102,6 +102,10 @@ let package = Package(
             path: "Sources/GleamBaselineGenerator"
         ),
         .executableTarget(
+            name: "GleamBundler",
+            path: "Sources/GleamBundler"
+        ),
+        .executableTarget(
             name: "MacGleam",
             dependencies: [
         "GleamHub", "GleamDesign", "GleamCore", "CleanupEngine", "CleanupModule",

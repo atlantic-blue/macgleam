@@ -19,10 +19,11 @@ struct OnboardingView: View {
       Text(
         """
         Finding caches, mail attachments and the trash bins of other apps \
-        needs Full Disk Access, which macOS grants only from System Settings \
-        under Privacy and Security. MacGleam scans on your say so, never \
-        sends a file name off this Mac, and moves nothing without showing \
-        you first.
+        needs Full Disk Access. macOS never asks for it, so you grant it \
+        yourself: open System Settings, then add MacGleam to the list with \
+        the plus button and switch it on. MacGleam scans on your say so, \
+        never sends a file name off this Mac, and moves nothing without \
+        showing you first.
         """
       )
       .font(GleamTypeToken.body.font)
