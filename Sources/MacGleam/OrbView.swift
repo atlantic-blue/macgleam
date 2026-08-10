@@ -8,10 +8,9 @@ import SwiftUI
 /// changes crossfade.
 struct OrbView: View {
   let mood: OrbMood
+  var diameter: CGFloat = GleamSpacing.points(5)
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.colorScheme) private var colorScheme
-
-  private static let diameter: CGFloat = GleamSpacing.points(32)
 
   var body: some View {
     switch OrbAppearanceResolver.appearance(for: mood, reduceMotion: reduceMotion) {
@@ -46,14 +45,14 @@ struct OrbView: View {
           RadialGradient(
             colors: [tint.opacity(0.85), tint.opacity(0.3), surface],
             center: UnitPoint(x: 0.35, y: 0.3),
-            startRadius: Self.diameter * 0.05,
-            endRadius: Self.diameter * 0.65
+            startRadius: diameter * 0.05,
+            endRadius: diameter * 0.65
           )
         )
       Circle()
         .strokeBorder(tint.opacity(0.4), lineWidth: 1)
     }
-    .frame(width: Self.diameter, height: Self.diameter)
+    .frame(width: diameter, height: diameter)
   }
 
   private func sheenColor(_ sheen: OrbSheen) -> Color {

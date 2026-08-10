@@ -6,85 +6,76 @@ import Testing
 struct HubNavigationTotalityTests {
 
   @Test(
-    "every position, key and enabled set returns a transition and equal inputs return equal outputs",
-    arguments: makeAllPositions(), HubKeyEvent.allCases
+    "every destination and key returns a transition, and equal inputs return equal outputs",
+    arguments: railTopToBottom, HubKeyEvent.allCases
   )
-  func everyPositionKeyAndEnabledSetReturnsATransitionAndEqualInputsReturnEqualOutputs(
-    position: HubNavigationState.Position,
+  func everyDestinationAndKeyReturnsATransitionAndEqualInputsReturnEqualOutputs(
+    destination: HubDestination,
     key: HubKeyEvent
   ) {
-    for enabledModules in makeEnabledVariants() {
-      let state = makeNavigationState(position: position, slots: makeFullSlots())
-      let first = HubNavigationResolver.transition(
-        state, applying: key, enabledModules: enabledModules
-      )
-      let second = HubNavigationResolver.transition(
-        state, applying: key, enabledModules: enabledModules
-      )
-      #expect(first == second)
-    }
+    let state = makeNavigationState(selection: destination, slots: makeFullSlots())
+    let first = HubNavigationResolver.transition(state, applying: key)
+    let second = HubNavigationResolver.transition(state, applying: key)
+    #expect(first == second)
   }
 
   @Test(
     "separately constructed equal states produce equal transitions",
-    arguments: makeAllPositions(), HubKeyEvent.allCases
+    arguments: railTopToBottom, HubKeyEvent.allCases
   )
   func separatelyConstructedEqualStatesProduceEqualTransitions(
-    position: HubNavigationState.Position,
+    destination: HubDestination,
     key: HubKeyEvent
   ) {
     let first = HubNavigationResolver.transition(
-      makeNavigationState(position: position, slots: makeFullSlots()),
-      applying: key,
-      enabledModules: allModulesEnabled
-    )
+      makeNavigationState(selection: destination, slots: makeFullSlots()), applying: key)
     let second = HubNavigationResolver.transition(
-      makeNavigationState(position: position, slots: makeFullSlots()),
-      applying: key,
-      enabledModules: allModulesEnabled
-    )
+      makeNavigationState(selection: destination, slots: makeFullSlots()), applying: key)
     #expect(first == second)
   }
 
   @Test(
     "an identity transition stays the identity on repeated presses of the same key",
-    arguments: makeAllPositions(), HubKeyEvent.allCases
+    arguments: railTopToBottom, HubKeyEvent.allCases
   )
   func anIdentityTransitionStaysTheIdentityOnRepeatedPressesOfTheSameKey(
-    position: HubNavigationState.Position,
+    destination: HubDestination,
     key: HubKeyEvent
   ) {
-    let state = makeNavigationState(position: position, slots: makeFullSlots())
-    let first = HubNavigationResolver.transition(
-      state, applying: key, enabledModules: allModulesEnabled
-    )
+    let state = makeNavigationState(selection: destination, slots: makeFullSlots())
+    let first = HubNavigationResolver.transition(state, applying: key)
     guard first.next == state else { return }
-    let second = HubNavigationResolver.transition(
-      first.next, applying: key, enabledModules: allModulesEnabled
-    )
+    let second = HubNavigationResolver.transition(first.next, applying: key)
     #expect(second.next == state)
-    #expect(second.zoom == nil)
   }
 
   @Test(
-    "pressing one arrow three times settles at a card where a fourth press changes nothing",
-    arguments: HubModule.allCases, [HubKeyEvent.arrowUp, .arrowDown, .arrowLeft, .arrowRight]
+    "holding one arrow settles where a further press changes nothing",
+    arguments: railTopToBottom, [HubKeyEvent.arrowUp, .arrowDown, .arrowLeft, .arrowRight]
   )
-  func pressingOneArrowThreeTimesSettlesAtACardWhereAFourthPressChangesNothing(
-    start: HubModule,
+  func holdingOneArrowSettlesWhereAFurtherPressChangesNothing(
+    start: HubDestination,
     key: HubKeyEvent
   ) {
-    var state = makeNavigationState(position: .hub(focus: start), slots: makeFullSlots())
-    for _ in 0..<3 {
-      state =
-        HubNavigationResolver.transition(
-          state, applying: key, enabledModules: allModulesEnabled
-        ).next
+    var state = makeNavigationState(selection: start, slots: makeFullSlots())
+    for _ in 0..<railTopToBottom.count {
+      state = HubNavigationResolver.transition(state, applying: key).next
     }
-    let fourth = HubNavigationResolver.transition(
-      state, applying: key, enabledModules: allModulesEnabled
-    )
-    #expect(fourth.next == state)
-    #expect(fourth.zoom == nil)
+    let further = HubNavigationResolver.transition(state, applying: key)
+    #expect(further.next == state)
+  }
+
+  @Test(
+    "only return and escape carry an intent, and each carries exactly its own",
+    arguments: railTopToBottom, HubKeyEvent.allCases
+  )
+  func onlyReturnAndEscapeCarryAnIntent(destination: HubDestination, key: HubKeyEvent) {
+    let transition = HubNavigationResolver.transition(
+      makeNavigationState(selection: destination), applying: key)
+    switch key {
+    case .return: #expect(transition.intent == .activatePrimaryAction)
+    case .escape: #expect(transition.intent == .dismiss)
+    case .arrowUp, .arrowDown, .arrowLeft, .arrowRight: #expect(transition.intent == nil)
+    }
   }
 }

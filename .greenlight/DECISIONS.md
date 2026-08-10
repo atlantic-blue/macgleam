@@ -84,3 +84,21 @@ gets its own entry pointing at the one it supersedes.
   verifies its own rule catalogue and updates never shrink the denylist,
   external volumes are user domain when mutable without escalation, menu bar
   quick clean starts a scan, byte figures are allocated bytes). Status: locked.
+- 2026-08-10. Navigation rail replaces the hub, superseding the 2026-08-09
+  "hub with zoom navigation, no sidebar" decision, which is now reversed. The
+  window is a rail of every destination down the left and a pane for the
+  selected one, the shape CleanMyMac 5 uses. The centre orb and the hexagon of
+  six cards are removed: the orb held one line of text the cards already
+  carried, and the pane holds what the module is for, the jobs it runs and
+  their live figures instead. The orb survives at 40 points in the rail as a
+  live health light. Matched geometry zoom between hub and module is removed
+  with the hexagon; the zoom grammar itself stays, because Space Lens drills
+  into folders with it. Status: locked.
+- 2026-08-10. The Lumina Utility specification is the visual source of truth
+  for tokens: the palette, the eight text roles, three nested radii and the
+  elevation set all come from it. Two departures, both recorded here. SF Pro
+  and SF Mono replace Inter and JetBrains Mono, because the specification
+  names them only to work around a web page being unable to use SF Pro, and a
+  native app can. Control level padding sits on a 4 point half step because
+  the specification pads cards at 20; layout spacing stays on the 8 point
+  grid. Status: locked.

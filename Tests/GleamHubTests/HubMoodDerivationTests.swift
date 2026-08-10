@@ -17,7 +17,7 @@ struct HubMoodDerivationTests {
       lastScanFinishedAt: fixedNow.addingTimeInterval(-60),
       reclaimableEstimateBytes: 1_000_000,
       attentionReason: "One thing needs a look.",
-      cardFigures: makeFullCardFigures(),
+      moduleFigures: makeFullModuleFigures(),
       enabledModules: Set(HubModule.allCases)
     )
     #expect(HubModel.mood(for: state) == .idleAttention)

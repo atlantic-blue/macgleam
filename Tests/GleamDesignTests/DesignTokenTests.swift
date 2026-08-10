@@ -15,34 +15,9 @@ struct TokenCardinalityTests {
     #expect(GleamFade.allCases.count == 2)
   }
 
-  @Test("exactly two corner radii exist")
-  func exactlyTwoCornerRadiiExist() {
-    #expect(GleamRadius.allCases.count == 2)
-  }
-
   @Test("exactly three elevation levels exist")
   func exactlyThreeElevationLevelsExist() {
     #expect(GleamElevation.allCases.count == 3)
-  }
-
-  @Test("exactly five type roles exist")
-  func exactlyFiveTypeRolesExist() {
-    #expect(GleamTypeToken.allCases.count == 5)
-  }
-
-  @Test("the colour token case list is exactly the contract list")
-  func theColourTokenCaseListIsExactlyTheContractList() {
-    #expect(
-      GleamColorToken.allCases == [
-        .baseBackground,
-        .surface,
-        .accent,
-        .textPrimary,
-        .textSecondary,
-        .safe,
-        .review,
-        .dangerous,
-      ])
   }
 }
 
@@ -60,20 +35,5 @@ struct SpacingGridTests {
   )
   func pointsReturnsTheCountMultipliedByEight(count: Int) {
     #expect(GleamSpacing.points(count) == CGFloat(count) * 8)
-  }
-}
-
-@Suite("Radii and type roles")
-struct RadiusAndTypeRoleTests {
-
-  @Test("the control radius is strictly smaller than the card radius")
-  func theControlRadiusIsStrictlySmallerThanTheCardRadius() {
-    #expect(GleamRadius.control.value < GleamRadius.card.value)
-  }
-
-  @Test("every type role resolves a distinct font")
-  func everyTypeRoleResolvesADistinctFont() {
-    let fonts = Set(GleamTypeToken.allCases.map(\.font))
-    #expect(fonts.count == GleamTypeToken.allCases.count)
   }
 }

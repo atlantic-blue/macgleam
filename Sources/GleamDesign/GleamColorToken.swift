@@ -2,21 +2,33 @@ import SwiftUI
 
 /// The complete colour token set. Every colour in the app resolves through
 /// these cases; there is no other source of colour constants.
+///
+/// Dark is the appearance the Lumina Utility specification describes, so the
+/// dark values are its hexes exactly. Light is derived: the surface ramp
+/// inverts and the accents darken far enough to hold the same contrast.
 public enum GleamColorToken: CaseIterable, Sendable {
   case baseBackground
+  case surfaceLowest
+  case surfaceLow
   case surface
+  case surfaceHigh
+  case surfaceBright
+  case primary
+  case onPrimary
   case accent
   case textPrimary
   case textSecondary
+  case outline
+  case outlineVariant
   case safe
   case review
   case dangerous
 
   /// Resolved colour for the given appearance.
   ///
-  /// safe, review, dangerous, textPrimary and textSecondary hold at least
-  /// 4.5 to 1 contrast against both baseBackground and surface in both
-  /// appearances.
+  /// safe, review, dangerous, primary, accent, textPrimary and textSecondary
+  /// hold at least 4.5 to 1 contrast against every surface running text sits
+  /// on, in both appearances.
   public func color(for appearance: ColorScheme) -> Color {
     switch appearance {
     case .light:
@@ -29,10 +41,18 @@ public enum GleamColorToken: CaseIterable, Sendable {
   private var darkColor: Color {
     switch self {
     case .baseBackground: return Self.sRGB(0x0A, 0x0E, 0x1A)
+    case .surfaceLowest: return Self.sRGB(0x05, 0x0E, 0x1E)
+    case .surfaceLow: return Self.sRGB(0x12, 0x1C, 0x2C)
     case .surface: return Self.sRGB(0x14, 0x1A, 0x2E)
+    case .surfaceHigh: return Self.sRGB(0x20, 0x2A, 0x3B)
+    case .surfaceBright: return Self.sRGB(0x30, 0x3A, 0x4B)
+    case .primary: return Self.sRGB(0xA9, 0xF9, 0xFF)
+    case .onPrimary: return Self.sRGB(0x00, 0x37, 0x3A)
     case .accent: return Self.sRGB(0x6F, 0xE0, 0xE8)
-    case .textPrimary: return Self.sRGB(0xF2, 0xF5, 0xFA)
-    case .textSecondary: return Self.sRGB(0xA8, 0xB2, 0xC7)
+    case .textPrimary: return Self.sRGB(0xD9, 0xE3, 0xF9)
+    case .textSecondary: return Self.sRGB(0xBC, 0xC9, 0xCA)
+    case .outline: return Self.sRGB(0x86, 0x93, 0x94)
+    case .outlineVariant: return Self.sRGB(0x3D, 0x49, 0x4A)
     case .safe: return Self.sRGB(0x4F, 0xCE, 0x7E)
     case .review: return Self.sRGB(0xE5, 0xB8, 0x4A)
     case .dangerous: return Self.sRGB(0xF0, 0x76, 0x6B)
@@ -42,10 +62,18 @@ public enum GleamColorToken: CaseIterable, Sendable {
   private var lightColor: Color {
     switch self {
     case .baseBackground: return Self.sRGB(0xF5, 0xF7, 0xFB)
+    case .surfaceLowest: return Self.sRGB(0xFF, 0xFF, 0xFF)
+    case .surfaceLow: return Self.sRGB(0xED, 0xF1, 0xF8)
     case .surface: return Self.sRGB(0xFF, 0xFF, 0xFF)
-    case .accent: return Self.sRGB(0x0A, 0x71, 0x85)
+    case .surfaceHigh: return Self.sRGB(0xE3, 0xE9, 0xF4)
+    case .surfaceBright: return Self.sRGB(0xD5, 0xDD, 0xEC)
+    case .primary: return Self.sRGB(0x08, 0x5C, 0x6B)
+    case .onPrimary: return Self.sRGB(0xE6, 0xFB, 0xFF)
+    case .accent: return Self.sRGB(0x0A, 0x6C, 0x7C)
     case .textPrimary: return Self.sRGB(0x16, 0x21, 0x3A)
     case .textSecondary: return Self.sRGB(0x4A, 0x56, 0x6E)
+    case .outline: return Self.sRGB(0x6B, 0x77, 0x85)
+    case .outlineVariant: return Self.sRGB(0xC3, 0xCB, 0xD8)
     case .safe: return Self.sRGB(0x1B, 0x6F, 0x40)
     case .review: return Self.sRGB(0x7A, 0x52, 0x00)
     case .dangerous: return Self.sRGB(0xB3, 0x26, 0x1E)

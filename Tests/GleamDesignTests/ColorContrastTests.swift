@@ -8,10 +8,12 @@ import Testing
 struct ColorContrastTests {
 
   static let foregrounds: [GleamColorToken] = [
-    .safe, .review, .dangerous, .textPrimary, .textSecondary,
+    .safe, .review, .dangerous, .textPrimary, .textSecondary, .primary, .accent,
   ]
+  /// Every surface text is allowed to sit on. surfaceLowest and surfaceBright
+  /// are wells that hold a glyph or an image, never running text.
   static let backgrounds: [GleamColorToken] = [
-    .baseBackground, .surface,
+    .baseBackground, .surfaceLow, .surface, .surfaceHigh,
   ]
 
   @Test(
@@ -43,34 +45,4 @@ struct ColorContrastTests {
       "\(foreground) over \(background) in dark reaches \(ratio), the threshold is 4.5"
     )
   }
-}
-
-// Contrast arithmetic follows Web Content Accessibility Guidelines 2.1,
-// success criterion 1.4.3 and its relative luminance definition.
-
-private func contrastRatio(
-  of foreground: GleamColorToken,
-  over background: GleamColorToken,
-  in appearance: ColorScheme
-) throws -> Double {
-  let foregroundLuminance = try relativeLuminance(of: foreground.color(for: appearance))
-  let backgroundLuminance = try relativeLuminance(of: background.color(for: appearance))
-  let lighter = max(foregroundLuminance, backgroundLuminance)
-  let darker = min(foregroundLuminance, backgroundLuminance)
-  return (lighter + 0.05) / (darker + 0.05)
-}
-
-private func relativeLuminance(of color: Color) throws -> Double {
-  let resolved = try #require(
-    NSColor(color).usingColorSpace(.sRGB),
-    "colour must resolve into the sRGB space"
-  )
-  let red = linearise(Double(resolved.redComponent))
-  let green = linearise(Double(resolved.greenComponent))
-  let blue = linearise(Double(resolved.blueComponent))
-  return 0.2126 * red + 0.7152 * green + 0.0722 * blue
-}
-
-private func linearise(_ channel: Double) -> Double {
-  channel <= 0.03928 ? channel / 12.92 : pow((channel + 0.055) / 1.055, 2.4)
 }

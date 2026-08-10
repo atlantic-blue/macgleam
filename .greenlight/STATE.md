@@ -1,9 +1,10 @@
 ```state
 stage:    implement
-updated:  2026-08-09
+updated:  2026-08-10
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     M2 slice s2e, performance gates
-blocked:  none
+next:     finish the rail and pane pass, then the pixel comparison against the design
+blocked:  the live window cannot be captured; the terminal has no Screen
+          Recording permission, so checks run off offscreen renders
 prs:      atlantic-blue/macgleam#1
           atlantic-blue/macgleam#2
 steps:
@@ -20,10 +21,29 @@ steps:
   - [x] s2a large and old files (atlantic-blue/macgleam#11)
   - [x] s2b duplicates (atlantic-blue/macgleam#12)
   - [x] s2c similar photos (atlantic-blue/macgleam#13)
-  - [ ] s2d space lens (this branch)
+  - [x] s2d space lens (atlantic-blue/macgleam#14)
+  - [x] s3a Lumina token set (this branch)
+  - [ ] s3b rail navigation replacing the hexagon (this branch)
+  - [ ] s3c the shell: top bar, rail, status bar (this branch)
+  - [ ] s3d the module pane (this branch)
+  - [ ] s3e pixel comparison against the design
 
   - [ ] M2 to M7 per .greenlight/GRAPH.md
 ```
+
+## The interface changed shape on 2026-08-10
+
+Julian supplied the Lumina Utility design specification (`.desings/`), then a
+picture of CleanMyMac 5's window, and said the orb in the middle earned
+nothing and the centre needed something useful. Both decisions are recorded in
+DECISIONS.md. In short: the hexagon of six cards and the centre orb are gone,
+a navigation rail carries every destination, and the pane beside it shows what
+the selected module is for, the jobs it runs and their live figures. The orb
+lives on at 40 points in the rail as a health light.
+
+Only Cleanup is a built module, so its pane is its real screen and the other
+five say plainly that they are not built. That is deliberate: an action that
+does nothing is worse than an empty pane that explains itself.
 
 # State
 
