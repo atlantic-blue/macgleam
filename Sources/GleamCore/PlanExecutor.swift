@@ -17,6 +17,7 @@ public struct PlanExecutor: PlanExecuting {
   private let helper: (any PrivilegedOperationPerforming)?
   private let ownershipPolicy: any PathOwnershipPolicy
   private let environment: OwnershipEnvironment
+  private let safetyNet: (any SafetyNetStoring)?
   private let now: @Sendable () -> Date
   private let isCancelled: @Sendable () -> Bool
   private let launchItems: (any LaunchItemManaging)?
@@ -27,6 +28,7 @@ public struct PlanExecutor: PlanExecuting {
     helper: (any PrivilegedOperationPerforming)? = nil,
     ownershipPolicy: any PathOwnershipPolicy,
     environment: OwnershipEnvironment,
+    safetyNet: (any SafetyNetStoring)? = nil,
     now: @escaping @Sendable () -> Date,
     isCancelled: @escaping @Sendable () -> Bool,
     launchItems: (any LaunchItemManaging)? = nil
@@ -36,6 +38,7 @@ public struct PlanExecutor: PlanExecuting {
     self.helper = helper
     self.ownershipPolicy = ownershipPolicy
     self.environment = environment
+    self.safetyNet = safetyNet
     self.now = now
     self.isCancelled = isCancelled
     self.launchItems = launchItems
@@ -187,11 +190,10 @@ public struct PlanExecutor: PlanExecuting {
       return await reclaim(target) { _ = try await fileSystem.moveToTrash(target) }
     case .deletePermanently(let target):
       return await reclaim(target) { try await fileSystem.delete(target) }
-    case .quarantine(let target), .archive(let target, _):
-      let reason =
-        "The SafetyNet store is not available in this build, "
-        + "so \(target.value) was left untouched."
-      return .failed(reason: reason)
+    case .quarantine(let target):
+      return await moveIntoSafetyNet(target, source: .malwareQuarantine, groupID: nil)
+    case .archive(let target, let groupID):
+      return await moveIntoSafetyNet(target, source: .uninstallArchive, groupID: groupID)
     case .setLaunchItemEnabled(let item, _):
       let reason =
         "Launch item management is not available in this build, "
@@ -202,6 +204,26 @@ public struct PlanExecutor: PlanExecuting {
         "Maintenance tasks are not available in this build, "
         + "so \(task.rawValue) was not run."
       return .failed(reason: reason)
+    }
+  }
+
+  /// The store owns where a quarantined or archived payload goes, so the
+  /// executor hands it the path and invents no storage location of its own. The
+  /// move reclaims the bytes it moved, measured before it, exactly as a trash
+  /// move reports them.
+  private func moveIntoSafetyNet(
+    _ target: AbsolutePath,
+    source: SafetyNetItem.Source,
+    groupID: UUID?
+  ) async -> OperationResult {
+    guard let safetyNet else {
+      let reason =
+        "The SafetyNet store is not available in this build, "
+        + "so \(target.value) was left untouched."
+      return .failed(reason: reason)
+    }
+    return await reclaim(target) {
+      _ = try await safetyNet.store(target, source: source, groupID: groupID)
     }
   }
 
