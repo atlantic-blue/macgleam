@@ -64,6 +64,17 @@ struct SafetyNetItemTests {
     try expectLosslessRoundTrip(makeSafetyNetItem(isRestored: true))
   }
 
+  @Test("the recorded allocated size survives coding exactly")
+  func recordedAllocatedSizeSurvivesCoding() throws {
+    // Recorded once at store time and never recomputed, because the store
+    // makes its own payloads unreadable (C18). A size lost in the manifest is
+    // a size nothing can ever read back.
+    let item = makeSafetyNetItem(allocatedBytes: 3_145_728)
+    let encoded = try JSONEncoder().encode(item)
+    let decoded = try JSONDecoder().decode(SafetyNetItem.self, from: encoded)
+    #expect(decoded.allocatedBytes == 3_145_728)
+  }
+
   @Test("storage and expiry dates survive coding exactly")
   func storageAndExpiryDatesSurviveCoding() throws {
     let item = makeSafetyNetItem()

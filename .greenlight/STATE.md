@@ -2,10 +2,10 @@
 stage:    implement
 updated:  2026-08-11
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     s3b, the helper daemon, and s2i, which wires the rail's return and
-          escape keys; they do nothing today
-blocked:  the live window cannot be captured; the terminal has no Screen
-          Recording permission, so checks run off offscreen renders
+next:     s4e store sizing, then s4f the helper archive gap, then s4d
+blocked:  none. The live window cannot be captured (the terminal has no
+          Screen Recording permission), so visual checks run off offscreen
+          renders and the human checks stay queued below.
 prs:      atlantic-blue/macgleam#1
           atlantic-blue/macgleam#2
           atlantic-blue/macgleam#3

@@ -629,7 +629,7 @@ they were done alongside.
   choreography present it as one reversible unit, restore it, launch it.
 
 ### s4e. the store sizes what it stored
-- Contracts: C18, C13.
+- Contracts: C8, C13, C18.
 - Depends on: s4a, s4c.
 - Why it exists: found on 2026-08-11 while proving s4c's directory handling.
   C18 strips execute from a stored payload so a quarantined bundle cannot run
@@ -651,12 +651,63 @@ they were done alongside.
   to recompute. The alternative, not taken, was to stop stripping execute from
   directory payloads, which would trade a real containment guarantee for an
   arithmetic convenience.
+- Recorded in the contracts on 2026-08-11, before the slice: C8 gains
+  `allocatedBytes`, a fact recorded once at store time and never recomputed;
+  C13 states that a directory without execute cannot be traversed and that
+  every implementation answers that way; C18's byte total is the sum of the
+  recorded sizes, its store clause measures before the move and refuses a
+  payload it could not measure whole, and its KNOWN DEFECT annotation is gone
+  because the contract no longer asks for a reading the disk cannot give. What
+  survives until this slice lands is the tree: the merged store still sizes
+  payloads at purge time by reading them, the item carries no size, and the
+  fake still traverses a stripped directory. Nothing migrates; no build has
+  been distributed and no manifest has ever been written outside a test.
 - Verification: the shared conformance suite gains the case that hid this, so
   stripping execute from a directory behaves identically in the fake and on
   the real disk; a stored directory payload records its allocated size at
-  store time; a purge of an uninstall archive names the true byte total and
-  never zero; the fake cannot pass a case the real disk fails.
+  store time; a payload the walk could not read whole is refused rather than
+  stored against a short figure; a purge of an uninstall archive names the true
+  byte total and never zero, and sizes nothing while doing it; the fake cannot
+  pass a case the real disk fails.
 - Tier: auto.
+
+### s4f. the helper archives into the store, not beside it
+- Contracts: C18, C30, C31.
+- Depends on: s4e.
+- Why it exists: found on 2026-08-11 while amending C18 for s4e. No
+  `SafetyNetStore` is constructed in production code at all. The app builds the
+  store directory path and hands it to the helper as a removal destination, and
+  the helper moves the payload straight into that directory's root: no manifest
+  entry, no execute strip, no recorded size. So a privileged archive is
+  invisible to the store. It is not listed, not restorable, not purgeable and
+  not contained, which is every guarantee C18 exists to make, absent on exactly
+  the path that handles the files a person cannot remove themselves.
+- Why it is worse than it looks: the reversibility promise is the product's
+  whole trust position, and it currently holds only for what the user process
+  archives. A quarantined root owned binary keeps its execute bit and sits in a
+  directory the store does not know about.
+- The shape of the fix, not yet decided: either the helper reports what it
+  moved so the user process records it, or the store's manifest becomes
+  something both processes write, which raises a concurrency question C18 has
+  never had to answer. Deciding that is the first task of the slice, not an
+  implementation detail.
+- Verification: a privileged archive appears in the store's listing, restores
+  attribute for attribute, carries a recorded size and is contained the way a
+  user process archive is; nothing writes into the store directory without the
+  store knowing; the two processes cannot corrupt the manifest between them.
+- Tier: verify. Human check: quarantine something only root can move, then
+  restore it.
+- Carries a second defect of the same family, found 2026-08-11 while proving
+  s4e. `FileManager.removeItem` on a directory stripped of execute fails with
+  permission denied on a real volume, verified on this machine, because
+  removing the children needs search permission on the directory holding
+  them. So purge can now compute the correct total and still be unable to
+  delete a directory payload. The in memory file system deletes by removing
+  dictionary keys, so no test can see it, which is the third time the fake has
+  hidden a consequence of the strip. The fix is a choice: restore execute
+  before deleting, which puts a runnable bundle back on disk for the length of
+  the delete, or descend repairing permissions as it goes. Both touch the
+  containment guarantee, which is why it is a decision rather than a detail.
 
 ### s4d. leftover sweep
 - Contracts: C26 (orphan sweep).

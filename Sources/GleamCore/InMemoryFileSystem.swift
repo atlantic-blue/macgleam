@@ -16,6 +16,11 @@ public actor InMemoryFileSystem {
     let fileID: UInt64
 
     var isReadable: Bool { posixPermissions & 0o400 != 0 }
+    /// A directory is searched with its execute bit, never its read bit. The
+    /// read bit lists the names; the execute bit is what resolves a path
+    /// through it, so a directory stripped of execute holds contents nothing
+    /// can reach (C13).
+    var isSearchable: Bool { posixPermissions & 0o100 != 0 }
   }
 
   private static let volumeID: UInt64 = 1
@@ -87,8 +92,26 @@ public actor InMemoryFileSystem {
   }
 
   private func existingNode(at path: AbsolutePath) throws -> Node {
+    try requireReachable(path)
     guard let node = nodes[path] else { throw FileSystemError.notFound(path) }
     return node
+  }
+
+  /// Path resolution as the disk performs it: every directory on the way to a
+  /// path has to be searchable. Reaching a directory needs permission on its
+  /// parent rather than on itself, so a directory whose execute bits are clear
+  /// still answers for itself while nothing inside it resolves at all.
+  private func isReachable(_ path: AbsolutePath) -> Bool {
+    var ancestor = path.parent
+    while let directory = ancestor {
+      if let node = nodes[directory], node.isDirectory, !node.isSearchable { return false }
+      ancestor = directory.parent
+    }
+    return true
+  }
+
+  private func requireReachable(_ path: AbsolutePath) throws {
+    guard isReachable(path) else { throw FileSystemError.permissionDenied(path) }
   }
 }
 
@@ -100,7 +123,9 @@ extension InMemoryFileSystem: RawDirectoryReading {
     guard node.isDirectory else {
       throw FileSystemError.ioFailure(directory, description: "Not a directory.")
     }
-    guard node.isReadable else { throw FileSystemError.permissionDenied(directory) }
+    guard node.isReadable, node.isSearchable else {
+      throw FileSystemError.permissionDenied(directory)
+    }
     return nodes.compactMap { path, node in
       guard path.parent == directory else { return nil }
       return record(at: path, node: node)
@@ -140,8 +165,11 @@ extension InMemoryFileSystem: FileSystemReading {
     try existingNode(at: path).extendedAttributes
   }
 
+  /// A path nothing can resolve does not exist as far as a reader is
+  /// concerned, which is what the platform answers for a path inside a
+  /// directory stripped of execute.
   public func exists(_ path: AbsolutePath) async -> Bool {
-    nodes[path] != nil
+    nodes[path] != nil && isReachable(path)
   }
 
   public func volumeInfo(at path: AbsolutePath) async throws -> VolumeInfo {
@@ -168,6 +196,7 @@ extension InMemoryFileSystem: FileSystemMutating {
 
   public func move(_ source: AbsolutePath, to destination: AbsolutePath) async throws {
     _ = try existingNode(at: source)
+    try requireReachable(destination)
     guard nodes[destination] == nil else {
       throw FileSystemError.destinationOccupied(destination)
     }
@@ -183,6 +212,7 @@ extension InMemoryFileSystem: FileSystemMutating {
   }
 
   public func createDirectory(at path: AbsolutePath) async throws {
+    try requireReachable(path)
     if let node = nodes[path] {
       guard node.isDirectory else { throw FileSystemError.destinationOccupied(path) }
       return
@@ -194,6 +224,7 @@ extension InMemoryFileSystem: FileSystemMutating {
   /// missing parent directory throws rather than being created, so the fake
   /// refuses the mistyped path the real file system refuses.
   public func writeData(_ data: Data, to path: AbsolutePath) async throws {
+    try requireReachable(path)
     guard let parent = path.parent else { throw FileSystemError.destinationOccupied(path) }
     guard nodes[parent]?.isDirectory == true else { throw FileSystemError.notFound(parent) }
     if let existing = nodes[path] {

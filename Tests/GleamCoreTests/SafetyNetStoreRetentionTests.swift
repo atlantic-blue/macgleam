@@ -100,7 +100,7 @@ struct SafetyNetStoreRetentionTests {
     let fileSystem = await safetyNetFileSystem()
     let store = safetyNetMake(fileSystem: fileSystem)
     let stored = try await storedAgent(seed: 105, in: fileSystem, store: store)
-    let confirmation = try await safetyNetConfirmation(for: [stored.item], in: fileSystem)
+    let confirmation = safetyNetConfirmation(for: [stored.item])
 
     try await store.purge(itemIDs: [stored.item.id], confirmation: confirmation)
 
@@ -116,7 +116,7 @@ struct SafetyNetStoreRetentionTests {
     let stored = try await storedAgent(seed: 106, in: fileSystem, store: store)
     try await safetyNetSeedFile(in: fileSystem, at: Self.secondOrigin, seed: 107)
     let kept = try await store.store(Self.secondOrigin, source: .malwareQuarantine, groupID: nil)
-    let confirmation = try await safetyNetConfirmation(for: [stored.item], in: fileSystem)
+    let confirmation = safetyNetConfirmation(for: [stored.item])
 
     try await store.purge(itemIDs: [stored.item.id], confirmation: confirmation)
 
@@ -130,7 +130,7 @@ struct SafetyNetStoreRetentionTests {
     let fileSystem = await safetyNetFileSystem()
     let store = safetyNetMake(fileSystem: fileSystem)
     let stored = try await storedAgent(seed: 108, in: fileSystem, store: store)
-    let matching = try await safetyNetConfirmation(for: [stored.item], in: fileSystem)
+    let matching = safetyNetConfirmation(for: [stored.item])
     let wrongCount = PurgeConfirmation(
       itemCount: matching.itemCount + 1,
       byteTotal: matching.byteTotal,
@@ -150,7 +150,7 @@ struct SafetyNetStoreRetentionTests {
     let fileSystem = await safetyNetFileSystem()
     let store = safetyNetMake(fileSystem: fileSystem)
     let stored = try await storedAgent(seed: 109, in: fileSystem, store: store)
-    let matching = try await safetyNetConfirmation(for: [stored.item], in: fileSystem)
+    let matching = safetyNetConfirmation(for: [stored.item])
     let wrongBytes = PurgeConfirmation(
       itemCount: matching.itemCount,
       byteTotal: matching.byteTotal + 1,
@@ -172,8 +172,7 @@ struct SafetyNetStoreRetentionTests {
     let stored = try await storedAgent(seed: 110, in: fileSystem, store: store)
     try await safetyNetSeedFile(in: fileSystem, at: Self.secondOrigin, seed: 111)
     let second = try await store.store(Self.secondOrigin, source: .malwareQuarantine, groupID: nil)
-    let confirmationForBoth = try await safetyNetConfirmation(
-      for: [stored.item, second], in: fileSystem)
+    let confirmationForBoth = safetyNetConfirmation(for: [stored.item, second])
 
     await #expect(throws: SafetyNetError.confirmationMismatch) {
       try await store.purge(itemIDs: [stored.item.id], confirmation: confirmationForBoth)
@@ -188,7 +187,7 @@ struct SafetyNetStoreRetentionTests {
     let store = safetyNetMake(fileSystem: fileSystem)
     let stored = try await storedAgent(seed: 112, in: fileSystem, store: store)
     let unknown = Fixture.uuid(0xEF)
-    let confirmation = try await safetyNetConfirmation(for: [stored.item], in: fileSystem)
+    let confirmation = safetyNetConfirmation(for: [stored.item])
 
     await #expect(throws: SafetyNetError.itemNotFound(unknown)) {
       try await store.purge(itemIDs: [stored.item.id, unknown], confirmation: confirmation)
@@ -200,7 +199,7 @@ struct SafetyNetStoreRetentionTests {
     let fileSystem = await safetyNetFileSystem()
     let store = safetyNetMake(fileSystem: fileSystem)
     let stored = try await storedAgent(seed: 113, in: fileSystem, store: store)
-    let confirmation = try await safetyNetConfirmation(for: [stored.item], in: fileSystem)
+    let confirmation = safetyNetConfirmation(for: [stored.item])
 
     try? await store.purge(
       itemIDs: [stored.item.id, Fixture.uuid(0xEF)], confirmation: confirmation)

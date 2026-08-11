@@ -126,6 +126,7 @@ func makeSafetyNetItem(
   source: SafetyNetItem.Source = .malwareQuarantine,
   groupID: UUID? = nil,
   metadata: FileMetadataSnapshot = makeMetadataSnapshot(),
+  allocatedBytes: UInt64 = 20_480,
   isRestored: Bool = false
 ) -> SafetyNetItem {
   SafetyNetItem(
@@ -135,6 +136,7 @@ func makeSafetyNetItem(
     source: source,
     groupID: groupID,
     metadata: metadata,
+    allocatedBytes: allocatedBytes,
     storedAt: Fixture.referenceDate,
     expiresAt: Fixture.referenceDate.addingTimeInterval(Fixture.thirtyDays),
     isRestored: isRestored
