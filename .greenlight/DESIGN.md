@@ -101,7 +101,7 @@ the design session of 2026-08-09.
 ### Non Functional
 
 - Scan performance: a full Cleanup scan of a typical 512 GB system disk completes
-  in under 60 seconds; Disk Map maps a full volume in under 30 seconds on Apple
+  in under 60 seconds; Disk Maps a full volume in under 30 seconds on Apple
   silicon. Directory enumeration uses getattrlistbulk with 4 to 8 concurrent
   readers per volume (APFS serialises directory reads past that).
 - Animation: no dropped frames during the hub zoom and scan progress on a 60 Hz
@@ -362,7 +362,7 @@ crossfades; the shimmer becomes a determinate ring.
 Every destructive operation is reversible or explicitly confirmed. The
 mechanisms, by operation:
 
-- **Junk, clutter and Disk Map deletions**: default destination is the macOS
+- **Junk, leftovers and Disk Map deletions**: default destination is the macOS
   Trash, restorable by the user with tools they already know. The permanent
   delete setting is off by default and every permanent run confirms with file
   count and byte total.

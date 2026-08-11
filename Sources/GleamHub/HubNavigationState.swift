@@ -1,27 +1,21 @@
 /// Where the user is, and every module's preserved state.
 ///
-/// Focus is always exactly one card when on the hub, by construction: the
-/// hub case carries a non optional HubModule and no unfocused hub state is
+/// Exactly one destination is selected at all times, by construction: the
+/// selection is a non optional `HubDestination` and no unselected state is
 /// representable. Values are immutable; `storingSlot` is the only operation
 /// anywhere that changes `moduleStateSlots`.
 public struct HubNavigationState: Codable, Sendable, Equatable {
-  public enum Position: Codable, Sendable, Equatable {
-    case hub(focus: HubModule)
-    case module(HubModule)
-  }
-
-  public let position: Position
+  public let selection: HubDestination
   public let moduleStateSlots: [HubModule: ModuleStateSlot]
 
-  public init(position: Position, moduleStateSlots: [HubModule: ModuleStateSlot]) {
-    self.position = position
+  public init(selection: HubDestination, moduleStateSlots: [HubModule: ModuleStateSlot]) {
+    self.selection = selection
     self.moduleStateSlots = moduleStateSlots
   }
 
-  /// The hub with focus on the first card in `HubModule.allCases` order and
-  /// no stored slots.
+  /// The first destination in rail order, with no stored slots.
   public static let initial = HubNavigationState(
-    position: .hub(focus: HubModule.allCases[0]),
+    selection: HubDestination.allCases[0],
     moduleStateSlots: [:]
   )
 
@@ -32,6 +26,6 @@ public struct HubNavigationState: Codable, Sendable, Equatable {
   ) -> HubNavigationState {
     var slots = moduleStateSlots
     slots[module] = slot
-    return HubNavigationState(position: position, moduleStateSlots: slots)
+    return HubNavigationState(selection: selection, moduleStateSlots: slots)
   }
 }

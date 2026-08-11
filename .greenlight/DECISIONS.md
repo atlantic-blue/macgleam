@@ -23,7 +23,7 @@ gets its own entry pointing at the one it supersedes.
   Status: locked, revisit the commercial feed if field reports show misses.
 - 2026-08-09. Quarantine only for malware findings, never silent delete.
   SafetyNet store with 30 day retention and one click restore. Status: locked.
-- 2026-08-09. Deletion defaults to the macOS Trash for junk and clutter;
+- 2026-08-09. Deletion defaults to the macOS Trash for junk and leftovers;
   permanent delete is opt in and confirmed with counts. Uninstalls archive to
   SafetyNet before removal. Reversibility is a trust feature. Status: locked.
 - 2026-08-09. Sparkle 2 for updates, EdDSA signed appcast, beta and stable
@@ -84,20 +84,21 @@ gets its own entry pointing at the one it supersedes.
   verifies its own rule catalogue and updates never shrink the denylist,
   external volumes are user domain when mutable without escalation, menu bar
   quick clean starts a scan, byte figures are allocated bytes). Status: locked.
-- 2026-08-10. Renamed three modules away from the competitor's own product
-  names: Smart Care becomes Full Sweep, My Clutter becomes Leftovers, and
-  Space Lens becomes Disk Map. Those three were taken verbatim from
-  CleanMyMac 5 and are coined product names rather than ordinary English, so
-  they carried trademark exposure and made the product read as a clone; the
-  repository is public, so the names sat in the code as well as on screen.
-  The other four module names, Cleanup, Protection, Performance and
-  Applications, are ordinary descriptive English and stay exactly as they
-  are. The rename is mechanical with no behaviour change: targets, types,
-  directories, file names, test names and documents move together, and the
-  test count is unchanged at 628 in 145 suites. The interview brief keeps the
-  competitor's names where it records their module list, which is the one
-  place those names are correct. Earlier entries in this file were updated to
-  the new names so the documents stay consistent; the decisions they record
-  are unchanged. Branding is not settled by this: the trademark search before
-  launch remains a separate M7 gate on the MacGleam name itself.
-  Status: locked.
+- 2026-08-10. Navigation rail replaces the hub, superseding the 2026-08-09
+  "hub with zoom navigation, no sidebar" decision, which is now reversed. The
+  window is a rail of every destination down the left and a pane for the
+  selected one, the shape CleanMyMac 5 uses. The centre orb and the hexagon of
+  six cards are removed: the orb held one line of text the cards already
+  carried, and the pane holds what the module is for, the jobs it runs and
+  their live figures instead. The orb survives at 40 points in the rail as a
+  live health light. Matched geometry zoom between hub and module is removed
+  with the hexagon; the zoom grammar itself stays, because Disk Map drills
+  into folders with it. Status: locked.
+- 2026-08-10. The Lumina Utility specification is the visual source of truth
+  for tokens: the palette, the eight text roles, three nested radii and the
+  elevation set all come from it. Two departures, both recorded here. SF Pro
+  and SF Mono replace Inter and JetBrains Mono, because the specification
+  names them only to work around a web page being unable to use SF Pro, and a
+  native app can. Control level padding sits on a 4 point half step because
+  the specification pads cards at 20; layout spacing stays on the 8 point
+  grid. Status: locked.

@@ -38,22 +38,48 @@ import SwiftUI
 /// the app resolves through these types. There is no other source of visual
 /// constants.
 ///
+/// Revised 2026-08-10 to carry the Lumina Utility design specification
+/// (`.desings/lumina_utility/DESIGN.md`). The palette, the type scale and the
+/// radius scale all grew; the guarantees below are the current ones.
+///
 /// Guarantees:
 /// - Colour tokens resolve for both dark and light appearances from day one.
-/// - Semantic colours (safe, review, dangerous) meet Web Content Accessibility
-///   Guidelines AA contrast against the surfaces they appear on, in both
-///   appearances. This is a testable threshold, not an aspiration.
-/// - Spacing is an 8 point grid. `GleamSpacing.points(n)` returns exactly
-///   `n * 8`. No view uses a padding or offset that is not a grid multiple.
-/// - Exactly two corner radii and three elevation levels exist.
-/// - The type scale has exactly five roles: one display size for the hub
-///   number, three text sizes, one mono size for file paths. SF Pro only.
+///   Dark is the specified appearance and its values are the specification's
+///   hexes exactly; light is derived to hold the same contrast.
+/// - Semantic colours (safe, review, dangerous) and every text role meet Web
+///   Content Accessibility Guidelines AA contrast against the surfaces they
+///   appear on, in both appearances. This is a testable threshold, not an
+///   aspiration.
+/// - Layout spacing is an 8 point grid. `GleamSpacing.points(n)` returns
+///   exactly `n * 8`. Control level padding may sit on the half step,
+///   `GleamSpacing.half(n)` returning exactly `n * 4`, because the
+///   specification pads cards and controls at 20 and 4 points. No view uses a
+///   spacing value off both steps.
+/// - Exactly three corner radii and three elevation levels exist. The radii
+///   nest: control inside item inside card.
+/// - The type scale has exactly seven roles. Every role carries its point
+///   size, weight, tracking and line height, so a view never restates them.
+///   SF Pro and SF Mono only; the specification names Inter and JetBrains Mono
+///   solely because a web page cannot use SF Pro, and a native app can.
 public enum GleamColorToken: CaseIterable, Sendable {
-    case baseBackground      // deep neutral, near black blue
-    case surface             // card surface
-    case accent              // iridescent accent drawn from the orb motif
-    case textPrimary
-    case textSecondary
+    // Canvas and surfaces, lowest to highest.
+    case baseBackground      // #0A0E1A, the canvas
+    case surfaceLowest       // #050E1E
+    case surfaceLow          // #121C2C, the navigation rail
+    case surface             // #141A2E, the card
+    case surfaceHigh         // #202A3B, an inactive icon well
+    case surfaceBright       // #303A4B, the avatar well
+    // Accents. Two distinct roles, both cyan, never interchangeable.
+    case primary             // #A9F9FF, titles, active navigation, filled controls
+    case onPrimary           // #00373A, text and glyphs on a primary fill
+    case accent              // #6FE0E8, glow, strokes, progress, live figures
+    // Text.
+    case textPrimary         // #D9E3F9
+    case textSecondary       // #BCC9CA
+    // Lines.
+    case outline             // #869394
+    case outlineVariant      // #3D494A
+    // Semantic health.
     case safe
     case review
     case dangerous
@@ -67,26 +93,44 @@ public enum GleamSpacing: Sendable {
     public static let unit: CGFloat = 8
     /// Returns count multiplied by the grid unit. Traps on negative counts.
     public static func points(_ count: Int) -> CGFloat { fatalError("contract") }
+    /// Returns count multiplied by half the grid unit. Traps on negative
+    /// counts. `half(2)` and `points(1)` are the same distance.
+    public static func half(_ count: Int) -> CGFloat { fatalError("contract") }
 }
 
 public enum GleamRadius: CaseIterable, Sendable {
-    case card
-    case control
+    case card                // 12, containers
+    case item                // 8, rows and wells inside a container
+    case control             // 6, buttons and inputs
     public var value: CGFloat { fatalError("contract") }
 }
 
+/// Depth comes from tonal layering and luminous outlines, not heavy shadows.
+/// Each level carries the hairline it draws at its edge and the shadow it
+/// casts; `low` casts none at all.
 public enum GleamElevation: CaseIterable, Sendable {
-    case low, medium, high
-    // Each level is a material plus shadow token pair, resolved in SwiftUI.
+    case low                 // a resting card
+    case medium              // a hovered or focused card
+    case high                // a floating menu or popover
+    public var borderOpacity: Double { fatalError("contract") }
+    public var shadowOpacity: Double { fatalError("contract") }
+    public var shadowRadius: CGFloat { fatalError("contract") }
+    public var shadowOffsetY: CGFloat { fatalError("contract") }
 }
 
 public enum GleamTypeToken: CaseIterable, Sendable {
-    case display     // the hub number
-    case title
-    case body
-    case caption
-    case mono        // file paths
+    case display     // 56, the hub number
+    case title       // 22, view and card headings
+    case headline    // 15, the brand line
+    case label       // 14, navigation and control labels
+    case body        // 13, descriptions and list items
+    case caption     // 11, metadata
+    case mono        // 12, file paths
     public var font: Font { fatalError("contract") }
+    public var size: CGFloat { fatalError("contract") }
+    public var tracking: CGFloat { fatalError("contract") }
+    /// Line height minus point size, which is what SwiftUI's lineSpacing takes.
+    public var lineSpacing: CGFloat { fatalError("contract") }
 }
 ```
 
@@ -1848,11 +1892,12 @@ public enum OrbMood: String, CaseIterable, Sendable, Equatable {
     case cleanSweep
 }
 
-/// The six hub cards in their fixed hexagonal order. The order of
+/// The six modules in their fixed rail order. The order of
 /// `allCases` is the layout order and is part of the contract: a test
 /// asserts this exact sequence and the hub never reorders at runtime.
 /// `leftovers` presents the `GleamModule.leftovers` engine (C4). Disk Map
-/// and Settings are hub chrome, not cards, and have no case here.
+/// and Settings are rail destinations without a module behind them, so they
+/// have no case here; HubDestination (C37) is the full rail.
 public enum HubModule: String, CaseIterable, Sendable, Equatable {
     case fullSweep
     case cleanup
@@ -1868,8 +1913,9 @@ public enum HubModule: String, CaseIterable, Sendable, Equatable {
 /// - `figure` is the card's live figure line (for example a reclaimable
 ///   estimate or a last scan time). Empty is allowed while the module is a
 ///   placeholder; it is never filler text.
-/// - `isEnabled` false means the card renders but does not enter its module.
-public struct HubCard: Sendable, Equatable, Identifiable {
+/// - `isEnabled` false means the module is reachable and says so in its
+///   pane, but offers no action.
+public struct HubModuleSummary: Sendable, Equatable, Identifiable {
     public var id: HubModule { module }
     public let module: HubModule
     public let figure: String
@@ -1888,7 +1934,7 @@ public struct HubMachineState: Sendable, Equatable {
     public let lastScanFinishedAt: Date?
     public let reclaimableEstimateBytes: UInt64?
     public let attentionReason: String?
-    public let cardFigures: [HubModule: String]
+    public let moduleFigures: [HubModule: String]
     public let enabledModules: Set<HubModule>
     public let now: Date
 }
@@ -1911,7 +1957,7 @@ public struct HubMachineState: Sendable, Equatable {
 ///   is a plain sentence inviting the first scan.
 /// - `cards` always holds exactly six entries, one per HubModule, in
 ///   `HubModule.allCases` order, whatever the state says. A module missing
-///   from `cardFigures` gets an empty figure. The card order never changes
+///   from `moduleFigures` gets an empty figure. The order never changes
 ///   at runtime.
 /// - `apply` is the only mutation path, and after it `orbMood`,
 ///   `statusLine` and `cards` equal the pure functions of the applied
@@ -1922,14 +1968,14 @@ public struct HubMachineState: Sendable, Equatable {
 public final class HubModel {
     public private(set) var orbMood: OrbMood
     public private(set) var statusLine: String
-    public private(set) var cards: [HubCard]
+    public private(set) var summaries: [HubModuleSummary]
 
     public init(state: HubMachineState)
     public func apply(_ state: HubMachineState)
 
     public nonisolated static func mood(for state: HubMachineState) -> OrbMood
     public nonisolated static func statusLine(for state: HubMachineState) -> String
-    public nonisolated static func cards(for state: HubMachineState) -> [HubCard]
+    public nonisolated static func summaries(for state: HubMachineState) -> [HubModuleSummary]
 }
 
 /// The orb's surface tint. Exactly two cases and neither is the dangerous
@@ -1984,15 +2030,18 @@ public enum OrbAppearanceResolver {
 }
 ```
 
-### C37. Hub navigation model
+### C37. Rail navigation model
+
+Revised 2026-08-10. The hexagon of six cards and the hub to module zoom are
+gone; the rail replaces them. `HubZoomDirection` and `HubZoomResolver` stay
+because Disk Map drills into folders with the same grammar (C39).
 
 ```swift
 import Foundation
 import GleamDesign
 
-/// The keys the hub navigation understands. A closed set: full operation
-/// without a pointer means these six are sufficient to reach every module
-/// and come back.
+/// The keys the rail understands. A closed set: full operation without a
+/// pointer means these six reach every destination and act on it.
 public enum HubKeyEvent: String, CaseIterable, Sendable, Equatable {
     case arrowLeft
     case arrowRight
@@ -2002,15 +2051,40 @@ public enum HubKeyEvent: String, CaseIterable, Sendable, Equatable {
     case escape
 }
 
-/// One module's preserved state, opaque to the hub. The module encodes its
+/// Everywhere the rail can take you, in rail order.
+///
+/// Guarantees:
+/// - `allCases` is every module in `HubModule.allCases` order, then
+///   diskMap, then settings. The order is fixed; the rail never reorders
+///   at runtime.
+/// - Every destination has a non empty title and symbol, and no two share
+///   either.
+/// - Groups are contiguous and the work group comes first, so the rail draws
+///   at most one gap.
+public enum HubDestination: Hashable, Codable, Sendable, CaseIterable {
+    case module(HubModule)
+    case diskMap
+    case settings
+
+    public static let allCases: [HubDestination]
+    public var group: HubDestinationGroup { fatalError("contract") }
+    public var title: String { fatalError("contract") }
+    public var symbolName: String { fatalError("contract") }
+}
+
+public enum HubDestinationGroup: CaseIterable, Sendable, Equatable {
+    case work
+    case apart
+}
+
+/// One module's preserved state, opaque to the rail. The module encodes its
 /// own Codable state into `payload` on leaving and decodes it on re entry;
-/// the hub stores and returns bytes and never interprets them.
+/// the rail stores and returns bytes and never interprets them.
 ///
 /// Opaque data rather than a generic parameter is deliberate: a generic
 /// would make the navigation state's type depend on every module's state
-/// type, coupling s0c to modules that ship across M1 to M6. The cost is
-/// stated plainly: nothing at compile time proves a module decodes the type
-/// it encoded. Each module owns that round trip and tests it when it ships.
+/// type. The cost is stated plainly: nothing at compile time proves a module
+/// decodes the type it encoded. Each module owns that round trip.
 public struct ModuleStateSlot: Codable, Sendable, Equatable {
     public let payload: Data
     public init(payload: Data)
@@ -2019,88 +2093,107 @@ public struct ModuleStateSlot: Codable, Sendable, Equatable {
 /// Where the user is, and every module's preserved state.
 ///
 /// Guarantees:
-/// - Focus is always exactly one card when on the hub, by construction: the
-///   hub case carries a non optional HubModule and no unfocused hub state
-///   is representable.
-/// - `initial` is the hub with focus on the first card in
-///   `HubModule.allCases` order (fullSweep) and no stored slots.
+/// - Exactly one destination is selected at all times, by construction: the
+///   selection is a non optional HubDestination and no unselected state is
+///   representable. There is no overview screen and no unfocused state.
+/// - `initial` is the first destination in rail order, `.module(.fullSweep)`,
+///   with no stored slots.
 /// - Values are immutable. `storingSlot` returns a copy with that module's
 ///   slot replaced and everything else identical; it is the only operation
 ///   anywhere that changes `moduleStateSlots`.
 public struct HubNavigationState: Codable, Sendable, Equatable {
-    public enum Position: Codable, Sendable, Equatable {
-        case hub(focus: HubModule)
-        case module(HubModule)
-    }
-    public let position: Position
+    public let selection: HubDestination
     public let moduleStateSlots: [HubModule: ModuleStateSlot]
 
-    public init(position: Position, moduleStateSlots: [HubModule: ModuleStateSlot])
+    public init(selection: HubDestination, moduleStateSlots: [HubModule: ModuleStateSlot])
     public static let initial: HubNavigationState
     public func storingSlot(_ slot: ModuleStateSlot, for module: HubModule) -> HubNavigationState
 }
 
-/// The outcome of one key press: the next state, plus the zoom the view
-/// must perform when a module boundary was crossed.
+/// The outcome of one key press: the next state, plus what the open pane is
+/// being asked to do.
 ///
 /// Guarantees:
-/// - `zoom` is non nil exactly when `next` is on the other side of a module
-///   boundary from the input state: nil for every focus move and every
-///   ignored key.
+/// - `intent` is non nil exactly for return and escape, and nil for every
+///   arrow, whether or not the arrow moved the selection.
 public struct HubNavigationTransition: Sendable, Equatable {
     public let next: HubNavigationState
-    public let zoom: HubZoom?
+    public let intent: HubIntent?
 }
 
-/// A matched geometry zoom, as data: which module and which way. Views
-/// interpret it; its animation resolves through HubZoomResolver.
-public struct HubZoom: Sendable, Equatable {
-    public let module: HubModule
-    public let direction: HubZoomDirection
+/// What a key press asks of the pane. The rail owns the selection; anything
+/// beyond moving it belongs to whatever is on screen.
+public enum HubIntent: String, CaseIterable, Sendable, Equatable {
+    case activatePrimaryAction
+    case dismiss
 }
 
-public enum HubZoomDirection: String, CaseIterable, Sendable, Equatable {
-    case zoomIn
-    case zoomOut
-}
-
-/// The pure key transition. The whole hub navigation behaviour is this one
+/// The pure key transition. The whole rail navigation behaviour is this one
 /// function, driven in tests without a view.
 ///
 /// Guarantees:
-/// - Total and deterministic: every (state, key, enabledModules) input
-///   returns a transition; equal inputs return equal outputs; no clock, no
-///   randomness, no hidden state.
-/// - Spatial order: the six cards form two columns of three flanking the
-///   orb, in `HubModule.allCases` order (C36). Left column top to bottom is
-///   fullSweep, cleanup, protection; right column top to bottom is
-///   performance, applications, leftovers.
-/// - On the hub, arrowUp and arrowDown move within the focused card's
-///   column and clamp at its ends; arrowLeft and arrowRight move to the
-///   same row of the other column and clamp when focus is already in the
-///   pressed direction's column. A clamped press returns the state
-///   unchanged. Arrow walking therefore never leaves the six cards, over
-///   any key sequence.
-/// - On the hub, `return` on an enabled focused module moves to
-///   `.module(focused)` with a zoomIn for it; on a disabled module (C36,
-///   isEnabled false cards render but do not enter) the state is unchanged
-///   and no zoom is emitted. `escape` on the hub is the identity.
-/// - In a module, `escape` moves to the hub with focus restored to the
-///   module that was entered, with a zoomOut for it. Every other key in a
-///   module is the identity: module content owns its own keys, the hub
-///   model listens for escape alone.
-/// - Entering then escaping restores focus to the entered card, for every
-///   module.
+/// - Total and deterministic: every (state, key) input returns a transition;
+///   equal inputs return equal outputs; no clock, no randomness, no hidden
+///   state. `enabledModules` is not an input: enablement decides what a pane
+///   offers, never what the rail reaches.
+/// - arrowUp and arrowDown move one step through `HubDestination.allCases`
+///   and clamp at the ends. A clamped press returns the state unchanged.
+///   Walking therefore never leaves the rail, over any key sequence, and
+///   every destination is reachable from the top with down alone.
+/// - arrowLeft and arrowRight are the identity: the rail is one column, and
+///   horizontal movement belongs to the pane.
+/// - `return` carries `.activatePrimaryAction` and `escape` carries
+///   `.dismiss`; neither moves the selection.
+/// - Every destination is selectable, including a module that has not been
+///   built. The pane is where a module admits it has nothing to offer.
 /// - No transition creates, drops or alters a module state slot:
-///   `next.moduleStateSlots` always equals the input's. Slots therefore
-///   survive enter, leave and re enter, over any key sequence, as a
-///   property test.
+///   `next.moduleStateSlots` always equals the input's, over any key
+///   sequence, as a property test.
 public enum HubNavigationResolver {
     public static func transition(
         _ state: HubNavigationState,
-        applying key: HubKeyEvent,
-        enabledModules: Set<HubModule>
+        applying key: HubKeyEvent
     ) -> HubNavigationTransition { fatalError("contract") }
+}
+
+/// What the pane beside the rail shows. A module that is not built still gets
+/// one: it says what it will do and admits it cannot do it, rather than
+/// showing an empty screen or an action that does nothing.
+///
+/// Guarantees:
+/// - Total: every destination resolves a pane whose title is the
+///   destination's title and whose sentence is a full sentence.
+/// - A pane carries an action exactly when its module is enabled, and a not
+///   ready note exactly when it does not. Never both, never neither.
+/// - Job names come from DESIGN.md, so an unshipped module still tells the
+///   truth about what it is going to do. No module lists a job or a glyph
+///   twice, and every job carries a glyph.
+/// - The module's live figure appears on its first job and nowhere else, so
+///   a figure is never shown twice or attributed to the wrong job or module.
+public struct ModulePane: Sendable, Equatable {
+    public let title: String
+    public let sentence: String
+    public let jobs: [ModulePaneJob]
+    public let action: ModulePaneAction?
+    public let notReadyNote: String?
+}
+
+public struct ModulePaneJob: Sendable, Equatable, Identifiable {
+    public var id: String { name }
+    public let name: String
+    public let symbolName: String
+    public let detail: String
+}
+
+public struct ModulePaneAction: Sendable, Equatable {
+    public let title: String
+}
+
+public enum ModulePaneResolver {
+    public static func pane(
+        for destination: HubDestination,
+        summaries: [HubModuleSummary]
+    ) -> ModulePane { fatalError("contract") }
 }
 
 /// Pure mapping from zoom direction and Reduce Motion flag to the animation
@@ -2748,7 +2841,7 @@ so the move breaks no test source.
 ///
 /// The hub:
 /// - There is no hub estimate interplay. Disk Map has no HubModule case
-///   (C36), contributes nothing to HubMachineState.cardFigures or
+///   (C36), contributes nothing to HubMachineState.moduleFigures or
 ///   reclaimableEstimateBytes, and its reclaimed bytes surface only on its
 ///   own result screen. A test asserts the model exposes no hub figure.
 ///

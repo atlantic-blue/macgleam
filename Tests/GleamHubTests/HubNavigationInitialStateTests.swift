@@ -5,10 +5,10 @@ import Testing
 @Suite("Hub navigation initial state")
 struct HubNavigationInitialStateTests {
 
-  @Test("initial sits on the hub with focus on the first card in the layout order")
-  func initialSitsOnTheHubWithFocusOnTheFirstCardInTheLayoutOrder() {
-    #expect(HubModule.allCases.first == .fullSweep)
-    #expect(HubNavigationState.initial.position == .hub(focus: .fullSweep))
+  @Test("the app opens on the first destination in rail order")
+  func theAppOpensOnTheFirstDestinationInRailOrder() {
+    #expect(HubDestination.allCases.first == .module(.fullSweep))
+    #expect(HubNavigationState.initial.selection == .module(.fullSweep))
   }
 
   @Test("initial carries no stored module slots")

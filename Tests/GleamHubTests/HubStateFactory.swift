@@ -10,7 +10,7 @@ func makeHubMachineState(
   lastScanFinishedAt: Date? = nil,
   reclaimableEstimateBytes: UInt64? = nil,
   attentionReason: String? = nil,
-  cardFigures: [HubModule: String] = [:],
+  moduleFigures: [HubModule: String] = [:],
   enabledModules: Set<HubModule> = [],
   now: Date = fixedNow
 ) -> HubMachineState {
@@ -18,7 +18,7 @@ func makeHubMachineState(
     lastScanFinishedAt: lastScanFinishedAt,
     reclaimableEstimateBytes: reclaimableEstimateBytes,
     attentionReason: attentionReason,
-    cardFigures: cardFigures,
+    moduleFigures: moduleFigures,
     enabledModules: enabledModules,
     now: now
   )
@@ -56,8 +56,8 @@ func makeAttentionState(
   )
 }
 
-/// One figure per module so flow through checks can see every card.
-func makeFullCardFigures() -> [HubModule: String] {
+/// One figure per module so flow through checks can see every module.
+func makeFullModuleFigures() -> [HubModule: String] {
   Dictionary(
     uniqueKeysWithValues: HubModule.allCases.map { module in
       (module, "figure for \(module.rawValue)")
@@ -72,8 +72,22 @@ func makeFullyPopulatedState(now: Date = fixedNow) -> HubMachineState {
     lastScanFinishedAt: now.addingTimeInterval(-600),
     reclaimableEstimateBytes: 42_000_000_000,
     attentionReason: "Two applications are holding leftover support files.",
-    cardFigures: makeFullCardFigures(),
+    moduleFigures: makeFullModuleFigures(),
     enabledModules: Set(HubModule.allCases),
     now: now
   )
+}
+
+/// Module summaries with the named modules enabled and the given figures.
+func makeSummaries(
+  enabled: Set<HubModule> = [],
+  figures: [HubModule: String] = [:]
+) -> [HubModuleSummary] {
+  HubModule.allCases.map { module in
+    HubModuleSummary(
+      module: module,
+      figure: figures[module] ?? "",
+      isEnabled: enabled.contains(module)
+    )
+  }
 }

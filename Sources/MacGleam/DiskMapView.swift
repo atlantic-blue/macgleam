@@ -14,7 +14,9 @@ import SwiftUI
 struct DiskMapView: View {
   let model: DiskMapModuleModel
   let executor: CancellableCleanupExecutor
-  let onClose: () -> Void
+  /// The standard pane this destination shows before a map exists. Every
+  /// destination opens on the same shape.
+  let idlePane: ModulePane
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var confirmingScope: PermanentDeletionScope?
@@ -22,24 +24,17 @@ struct DiskMapView: View {
   private static let defaultVolume = AbsolutePath(normalising: "/")
 
   var body: some View {
-    VStack(alignment: .leading, spacing: GleamSpacing.points(2)) {
-      header
-      if let failure = model.failureNotice {
-        CleanupNoticeCard(
-          sentences: [failure],
-          tint: GleamColorToken.review.color(for: colorScheme)
+    Group {
+      if isIdle && model.failureNotice == nil {
+        ModulePaneView(
+          pane: idlePane,
+          onActivate: { model.startMapping(volume: Self.defaultVolume) }
         )
+      } else {
+        working
       }
-      content
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    .padding(GleamSpacing.points(3))
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(
-      RoundedRectangle(cornerRadius: GleamRadius.card.value)
-        .fill(GleamColorToken.surface.color(for: colorScheme))
-    )
-    .padding(GleamSpacing.points(2))
     .animation(GleamSpring.gentle.animation(reduceMotion: reduceMotion), value: stateShape)
     .confirmationDialog(
       "Delete permanently?",
@@ -63,24 +58,40 @@ struct DiskMapView: View {
     }
   }
 
-  private var header: some View {
-    HStack(alignment: .firstTextBaseline) {
-      Text("Disk Map")
-        .font(GleamTypeToken.title.font)
-        .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
-      Spacer()
-      Button("Close") { onClose() }
-        .buttonStyle(.plain)
-        .font(GleamTypeToken.caption.font)
-        .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
+  private var isIdle: Bool {
+    if case .idle = model.state { return true }
+    return false
+  }
+
+  private var working: some View {
+    VStack(alignment: .leading, spacing: GleamSpacing.points(2)) {
+      header
+      if let failure = model.failureNotice {
+        CleanupNoticeCard(
+          sentences: [failure],
+          tint: GleamColorToken.review.color(for: colorScheme)
+        )
+      }
+      content
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+    .padding(.horizontal, GleamSpacing.points(6))
+    .padding(.vertical, GleamSpacing.points(5))
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+
+  /// The rail is how you leave, so the heading carries no close control.
+  private var header: some View {
+    Text("Disk Map")
+      .gleamType(.heading)
+      .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
   }
 
   @ViewBuilder
   private var content: some View {
     switch model.state {
     case .idle:
-      DiskMapIdleView(onMap: { model.startMapping(volume: Self.defaultVolume) })
+      DiskMapIdleInvitation(onMap: { model.startMapping(volume: Self.defaultVolume) })
     case .mapping(let map):
       mapScene(map, isStreaming: true)
     case .browsing(let map):
@@ -119,7 +130,7 @@ struct DiskMapView: View {
   private func footer(_ map: DiskMapState, isStreaming: Bool) -> some View {
     HStack {
       Text(selectionLine(map))
-        .font(GleamTypeToken.body.font)
+        .gleamType(.body)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
         .contentTransition(.numericText())
         .animation(
@@ -130,10 +141,10 @@ struct DiskMapView: View {
       if !isStreaming {
         Button("Remap") { model.startMapping(volume: map.volume) }
           .buttonStyle(.plain)
-          .font(GleamTypeToken.caption.font)
+          .gleamType(.caption)
           .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       }
-      CleanupPrimaryButton(
+      PrimaryButton(
         title: "Remove",
         action: beginExecution,
         isEnabled: !isStreaming && !map.selectedPaths.isEmpty
@@ -216,7 +227,7 @@ enum DiskMapStateShape {
 }
 
 /// The designed entry state: what a map covers and the one action.
-struct DiskMapIdleView: View {
+struct DiskMapIdleInvitation: View {
   let onMap: () -> Void
   @Environment(\.colorScheme) private var colorScheme
 
@@ -224,16 +235,16 @@ struct DiskMapIdleView: View {
     VStack(spacing: GleamSpacing.points(2)) {
       Spacer()
       Text("See where your space went")
-        .font(GleamTypeToken.title.font)
+        .gleamType(.title)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
       Text(
         "The map builds outward from the volume root while scanning, sized by what each folder actually takes on disk. Drill in, select what should go, and review before anything moves."
       )
-      .font(GleamTypeToken.body.font)
+      .gleamType(.body)
       .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       .multilineTextAlignment(.center)
       .frame(maxWidth: 460)
-      CleanupPrimaryButton(title: "Map This Mac", action: onMap)
+      PrimaryButton(title: "Map This Mac", action: onMap)
         .padding(.top, GleamSpacing.points(1))
       Spacer()
     }
@@ -259,165 +270,20 @@ struct DiskMapBreadcrumb: View {
         .buttonStyle(.plain)
       }
       Text(map.focusPath.value)
-        .font(GleamTypeToken.mono.font)
+        .gleamType(.mono)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
         .lineLimit(1)
         .truncationMode(.middle)
       Spacer()
       if isStreaming {
         Text("Mapping\u{2026}")
-          .font(GleamTypeToken.caption.font)
+          .gleamType(.caption)
           .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
         Button("Cancel") { onCancel() }
           .buttonStyle(.plain)
-          .font(GleamTypeToken.caption.font)
+          .gleamType(.caption)
           .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       }
-    }
-  }
-}
-
-/// The focused folder's children as size proportional blocks: each block's
-/// height follows its share of the focused subtree, so the map reads as
-/// weight at a glance and grows as the stream revises totals upward.
-struct DiskMapCanvas: View {
-  let map: DiskMapState
-  let onToggle: (AbsolutePath) -> Void
-  let onDrillIn: (AbsolutePath) -> Void
-  @Environment(\.colorScheme) private var colorScheme
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-  private static let minimumRowHeight: CGFloat = 44
-
-  var body: some View {
-    let focused = focusedNode
-    ScrollView {
-      VStack(spacing: GleamSpacing.points(1) / 2) {
-        if let focused, !focused.children.isEmpty {
-          ForEach(focused.children) { child in
-            DiskMapBlockRow(
-              node: child,
-              share: share(of: child, in: focused),
-              isSelected: map.selectedPaths.contains(child.path),
-              onToggle: { onToggle(child.path) },
-              onDrillIn: { onDrillIn(child.path) }
-            )
-            .frame(height: rowHeight(for: child, in: focused))
-          }
-        } else {
-          Text(focused == nil ? "Waiting for the first folders\u{2026}" : "Nothing inside yet")
-            .font(GleamTypeToken.body.font)
-            .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
-            .frame(maxWidth: .infinity)
-            .padding(GleamSpacing.points(4))
-        }
-      }
-      .animation(GleamSpring.gentle.animation(reduceMotion: reduceMotion), value: rowShape)
-    }
-  }
-
-  private var focusedNode: DiskMapTreeNode? {
-    guard let root = map.root else { return nil }
-    var stack = [root]
-    while let node = stack.popLast() {
-      if node.path == map.focusPath { return node }
-      stack.append(contentsOf: node.children)
-    }
-    return nil
-  }
-
-  private func share(of child: DiskMapTreeNode, in focused: DiskMapTreeNode) -> Double {
-    let total = focused.children.reduce(UInt64(0)) { $0 + $1.allocatedBytesSoFar }
-    guard total > 0 else { return 0 }
-    return Double(child.allocatedBytesSoFar) / Double(total)
-  }
-
-  /// Proportional heights over a 480 point canvas, clamped so a sliver of a
-  /// folder still offers a full tap target.
-  private func rowHeight(for child: DiskMapTreeNode, in focused: DiskMapTreeNode) -> CGFloat {
-    max(Self.minimumRowHeight, 480 * share(of: child, in: focused))
-  }
-
-  /// The identity the growth animation tracks: paths and their current
-  /// totals.
-  private var rowShape: [AbsolutePath: UInt64] {
-    guard let focused = focusedNode else { return [:] }
-    return Dictionary(
-      uniqueKeysWithValues: focused.children.map { ($0.path, $0.allocatedBytesSoFar) }
-    )
-  }
-}
-
-/// One block of the map: selection on the left, the name and figure, and
-/// the way in for folders.
-struct DiskMapBlockRow: View {
-  let node: DiskMapTreeNode
-  let share: Double
-  let isSelected: Bool
-  let onToggle: () -> Void
-  let onDrillIn: () -> Void
-  @Environment(\.colorScheme) private var colorScheme
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-  var body: some View {
-    HStack(spacing: GleamSpacing.points(1)) {
-      if node.isSelectable {
-        CleanupCheckmark(
-          isSelected: isSelected,
-          reduceMotion: reduceMotion,
-          action: onToggle
-        )
-      } else {
-        Image(systemName: "lock")
-          .font(.system(size: 12))
-          .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
-          .help("Protected by the safety denylist; the map shows it but never offers it.")
-      }
-      Image(systemName: node.isDirectory ? "folder.fill" : "doc")
-        .foregroundStyle(GleamColorToken.accent.color(for: colorScheme).opacity(0.8))
-      Text(node.path.lastComponent)
-        .font(GleamTypeToken.body.font)
-        .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
-        .lineLimit(1)
-        .truncationMode(.middle)
-      Spacer()
-      Text(ByteFigure.string(node.allocatedBytesSoFar))
-        .font(GleamTypeToken.caption.font)
-        .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
-        .contentTransition(.numericText())
-        .animation(
-          GleamSpring.snappy.animation(reduceMotion: reduceMotion),
-          value: node.allocatedBytesSoFar
-        )
-      if node.isDirectory {
-        Button(action: onDrillIn) {
-          Image(systemName: "chevron.right")
-            .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
-        }
-        .buttonStyle(.plain)
-      }
-    }
-    .padding(.horizontal, GleamSpacing.points(2))
-    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-    .background(
-      RoundedRectangle(cornerRadius: GleamRadius.control.value)
-        .fill(
-          GleamColorToken.accent.color(for: colorScheme)
-            .opacity(0.08 + 0.24 * share)
-        )
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: GleamRadius.control.value)
-        .strokeBorder(
-          isSelected
-            ? GleamColorToken.accent.color(for: colorScheme)
-            : Color.clear,
-          lineWidth: 2
-        )
-    )
-    .contentShape(Rectangle())
-    .onTapGesture(count: 2) {
-      if node.isDirectory { onDrillIn() }
     }
   }
 }
@@ -434,7 +300,7 @@ struct DiskMapExecutionView: View {
     VStack(spacing: GleamSpacing.points(2)) {
       Spacer()
       Text("Removing\u{2026}")
-        .font(GleamTypeToken.title.font)
+        .gleamType(.title)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
       ProgressView(
         value: Double(progress.finishedOperations),
@@ -442,10 +308,11 @@ struct DiskMapExecutionView: View {
       )
       .frame(maxWidth: 320)
       Text("\(progress.finishedOperations) of \(progress.totalOperations) items")
-        .font(GleamTypeToken.body.font)
+        .gleamType(.body)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       Text("\(ByteFigure.string(progress.bytesReclaimed)) reclaimed")
-        .font(GleamTypeToken.body.font.weight(.semibold))
+        .gleamType(.body)
+        .fontWeight(.semibold)
         .foregroundStyle(GleamColorToken.accent.color(for: colorScheme))
         .contentTransition(.numericText())
         .animation(
@@ -454,7 +321,7 @@ struct DiskMapExecutionView: View {
         )
       Button("Cancel") { onCancel() }
         .buttonStyle(.plain)
-        .font(GleamTypeToken.caption.font)
+        .gleamType(.caption)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       Spacer()
     }
@@ -472,10 +339,10 @@ struct DiskMapResultView: View {
     VStack(spacing: GleamSpacing.points(2)) {
       Spacer()
       Text("\(ByteFigure.string(summary.bytesReclaimed)) reclaimed")
-        .font(GleamTypeToken.title.font)
+        .gleamType(.title)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
       Text(outcomeLine)
-        .font(GleamTypeToken.body.font)
+        .gleamType(.body)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       if !summary.failures.isEmpty {
         CleanupNoticeCard(
@@ -491,7 +358,7 @@ struct DiskMapResultView: View {
         )
         .frame(maxWidth: 460)
       }
-      CleanupPrimaryButton(title: "Done", action: onDone)
+      PrimaryButton(title: "Done", action: onDone)
         .padding(.top, GleamSpacing.points(1))
       Spacer()
     }

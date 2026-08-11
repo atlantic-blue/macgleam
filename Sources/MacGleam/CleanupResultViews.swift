@@ -28,7 +28,7 @@ struct CleanupExecutionView: View {
       }
       Button("Stop After This Item", action: onCancel)
         .buttonStyle(.plain)
-        .font(GleamTypeToken.caption.font)
+        .gleamType(.caption)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
     }
   }
@@ -36,7 +36,7 @@ struct CleanupExecutionView: View {
   private var reclaimedFigure: some View {
     VStack(spacing: 2) {
       Text(ByteFigure.string(progress.bytesReclaimed))
-        .font(GleamTypeToken.display.font)
+        .gleamType(.display)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
         .contentTransition(.numericText())
         .animation(
@@ -44,14 +44,14 @@ struct CleanupExecutionView: View {
           value: progress.bytesReclaimed
         )
       Text("reclaimed")
-        .font(GleamTypeToken.caption.font)
+        .gleamType(.caption)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
     }
   }
 
   private var operationLine: some View {
     Text("\(progress.finishedOperations) of \(progress.totalOperations) operations")
-      .font(GleamTypeToken.caption.font)
+      .gleamType(.caption)
       .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       .contentTransition(.numericText())
       .animation(
@@ -65,11 +65,11 @@ struct CleanupExecutionView: View {
       Text(
         finding.paths.count == 1 ? finding.paths[0].lastComponent : "\(finding.paths.count) files"
       )
-      .font(GleamTypeToken.body.font)
+      .gleamType(.body)
       .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
       Spacer()
       Text(ByteFigure.string(finding.byteSize))
-        .font(GleamTypeToken.caption.font)
+        .gleamType(.caption)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
     }
     .padding(GleamSpacing.points(1))
@@ -118,7 +118,7 @@ struct CleanupResultView: View {
         .padding(.vertical, GleamSpacing.points(1))
       }
       .frame(maxWidth: 480)
-      CleanupPrimaryButton(title: "Done", action: onDone)
+      PrimaryButton(title: "Done", action: onDone)
       Spacer(minLength: GleamSpacing.points(2))
     }
     .frame(maxWidth: .infinity)
@@ -132,10 +132,10 @@ struct CleanupResultView: View {
   private var figure: some View {
     VStack(spacing: 2) {
       Text(ByteFigure.string(summary.bytesReclaimed))
-        .font(GleamTypeToken.display.font)
+        .gleamType(.display)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
       Text("reclaimed")
-        .font(GleamTypeToken.body.font)
+        .gleamType(.body)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
     }
     .scaleEffect(hasLanded || reduceMotion ? 1 : 0.8)
@@ -145,11 +145,11 @@ struct CleanupResultView: View {
   private func outcomeRow(_ outcome: CleanupCategoryOutcome) -> some View {
     HStack {
       Text(outcome.category.cleanupTitle)
-        .font(GleamTypeToken.body.font)
+        .gleamType(.body)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
       Spacer()
       Text(outcomeLine(outcome))
-        .font(GleamTypeToken.caption.font)
+        .gleamType(.caption)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
     }
     .padding(.horizontal, GleamSpacing.points(1))
@@ -159,7 +159,7 @@ struct CleanupResultView: View {
   private var failureRows: some View {
     ForEach(summary.failures, id: \.self) { sentence in
       Text(sentence)
-        .font(GleamTypeToken.caption.font)
+        .gleamType(.caption)
         .foregroundStyle(GleamColorToken.review.color(for: colorScheme))
         .padding(.horizontal, GleamSpacing.points(1))
     }
@@ -171,7 +171,7 @@ struct CleanupResultView: View {
       Text(
         "Left in place by the safety list: \(summary.skippedDenylistedNames.joined(separator: ", "))."
       )
-      .font(GleamTypeToken.caption.font)
+      .gleamType(.caption)
       .foregroundStyle(GleamColorToken.safe.color(for: colorScheme))
       .padding(.horizontal, GleamSpacing.points(1))
     }
@@ -205,12 +205,12 @@ struct CleanupCleanSweepView: View {
       Spacer()
       bloom
       Text("Nothing to clean")
-        .font(GleamTypeToken.title.font)
+        .gleamType(.title)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
       Text(checkedLine)
-        .font(GleamTypeToken.body.font)
+        .gleamType(.body)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
-      CleanupPrimaryButton(title: "Done", action: onDone)
+      PrimaryButton(title: "Done", action: onDone)
         .padding(.top, GleamSpacing.points(1))
       Spacer()
     }

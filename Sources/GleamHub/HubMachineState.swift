@@ -11,7 +11,7 @@ public struct HubMachineState: Sendable, Equatable {
   public let lastScanFinishedAt: Date?
   public let reclaimableEstimateBytes: UInt64?
   public let attentionReason: String?
-  public let cardFigures: [HubModule: String]
+  public let moduleFigures: [HubModule: String]
   public let enabledModules: Set<HubModule>
   public let now: Date
 
@@ -19,14 +19,14 @@ public struct HubMachineState: Sendable, Equatable {
     lastScanFinishedAt: Date?,
     reclaimableEstimateBytes: UInt64?,
     attentionReason: String?,
-    cardFigures: [HubModule: String],
+    moduleFigures: [HubModule: String],
     enabledModules: Set<HubModule>,
     now: Date
   ) {
     self.lastScanFinishedAt = lastScanFinishedAt
     self.reclaimableEstimateBytes = reclaimableEstimateBytes
     self.attentionReason = attentionReason
-    self.cardFigures = cardFigures
+    self.moduleFigures = moduleFigures
     self.enabledModules = enabledModules
     self.now = now
   }

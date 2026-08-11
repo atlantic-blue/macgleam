@@ -12,15 +12,15 @@ also keeps us clear of MacPaw's trademarks.
 
 CleanMyMac 5 is organised as six primary modules plus standalone tools:
 
-- Smart Care: one scan that runs five jobs (deep clean, threat scan, performance
+- Full Sweep: one scan that runs five jobs (deep clean, threat scan, performance
   boost, software updates, storage declutter) and presents one combined result
 - Cleanup: system junk (caches, logs, broken downloads), mail attachments, trash bins
 - Protection: malware scan and removal, privacy cleanup (browser data, recent lists)
 - Performance: maintenance scripts, login items, background items and launch agents,
   memory and CPU load
 - Applications: full uninstall with leftover sweep, updater, leftovers from removed apps
-- My Clutter: duplicates, similar photos, large and old files, downloads triage
-- Space Lens: visual disk map, drill in by folder size
+- Leftovers: duplicates, similar photos, large and old files, downloads triage
+- Disk Map: visual disk map, drill in by folder size
 - Cloud Cleanup: large cloud files and redundant local copies
 - Menu bar item: live monitors (storage, memory, CPU, battery, network) and quick actions
 - Assistant layer: suggestions after each scan

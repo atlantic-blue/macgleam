@@ -23,7 +23,7 @@ struct CleanupScanProgressView: View {
       counters
       Button("Stop Scan") { isConfirmingCancel = true }
         .buttonStyle(.plain)
-        .font(GleamTypeToken.caption.font)
+        .gleamType(.caption)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       Spacer()
     }
@@ -69,7 +69,7 @@ struct CleanupScanProgressView: View {
   private var counters: some View {
     VStack(spacing: GleamSpacing.points(1) / 2) {
       Text(ByteFigure.string(progress.counters.bytesReclaimable))
-        .font(GleamTypeToken.display.font)
+        .gleamType(.display)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
         .contentTransition(.numericText())
         .animation(
@@ -77,7 +77,7 @@ struct CleanupScanProgressView: View {
           value: progress.counters.bytesReclaimable
         )
       Text(counterLine)
-        .font(GleamTypeToken.caption.font)
+        .gleamType(.caption)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
         .contentTransition(.numericText())
         .animation(

@@ -12,18 +12,18 @@ import Observation
 public final class HubModel {
   public private(set) var orbMood: OrbMood
   public private(set) var statusLine: String
-  public private(set) var cards: [HubCard]
+  public private(set) var summaries: [HubModuleSummary]
 
   public init(state: HubMachineState) {
     orbMood = Self.mood(for: state)
     statusLine = Self.statusLine(for: state)
-    cards = Self.cards(for: state)
+    summaries = Self.summaries(for: state)
   }
 
   public func apply(_ state: HubMachineState) {
     orbMood = Self.mood(for: state)
     statusLine = Self.statusLine(for: state)
-    cards = Self.cards(for: state)
+    summaries = Self.summaries(for: state)
   }
 
   /// `idleAttention` exactly when an attention reason is present,
@@ -54,12 +54,12 @@ public final class HubModel {
   }
 
   /// Always exactly six entries, one per HubModule, in `allCases` order. A
-  /// module missing from `cardFigures` gets an empty figure.
-  public nonisolated static func cards(for state: HubMachineState) -> [HubCard] {
+  /// module missing from `moduleFigures` gets an empty figure.
+  public nonisolated static func summaries(for state: HubMachineState) -> [HubModuleSummary] {
     HubModule.allCases.map { module in
-      HubCard(
+      HubModuleSummary(
         module: module,
-        figure: state.cardFigures[module] ?? "",
+        figure: state.moduleFigures[module] ?? "",
         isEnabled: state.enabledModules.contains(module)
       )
     }

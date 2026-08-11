@@ -74,11 +74,12 @@ struct CleanupReviewView: View {
         action: { model.toggleCategory(group.category) }
       )
       Text(group.category.cleanupTitle)
-        .font(GleamTypeToken.body.font.weight(.semibold))
+        .gleamType(.body)
+        .fontWeight(.semibold)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
       Spacer()
       Text(ByteFigure.string(group.findings.reduce(0) { $0 + $1.byteSize }))
-        .font(GleamTypeToken.caption.font)
+        .gleamType(.caption)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       Button {
         withAnimation(GleamSpring.gentle.animation(reduceMotion: reduceMotion)) {
@@ -106,19 +107,19 @@ struct CleanupReviewView: View {
         HStack(spacing: GleamSpacing.points(1)) {
           CleanupRiskDot(risk: finding.risk)
           Text(rowTitle(finding))
-            .font(GleamTypeToken.body.font)
+            .gleamType(.body)
             .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
           Spacer()
           Text(ByteFigure.string(finding.byteSize))
-            .font(GleamTypeToken.caption.font)
+            .gleamType(.caption)
             .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
         }
         Text(finding.explanation)
-          .font(GleamTypeToken.caption.font)
+          .gleamType(.caption)
           .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
         if let path = finding.paths.first {
           Text(path.value)
-            .font(GleamTypeToken.mono.font)
+            .gleamType(.mono)
             .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme).opacity(0.7))
             .lineLimit(1)
             .truncationMode(.middle)
@@ -133,7 +134,7 @@ struct CleanupReviewView: View {
   private var footer: some View {
     HStack {
       Text(selectionLine)
-        .font(GleamTypeToken.body.font)
+        .gleamType(.body)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
         .contentTransition(.numericText())
         .animation(
@@ -143,9 +144,9 @@ struct CleanupReviewView: View {
       Spacer()
       Button("Rescan") { model.startScan() }
         .buttonStyle(.plain)
-        .font(GleamTypeToken.caption.font)
+        .gleamType(.caption)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
-      CleanupPrimaryButton(
+      PrimaryButton(
         title: "Clean",
         action: beginExecution,
         isEnabled: !review.selectedFindingIDs.isEmpty

@@ -18,16 +18,14 @@ struct ModuleStateSlotTests {
   }
 
   @Test(
-    "storingSlot leaves the position and every other slot identical",
+    "storingSlot leaves the selection and every other slot identical",
     arguments: HubModule.allCases
   )
-  func storingSlotLeavesThePositionAndEveryOtherSlotIdentical(module: HubModule) {
-    let original = makeNavigationState(
-      position: .hub(focus: .protection), slots: makeFullSlots()
-    )
+  func storingSlotLeavesTheSelectionAndEveryOtherSlotIdentical(module: HubModule) {
+    let original = makeNavigationState(selection: .module(.protection), slots: makeFullSlots())
     let replacement = makeSlot("replacement payload")
     let stored = original.storingSlot(replacement, for: module)
-    #expect(stored.position == original.position)
+    #expect(stored.selection == original.selection)
     #expect(stored.moduleStateSlots[module] == replacement)
     for other in HubModule.allCases where other != module {
       #expect(stored.moduleStateSlots[other] == original.moduleStateSlots[other])
@@ -46,41 +44,33 @@ struct ModuleStateSlotTests {
 
   @Test(
     "every transition passes the module state slots through untouched",
-    arguments: makeAllPositions(), HubKeyEvent.allCases
+    arguments: railTopToBottom, HubKeyEvent.allCases
   )
   func everyTransitionPassesTheModuleStateSlotsThroughUntouched(
-    position: HubNavigationState.Position,
+    destination: HubDestination,
     key: HubKeyEvent
   ) {
-    for enabledModules in makeEnabledVariants() {
-      let slots = makeFullSlots()
-      let state = makeNavigationState(position: position, slots: slots)
-      let transition = HubNavigationResolver.transition(
-        state, applying: key, enabledModules: enabledModules
-      )
-      #expect(transition.next.moduleStateSlots == slots)
-    }
+    let slots = makeFullSlots()
+    let transition = HubNavigationResolver.transition(
+      makeNavigationState(selection: destination, slots: slots), applying: key)
+    #expect(transition.next.moduleStateSlots == slots)
   }
 
   @Test(
-    "a slot survives enter, leave and re entry byte for byte",
+    "a slot survives leaving a module and coming back byte for byte",
     arguments: HubModule.allCases
   )
-  func aSlotSurvivesEnterLeaveAndReEntryByteForByte(module: HubModule) {
+  func aSlotSurvivesLeavingAModuleAndComingBack(module: HubModule) {
     let payload = Data("scroll offset 42, selection three".utf8)
     let seeded = HubNavigationState.initial.storingSlot(
       ModuleStateSlot(payload: payload), for: module
     )
     var state = makeNavigationState(
-      position: .hub(focus: module), slots: seeded.moduleStateSlots
-    )
-    for key in [HubKeyEvent.return, .escape, .return] {
-      state =
-        HubNavigationResolver.transition(
-          state, applying: key, enabledModules: allModulesEnabled
-        ).next
+      selection: .module(module), slots: seeded.moduleStateSlots)
+    for key in [HubKeyEvent.arrowDown, .arrowUp, .return, .escape] {
+      state = HubNavigationResolver.transition(state, applying: key).next
     }
-    #expect(state.position == .module(module))
+    #expect(state.selection == .module(module))
     #expect(state.moduleStateSlots[module]?.payload == payload)
   }
 
@@ -92,10 +82,7 @@ struct ModuleStateSlotTests {
     let slots = makeFullSlots()
     var state = makeNavigationState(slots: slots)
     for key in makeKeySequence(seed: seed, length: 200, drawnFrom: HubKeyEvent.allCases) {
-      state =
-        HubNavigationResolver.transition(
-          state, applying: key, enabledModules: allModulesEnabled
-        ).next
+      state = HubNavigationResolver.transition(state, applying: key).next
       #expect(state.moduleStateSlots == slots)
     }
   }

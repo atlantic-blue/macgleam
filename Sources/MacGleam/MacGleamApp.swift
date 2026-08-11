@@ -10,8 +10,38 @@ import SwiftUI
 /// launch makes a plain `swift run MacGleam` behave like a shipped app.
 final class MacGleamAppDelegate: NSObject, NSApplicationDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
+    if let request = RenderToFile.request(from: CommandLine.arguments) {
+      renderAndExit(request)
+      return
+    }
     NSApplication.shared.setActivationPolicy(.regular)
     NSApplication.shared.activate(ignoringOtherApps: true)
+  }
+
+  /// A render run never shows a window. It reads the file system only when
+  /// asked to map a folder, and writes only the image.
+  @MainActor
+  private func renderAndExit(_ request: RenderToFile.Request) {
+    let onboarding = DiskAccessOnboardingModel(monitor: RealFullDiskAccessMonitor())
+    let diskMap = DiskMapComposition.make()
+    Task { @MainActor in
+      if let folder = request.mapFolder {
+        await RenderToFile.mapAndSettle(diskMap.model, folder: folder)
+      }
+      do {
+        try RenderToFile.render(
+          request,
+          hub: HubModel(state: .firstRun(now: Date())),
+          cleanup: CleanupComposition.make(onboarding: onboarding),
+          diskMap: diskMap
+        )
+        FileHandle.standardOutput.write(Data("rendered \(request.destination.path)\n".utf8))
+        exit(0)
+      } catch {
+        FileHandle.standardError.write(Data("render failed: \(error)\n".utf8))
+        exit(1)
+      }
+    }
   }
 
   func applicationShouldTerminateAfterLastWindowClosed(_ application: NSApplication) -> Bool {
@@ -42,18 +72,18 @@ struct MacGleamApp: App {
         cleanup: cleanup,
         diskMap: diskMap
       )
-      .frame(minWidth: 980, minHeight: 700)
+      .frame(minWidth: 1120, minHeight: 760)
     }
+    .windowStyle(.hiddenTitleBar)
     .windowResizability(.contentMinSize)
   }
 }
 
-/// Composes the hub with the Full Disk Access flow: the explanation card
-/// over a blurred hub while ungranted and undecided, the degraded banner
-/// inline at the hub's bottom edge after declining or revocation, and
-/// nothing at all once granted. The onboarding model's monitoring runs for
-/// the life of this scene, and the cleanup model's live estimate feeds the
-/// hub card figure.
+/// Composes the shell with the Full Disk Access flow: the explanation card
+/// over a blurred window while ungranted and undecided, the degraded banner
+/// inline at the bottom edge after declining or revocation, and nothing at
+/// all once granted. The onboarding model's monitoring runs for the life of
+/// this scene, and the cleanup model's live estimate feeds its pane.
 struct RootView: View {
   let hubModel: HubModel
   let onboardingModel: DiskAccessOnboardingModel
@@ -63,9 +93,14 @@ struct RootView: View {
 
   private static let hubBlurWhileOnboarding: CGFloat = 8
 
+  /// The modules whose engine and module model have shipped. Everything else
+  /// still gets a pane; the pane says the module is not built rather than
+  /// offering an action that would do nothing.
+  static let builtModules: Set<HubModule> = [.cleanup]
+
   var body: some View {
     ZStack {
-      HubView(model: hubModel, cleanup: cleanup, diskMap: diskMap)
+      AppShellView(model: hubModel, cleanup: cleanup, diskMap: diskMap)
         .blur(radius: showsExplanation ? Self.hubBlurWhileOnboarding : 0)
         .allowsHitTesting(!showsExplanation)
       if let sentence = degradedSentence {
@@ -112,8 +147,8 @@ struct RootView: View {
         lastScanFinishedAt: nil,
         reclaimableEstimateBytes: nil,
         attentionReason: nil,
-        cardFigures: bytes > 0 ? [.cleanup: "\(ByteFigure.string(bytes)) reclaimable"] : [:],
-        enabledModules: Set(HubModule.allCases),
+        moduleFigures: bytes > 0 ? [.cleanup: "\(ByteFigure.string(bytes)) reclaimable"] : [:],
+        enabledModules: Self.builtModules,
         now: Date()
       )
     )
@@ -128,8 +163,8 @@ extension HubMachineState {
       lastScanFinishedAt: nil,
       reclaimableEstimateBytes: nil,
       attentionReason: nil,
-      cardFigures: [:],
-      enabledModules: Set(HubModule.allCases),
+      moduleFigures: [:],
+      enabledModules: RootView.builtModules,
       now: now
     )
   }

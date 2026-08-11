@@ -1,23 +1,21 @@
 import Foundation
 import GleamHub
 
-/// Every module enabled, the common case for navigation tests.
+/// Every module enabled, the common case for tests that reach past the rail.
 let allModulesEnabled = Set(HubModule.allCases)
 
-/// The spatial card layout from the contract: two columns of three flanking
-/// the orb, in HubModule.allCases order. Left column top to bottom, then
-/// right column top to bottom.
-let leftColumnTopToBottom: [HubModule] = [.fullSweep, .cleanup, .protection]
-let rightColumnTopToBottom: [HubModule] = [.performance, .applications, .leftovers]
+/// The rail, top to bottom, as the contract fixes it.
+let railTopToBottom: [HubDestination] =
+  HubModule.allCases.map(HubDestination.module) + [.diskMap, .settings]
 
-/// The four arrow keys, for tests that walk without entering or leaving.
+/// The four arrow keys, for tests that walk the rail.
 let arrowKeys: [HubKeyEvent] = [.arrowUp, .arrowDown, .arrowLeft, .arrowRight]
 
 func makeNavigationState(
-  position: HubNavigationState.Position = .hub(focus: .fullSweep),
+  selection: HubDestination = .module(.fullSweep),
   slots: [HubModule: ModuleStateSlot] = [:]
 ) -> HubNavigationState {
-  HubNavigationState(position: position, moduleStateSlots: slots)
+  HubNavigationState(selection: selection, moduleStateSlots: slots)
 }
 
 func makeSlot(_ text: String) -> ModuleStateSlot {
@@ -31,26 +29,6 @@ func makeFullSlots() -> [HubModule: ModuleStateSlot] {
       (module, makeSlot("slot payload for \(module.rawValue)"))
     }
   )
-}
-
-/// Every representable position: the six hub focuses and the six modules.
-func makeAllPositions() -> [HubNavigationState.Position] {
-  HubModule.allCases.map { .hub(focus: $0) } + HubModule.allCases.map { .module($0) }
-}
-
-/// Enabled set shapes the transition must be total over: nothing enabled,
-/// everything enabled, and a mixed set.
-func makeEnabledVariants() -> [Set<HubModule>] {
-  [
-    [],
-    Set(HubModule.allCases),
-    [.fullSweep, .protection, .leftovers],
-  ]
-}
-
-func isInsideModule(_ state: HubNavigationState) -> Bool {
-  if case .module = state.position { return true }
-  return false
 }
 
 /// Deterministic pseudo random source so property style tests are repeatable

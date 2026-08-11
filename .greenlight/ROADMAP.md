@@ -19,7 +19,7 @@ flowchart TB
         design["GleamDesign (tokens, motion, status scene)"]
         core["GleamCore (domain, enumeration, SafetyNet)"]
         engines["Engines: Cleanup, Protection, Performance, Applications, Leftovers, DiskMap"]
-        fullsweep["FullSweepOrchestrator"]
+        smartcare["FullSweepOrchestrator"]
         helpercore["GleamHelperCore (XPC contract and policy)"]
     end
 
@@ -32,8 +32,8 @@ flowchart TB
     app --> design
     app --> core
     app --> engines
-    app --> fullsweep
-    fullsweep --> engines
+    app --> smartcare
+    smartcare --> engines
     engines --> core
     app -- "XPC typed operations" --> helper
     helper --> helpercore

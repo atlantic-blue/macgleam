@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MacGleam Hub - System Status</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-bright": "#303a4b",
+                        "on-secondary": "#2a3045",
+                        "background": "#091423",
+                        "secondary": "#c0c5e0",
+                        "primary": "#a9f9ff",
+                        "secondary-fixed-dim": "#c0c5e0",
+                        "on-tertiary-container": "#545866",
+                        "surface-container-high": "#202a3b",
+                        "surface-container": "#162030",
+                        "inverse-primary": "#00696f",
+                        "on-error": "#690005",
+                        "on-surface-variant": "#bcc9ca",
+                        "surface-tint": "#65d7df",
+                        "surface": "#091423",
+                        "on-error-container": "#ffdad6",
+                        "primary-container": "#6fe0e8",
+                        "surface-container-highest": "#2b3546",
+                        "primary-fixed": "#84f4fc",
+                        "secondary-container": "#454b61",
+                        "on-secondary-fixed-variant": "#40465c",
+                        "tertiary-fixed": "#dfe2f3",
+                        "surface-container-low": "#121c2c",
+                        "tertiary-fixed-dim": "#c3c6d7",
+                        "surface-dim": "#091423",
+                        "inverse-surface": "#d9e3f9",
+                        "on-primary-fixed-variant": "#004f53",
+                        "on-tertiary-fixed-variant": "#434654",
+                        "on-primary-fixed": "#002022",
+                        "tertiary": "#e8eafc",
+                        "on-secondary-container": "#b5bbd5",
+                        "primary-fixed-dim": "#65d7df",
+                        "on-background": "#d9e3f9",
+                        "on-surface": "#d9e3f9",
+                        "on-tertiary": "#2c303d",
+                        "error-container": "#93000a",
+                        "on-primary-container": "#006268",
+                        "on-primary": "#00373a",
+                        "on-tertiary-fixed": "#171b28",
+                        "secondary-fixed": "#dce1fd",
+                        "surface-variant": "#2b3546",
+                        "error": "#ffb4ab",
+                        "outline": "#869394",
+                        "inverse-on-surface": "#273141",
+                        "tertiary-container": "#cbcee0",
+                        "surface-container-lowest": "#050e1e",
+                        "on-secondary-fixed": "#151b2f",
+                        "outline-variant": "#3d494a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xl": "32px",
+                        "md": "16px",
+                        "lg": "24px",
+                        "xs": "4px",
+                        "unit": "8px",
+                        "container-margin": "24px",
+                        "gutter": "16px",
+                        "sm": "8px"
+                    },
+                    "fontFamily": {
+                        "code-path": ["JetBrains Mono"],
+                        "display-hub": ["Inter"],
+                        "body-standard": ["Inter"],
+                        "title-main": ["Inter"],
+                        "caption-tiny": ["Inter"]
+                    },
+                    "fontSize": {
+                        "code-path": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "display-hub": ["56px", { "lineHeight": "64px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-standard": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "title-main": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "caption-tiny": ["11px", { "lineHeight": "14px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #0A0E1A; /* Base Canvas Level 0 per style guidance */
+            color: #d9e3f9; /* on-surface */
+            overflow: hidden; /* App-like feel */
+        }
+        
+        .card-surface {
+            background-color: #141A2E; /* Card Level 1 */
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.02); /* Very subtle inner top edge */
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Snappy spring */
+        }
+        
+        .card-surface:hover {
+            border-color: rgba(111, 224, 232, 0.4); /* Primary Accent #6FE0E8 at 40% */
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+
+        .orb-glow-container {
+            position: relative;
+        }
+
+        .orb-glow-container::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 340px;
+            height: 340px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(111, 224, 232, 0.2) 0%, transparent 70%);
+            filter: blur(30px);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        /* Hexagonal Layout Adjustments */
+        .hex-offset-out {
+            transform: translateX(-24px); /* Pushed out left */
+        }
+        .hex-offset-out-right {
+            transform: translateX(24px); /* Pushed out right */
+        }
+
+        /* Nav Scrollbar hidden for app-feel */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="font-body-standard text-body-standard text-on-surface antialiased h-screen w-screen flex flex-col selection:bg-primary/30">
+<!-- TopAppBar -->
+<header class="docked full-width top-0 bg-transparent flex justify-between items-center w-full px-lg h-16 bg-surface-container/50 backdrop-blur-xl border-b border-white/5 z-50">
+<div class="flex items-center gap-md">
+<!-- Space for sidebar toggle on small screens if needed, otherwise just logo area -->
+<span class="font-title-main text-title-main font-bold text-primary">MacGleam Hub</span>
+</div>
+<div class="flex items-center gap-md">
+<!-- Search Bar placeholder (on_right) -->
+<div class="hidden md:flex items-center bg-black/20 rounded-lg px-3 py-1.5 border border-white/5 focus-within:border-primary/50 focus-within:shadow-[0_0_0_2px_rgba(111,224,232,0.5)] transition-all">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px] mr-2">search</span>
+<input class="bg-transparent border-none text-body-standard text-on-surface placeholder:text-on-surface-variant/50 focus:ring-0 p-0 w-48" placeholder="Search tools..." type="text"/>
+</div>
+<!-- Trailing Icons -->
+<div class="flex items-center gap-sm">
+<button class="p-2 rounded-full text-on-surface-variant font-medium hover:bg-white/10 transition-colors active:scale-95 duration-200 flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+</button>
+<button class="p-2 rounded-full text-on-surface-variant font-medium hover:bg-white/10 transition-colors active:scale-95 duration-200 flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">help</span>
+</button>
+<button class="p-2 rounded-full text-on-surface-variant font-medium hover:bg-white/10 transition-colors active:scale-95 duration-200 flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">info</span>
+</button>
+</div>
+<!-- CTA Button -->
+<button class="ml-4 bg-primary text-background font-medium py-1.5 px-4 rounded-[6px] hover:brightness-110 active:scale-95 transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]">
+                Space Lens
+            </button>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden relative z-10">
+<!-- SideNavBar -->
+<nav class="docked left-0 h-screen w-[240px] bg-surface-container-low/80 backdrop-blur-2xl border-r border-white/5 flex flex-col h-full p-md z-40">
+<!-- Header/Profile Area -->
+<div class="flex items-center gap-3 mb-xl px-2">
+<div class="w-10 h-10 rounded-full bg-surface-bright border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="A highly detailed, ultra-realistic macro shot of a sleek, anodized aluminum user avatar placeholder icon in a dark, moody environment with soft cyan rim lighting. The texture of the metal should be visible, creating a premium, tactile macOS aesthetic. High contrast, sharp focus." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCr6SBfnAkjk0vdvhPOg0J2KmuQSlE6IBHCM8-Zy-34aM2-Ma8xJaKKcROVke5aNNcXtrR3Fq-GnDjDNQylHPVCBNhlIgYY-tBwN6a82Sq9sv3iSDYwwki9u3fLUia4IuTmWL21PoS6DbItos9Djlo3JzRL2QEgxzz9ys4VnAsP2bjUwooAc4uT2iPTyv_Fyg8fHBqTUQ4H_FvXjmw8EcDz9YnwV_I75l5oA1uRI2-v2fjdnFhE68bQCg"/>
+</div>
+<div class="flex flex-col">
+<span class="font-title-main text-[15px] leading-tight text-primary font-semibold tracking-tight">MacGleam</span>
+<span class="font-caption-tiny text-caption-tiny text-on-surface-variant mt-0.5">Pro Version</span>
+</div>
+</div>
+<!-- Navigation Links -->
+<div class="flex flex-col gap-1 flex-1 overflow-y-auto no-scrollbar">
+<!-- Active Tab: Overview -->
+<a class="flex items-center gap-3 px-3 py-2 text-primary bg-primary/10 rounded-lg hover:bg-white/5 transition-all duration-300 active:scale-[0.98]" href="#">
+<span class="material-symbols-outlined text-[20px]">dashboard</span>
+<span class="font-medium text-[14px]">Overview</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-white/5 rounded-lg transition-all duration-300 active:scale-[0.98]" href="#">
+<span class="material-symbols-outlined text-[20px]">security</span>
+<span class="font-medium text-[14px]">System Scan</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-white/5 rounded-lg transition-all duration-300 active:scale-[0.98]" href="#">
+<span class="material-symbols-outlined text-[20px]">build</span>
+<span class="font-medium text-[14px]">Tools</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-white/5 rounded-lg transition-all duration-300 active:scale-[0.98]" href="#">
+<span class="material-symbols-outlined text-[20px]">lock</span>
+<span class="font-medium text-[14px]">Privacy</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-white/5 rounded-lg transition-all duration-300 active:scale-[0.98]" href="#">
+<span class="material-symbols-outlined text-[20px]">update</span>
+<span class="font-medium text-[14px]">Updater</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area - Radial/Hexagonal Layout -->
+<main class="flex-1 relative flex flex-col items-center justify-center overflow-hidden">
+<!-- Container for the central hub and surrounding cards -->
+<div class="relative flex items-center justify-center w-full max-w-5xl h-[600px]">
+<!-- Center: The Orb & Caption -->
+<div class="absolute flex flex-col items-center justify-center z-20 pointer-events-none">
+<div class="orb-glow-container w-[300px] h-[300px] flex items-center justify-center mb-6">
+<!-- Shader Animation injected here -->
+<!-- STITCH_SHADER_START:ANIMATION_7 class="absolute inset-0 w-full h-full rounded-full overflow-hidden" -->
+<div class="absolute inset-0 w-full h-full rounded-full overflow-hidden" style="display:block;">
+<canvas id="shader-canvas-ANIMATION_7" style="display:block;width:100%;height:100%"></canvas>
+<script>
+(function() {
+  const canvas = document.getElementById('shader-canvas-ANIMATION_7');
+
+  // Sync the WebGL drawing-buffer size with the CSS-driven layout size.
+  // This fires on initial layout and whenever the element is resized.
+  function syncSize() {
+    const w = canvas.clientWidth  || 1280;
+    const h = canvas.clientHeight || 720;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width  = w;
+      canvas.height = h;
+    }
+  }
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(syncSize).observe(canvas);
+  }
+  syncSize();
+
+  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  if (!gl) return;
+  const vs = `attribute vec2 a_position;
+varying vec2 v_texCoord;
+void main() {
+  v_texCoord = a_position * 0.5 + 0.5;
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}`;
+  const fs = `precision highp float;
+uniform float u_time;
+uniform vec2 u_resolution;
+uniform vec2 u_mouse;
+varying vec2 v_texCoord;
+
+// MacGleam Orb Shader: Idle & Healthy
+// Slow breathing (scale oscillation) + Iridescent sheen
+
+void main() {
+    vec2 uv = v_texCoord - 0.5;
+    uv.x *= u_resolution.x / u_resolution.y;
+    
+    // Breathing cycle: ~6 seconds
+    float breath = 0.5 + 0.5 * sin(u_time * (6.28318 / 6.0));
+    float scale = 0.85 + 0.05 * breath;
+    
+    float dist = length(uv);
+    
+    // Base Orb Shape
+    float orb = smoothstep(0.4 * scale, 0.38 * scale, dist);
+    
+    // Iridescent Sheen
+    vec3 color1 = vec3(0.435, 0.878, 0.910); // #6FE0E8 (Accent)
+    vec3 color2 = vec3(0.6, 0.4, 0.9);       // Soft Purple
+    vec3 color3 = vec3(0.4, 0.9, 0.7);       // Soft Teal
+    
+    float noise = sin(uv.x * 3.0 + u_time * 0.5) * cos(uv.y * 3.0 - u_time * 0.3);
+    vec3 sheen = mix(color1, color2, 0.5 + 0.5 * sin(u_time * 0.4 + dist * 5.0));
+    sheen = mix(sheen, color3, 0.5 + 0.5 * cos(u_time * 0.7 - uv.x * 4.0));
+    
+    // Lighting/Glow
+    float glow = exp(-dist * 4.0 / scale);
+    vec3 finalColor = sheen * (0.8 + 0.4 * noise) * orb;
+    finalColor += color1 * glow * 0.2;
+    
+    // Alpha transparency for the orb
+    float alpha = orb + glow * 0.1;
+    
+    gl_FragColor = vec4(finalColor, alpha);
+}
+`;
+  function cs(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, cs(gl.VERTEX_SHADER, vs));
+  gl.attachShader(prog, cs(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const pos = gl.getAttribLocation(prog, 'a_position');
+  gl.enableVertexAttribArray(pos);
+  gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+  const uTime = gl.getUniformLocation(prog, 'u_time');
+  const uRes = gl.getUniformLocation(prog, 'u_resolution');
+  const uMouse = gl.getUniformLocation(prog, 'u_mouse');
+
+  // u_mouse is in pixel coordinates matching u_resolution (ShaderToy convention).
+  // Shaders that need normalized coords should use: u_mouse / u_resolution.
+  let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+  window.addEventListener('mousemove', (event) => {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width && rect.height) {
+      const nx = (event.clientX - rect.left) / rect.width;
+      const ny = 1.0 - (event.clientY - rect.top) / rect.height;
+      mouse.x = nx * canvas.width;
+      mouse.y = ny * canvas.height;
+    }
+  });
+
+  function render(t) {
+    if (typeof ResizeObserver === 'undefined') syncSize();
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    if (uTime) gl.uniform1f(uTime, t * 0.001);
+    if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
+    if (uMouse) gl.uniform2f(uMouse, mouse.x, mouse.y);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    requestAnimationFrame(render);
+  }
+  render(0);
+})();
+</script>
+</div>
+<!-- STITCH_SHADER_END:ANIMATION_7 -->
+<!-- Optional inner overlay to give it a physical glass dome feel -->
+<div class="absolute inset-0 rounded-full border border-white/5 shadow-[inset_0_0_40px_rgba(255,255,255,0.05)] pointer-events-none"></div>
+</div>
+<!-- Subtext below orb -->
+<div class="font-caption-tiny text-caption-tiny text-on-surface-variant bg-black/30 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/5 shadow-sm">
+                        Last scan 2 hours ago • <span class="text-primary-container">12.4 GB reclaimable</span>
+</div>
+</div>
+<!-- Hexagonal Cards Grid -->
+<div class="w-full flex justify-between items-center px-12 z-10">
+<!-- Left Column -->
+<div class="flex flex-col gap-6 w-[280px]">
+<!-- Smart Care -->
+<div class="card-surface p-5 cursor-pointer group flex items-start gap-4">
+<div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[20px]">health_and_safety</span>
+</div>
+<div class="flex flex-col pt-1">
+<h3 class="font-title-main text-title-main text-on-surface group-hover:text-primary transition-colors">Smart Care</h3>
+<p class="font-body-standard text-body-standard text-on-surface-variant mt-1">System is healthy</p>
+</div>
+</div>
+<!-- Cleanup (Pushed out) -->
+<div class="card-surface p-5 cursor-pointer group flex items-start gap-4 hex-offset-out">
+<div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0 group-hover:scale-110 transition-transform relative">
+<!-- Simulated Hexagonal progress stroke snippet -->
+<svg class="absolute inset-0 w-full h-full -rotate-90" viewbox="0 0 40 40">
+<circle cx="20" cy="20" fill="none" r="18" stroke="rgba(255,255,255,0.1)" stroke-width="2"></circle>
+<circle class="transition-all duration-1000" cx="20" cy="20" fill="none" r="18" stroke="#6FE0E8" stroke-dasharray="113" stroke-dashoffset="30" stroke-width="2"></circle>
+</svg>
+<span class="material-symbols-outlined text-[20px]">mop</span>
+</div>
+<div class="flex flex-col pt-1">
+<h3 class="font-title-main text-title-main text-on-surface group-hover:text-primary transition-colors">Cleanup</h3>
+<p class="font-body-standard text-body-standard text-on-surface-variant mt-1">12.4 GB reclaimable</p>
+</div>
+</div>
+<!-- Protection -->
+<div class="card-surface p-5 cursor-pointer group flex items-start gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant shrink-0 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[20px]">shield</span>
+</div>
+<div class="flex flex-col pt-1">
+<h3 class="font-title-main text-title-main text-on-surface group-hover:text-primary transition-colors">Protection</h3>
+<p class="font-body-standard text-body-standard text-on-surface-variant mt-1">Scanned 2 hours ago</p>
+</div>
+</div>
+</div>
+<!-- Right Column -->
+<div class="flex flex-col gap-6 w-[280px]">
+<!-- Performance -->
+<div class="card-surface p-5 cursor-pointer group flex items-start gap-4">
+<div class="flex flex-col pt-1 w-full text-right">
+<h3 class="font-title-main text-title-main text-on-surface group-hover:text-primary transition-colors">Performance</h3>
+<p class="font-body-standard text-body-standard text-on-surface-variant mt-1">2 background tasks</p>
+</div>
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant shrink-0 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[20px]">speed</span>
+</div>
+</div>
+<!-- Applications (Pushed out) -->
+<div class="card-surface p-5 cursor-pointer group flex items-start gap-4 hex-offset-out-right">
+<div class="flex flex-col pt-1 w-full text-right">
+<h3 class="font-title-main text-title-main text-on-surface group-hover:text-primary transition-colors">Applications</h3>
+<p class="font-body-standard text-body-standard text-on-surface-variant mt-1">All up to date</p>
+</div>
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant shrink-0 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[20px]">apps</span>
+</div>
+</div>
+<!-- My Clutter -->
+<div class="card-surface p-5 cursor-pointer group flex items-start gap-4">
+<div class="flex flex-col pt-1 w-full text-right">
+<h3 class="font-title-main text-title-main text-on-surface group-hover:text-primary transition-colors">My Clutter</h3>
+<p class="font-body-standard text-body-standard text-on-surface-variant mt-1">895 duplicate files</p>
+</div>
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant shrink-0 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-[20px]">folder_delete</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Footer -->
+<footer class="fixed bottom-0 right-0 left-[240px] flex justify-between items-center px-lg py-xs z-30 bg-background/20 backdrop-blur-sm font-caption-tiny text-caption-tiny text-on-surface-variant border-t border-white/5">
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-1.5 cursor-default">
+<span class="w-1.5 h-1.5 rounded-full bg-primary/80 animate-pulse"></span>
+                © 2024 MacGleam Utility Hub. System Status: Optimal.
+            </span>
+</div>
+<div class="flex gap-4">
+<a class="hover:text-primary transition-colors cursor-pointer" href="#">Terms</a>
+<a class="hover:text-primary transition-colors cursor-pointer" href="#">Privacy</a>
+<a class="hover:text-primary transition-colors cursor-pointer" href="#">Support</a>
+</div>
+</footer>
+</body></html>

@@ -1,5 +1,13 @@
 import GleamDesign
 
+/// Which way a zoom goes. Disk Map drills into a folder and back out with
+/// this, so one motion grammar covers every place the app pushes the user
+/// deeper into something and returns them.
+public enum HubZoomDirection: String, CaseIterable, Codable, Sendable, Equatable {
+  case zoomIn
+  case zoomOut
+}
+
 /// What the zoom does, as data.
 public enum HubZoomAppearance: Sendable, Equatable {
   /// Full motion: the matched geometry zoom with a C2 spring.
