@@ -657,11 +657,13 @@ they were done alongside.
   every implementation answers that way; C18's byte total is the sum of the
   recorded sizes, its store clause measures before the move and refuses a
   payload it could not measure whole, and its KNOWN DEFECT annotation is gone
-  because the contract no longer asks for a reading the disk cannot give. What
-  survives until this slice lands is the tree: the merged store still sizes
-  payloads at purge time by reading them, the item carries no size, and the
-  fake still traverses a stripped directory. Nothing migrates; no build has
-  been distributed and no manifest has ever been written outside a test.
+  because the contract no longer asks for a reading the disk cannot give.
+  Nothing migrates; no build has been distributed and no manifest has ever been
+  written outside a test. Landed 2026-08-11 in atlantic-blue/macgleam#30: the
+  store records the size at store time, purge sums recorded sizes, and the fake
+  refuses to traverse a stripped directory. What it could not know is that the
+  purge it taught to compute the right total still cannot delete a contained
+  directory payload, which is the second defect carried by s4f.
 - Verification: the shared conformance suite gains the case that hid this, so
   stripping execute from a directory behaves identically in the fake and on
   the real disk; a stored directory payload records its allocated size at
@@ -672,8 +674,8 @@ they were done alongside.
 - Tier: auto.
 
 ### s4f. the helper archives into the store, not beside it
-- Contracts: C18, C30, C31.
-- Depends on: s4e.
+- Contracts: C18, C30, C31, and one clause each in C14 and C17.
+- Depends on: s4e, s3f.
 - Why it exists: found on 2026-08-11 while amending C18 for s4e. No
   `SafetyNetStore` is constructed in production code at all. The app builds the
   store directory path and hands it to the helper as a removal destination, and
@@ -683,31 +685,168 @@ they were done alongside.
   not contained, which is every guarantee C18 exists to make, absent on exactly
   the path that handles the files a person cannot remove themselves.
 - Why it is worse than it looks: the reversibility promise is the product's
-  whole trust position, and it currently holds only for what the user process
-  archives. A quarantined root owned binary keeps its execute bit and sits in a
-  directory the store does not know about.
-- The shape of the fix, not yet decided: either the helper reports what it
-  moved so the user process records it, or the store's manifest becomes
-  something both processes write, which raises a concurrency question C18 has
-  never had to answer. Deciding that is the first task of the slice, not an
-  implementation detail.
-- Verification: a privileged archive appears in the store's listing, restores
-  attribute for attribute, carries a recorded size and is contained the way a
-  user process archive is; nothing writes into the store directory without the
-  store knowing; the two processes cannot corrupt the manifest between them.
-- Tier: verify. Human check: quarantine something only root can move, then
-  restore it.
-- Carries a second defect of the same family, found 2026-08-11 while proving
-  s4e. `FileManager.removeItem` on a directory stripped of execute fails with
-  permission denied on a real volume, verified on this machine, because
-  removing the children needs search permission on the directory holding
-  them. So purge can now compute the correct total and still be unable to
-  delete a directory payload. The in memory file system deletes by removing
-  dictionary keys, so no test can see it, which is the third time the fake has
-  hidden a consequence of the strip. The fix is a choice: restore execute
-  before deleting, which puts a runnable bundle back on disk for the length of
-  the delete, or descend repairing permissions as it goes. Both touch the
-  containment guarantee, which is why it is a decision rather than a detail.
+  whole trust position, and it currently holds for nothing at all. The user
+  process path is wired to no store either, so a user domain archive fails with
+  the sentence about the store not being available in this build, while the
+  privileged path succeeds and records nothing. One of those fails safe and the
+  other fails silent, and it is the privileged one that fails silent.
+- Nothing has ever been archived, which is why this costs no migration. No
+  build has been distributed, no store directory exists, no Applications module
+  is wired into the app and no production surface issues an archive or a
+  quarantine operation yet. The defect is in the merged design of the
+  privileged path rather than in something a person can hit today, and the
+  window to fix it without a data question is now.
+
+- Decision one, the manifest: the helper reports and the user process records.
+  Rejected: a manifest both processes write. Reasons, in the order they
+  decided it. Only one process can hold the manifest consistently if only one
+  writes, and the alternative introduces a cross process locking question C18
+  has never had to answer, for a file that is rewritten whole on every
+  mutation. A root process writing into a directory the user owns is also a
+  hazard in its own right, and the helper is already doing more of that than it
+  should. The reply channel the app already validates is the existing way for
+  the helper to tell the app something, so the report costs no new mechanism.
+  And the manifest is read, listed, grouped and summed by the user process
+  alone, so the writer and the reader stay the same component.
+- What makes the recording an invariant rather than a hope: the store chooses
+  the payload path and the item identifier before it asks, so after a lost
+  reply it can look. Payload absent means nothing happened. Payload present
+  means it asks the helper to describe it and records the entry from the stamp
+  root wrote at archive time. A payload sitting in the store that no manifest
+  entry names is the defect, so it is the one outcome the contract forbids
+  whatever the transport did.
+- Decision one, second half, who strips and who measures: the helper does both,
+  and it also stamps the payload with what it observed. This is forced rather
+  than chosen. The measurement has to happen at the origin before the move, and
+  the origin may be a path the user process cannot read at all, which is the
+  case a privileged archive exists for; a measurement that only usually works
+  is not a contract. The strip has to happen after the move, and after the move
+  the payload is root owned, so the user process cannot change its mode: only
+  the mover can contain what it moved, and the payload is never in the store
+  uncontained. The store still names the path, so the helper chooses nothing.
+- Two consequences that had to be decided with it. The payload stays root
+  owned, so purge and restore of a privileged item go back through the helper
+  too, and the message set grows four requests rather than one. Handing the
+  payload to the user account would have made purge free and would have let
+  anything running as that user put the execute bits back on a quarantined
+  bundle. It also keeps restore exact for nothing: a rename does not change an
+  owner, so a payload taken by root and put back by root lands owned by
+  whoever owned it, and C8 does not have to bring back the account name it
+  dropped in s4a. That answers open question 11 for the archive path.
+- And the helper never writes what the request tells it to. The mode, the
+  extended attributes, the dates and the origin all come from the stamp it
+  wrote itself, on a payload it requires to be root owned. `restoreArchived` is
+  the first request that puts something back rather than taking it away, and
+  without that rule it is a way for whoever holds the connection to have root
+  place chosen content at a chosen system path. With it, the authority is to
+  reverse exactly what this helper did and nothing else.
+
+- Decision two, the delete: a delete that descends repairing traversal, never a
+  restore of the payload's execute bits. Both were tried on a real volume
+  before deciding. Restoring execute at the payload root does not work in
+  general: a payload holding a directory of its own that lacks execute still
+  refuses to be deleted, and an uninstall archive is arbitrary user data rather
+  than only well formed bundles. It is also the wider opening, because it
+  grants whatever the original mode granted, to group and other as well, while
+  the binary inside a directory payload still carries its own execute bit and
+  becomes reachable the moment the fence comes down. The descent adds owner
+  search and write, only to directories, never to a file, and it clears every
+  bit it added if it cannot finish, so an interrupted purge leaves the payload
+  as contained as it found it.
+- It lives on C14's `delete`, because the store reaches the disk only through
+  the injected file system and because both implementations have to answer the
+  same way. The fake has to model it: it drops dictionary keys with no
+  permission check, so it cannot see this and could not fail against an
+  implementation that does not repair. It applies to removing a directory's
+  children the rule it already applies to listing them, which is s4e's change
+  extended from reading to writing. Without that the store's own purge tests
+  stay blind and only the conformance suite could catch a regression, which is
+  the wrong place for it to be caught.
+
+- The wire moves to version 3, after s3f's move to 2, and s4f now depends on
+  s3f so the two pending changes take their numbers in a fixed order rather
+  than by whichever lands first. The new requests are written with s3f's
+  correlation identifier from the start, so nothing here is renamed afterwards.
+  `HelperRemovalDestination.safetyNetStore` is deleted rather than deprecated:
+  the shape that caused the defect should not be constructible, and a version 2
+  client is refused by the handshake with both numbers named.
+- Recorded in the contracts on 2026-08-11, before the slice: C18 gains the
+  routing, the privileged boundary and its report type, two error cases and the
+  interrupted archive rule; C30 gains the four archive requests, three replies
+  and a refusal, loses the store destination and goes to version 3; C31 gains
+  the destination stage, the provenance rule and the fence around restore; C14
+  states what `delete` does with a contained directory; C17 stops routing
+  archive and quarantine by ownership and takes its byte figure from the item.
+  Both decisions are in DECISIONS.md.
+
+- Verification: a privileged archive appears in the store's listing, carries
+  the size measured at its origin before the move, restores attribute for
+  attribute to the path it came from, and is contained exactly as a user
+  process archive is, with nothing inside the stored payload reachable through
+  it. The store is actually constructed in the composition and handed to the
+  executor, which is what makes any of the above reachable at all: an archive
+  operation through the built app reaches C18 for a user domain target and for
+  a system domain target alike, and the operation's reclaimed figure is the
+  size the store recorded rather than one the executor measured.
+  No archive can be routed past the store: the executor hands every quarantine
+  and archive to C18 whatever the ownership policy says, which is asserted over
+  the plan space rather than on one path, and the helper client offers no way
+  to send a payload to the store directory, because the destination case is
+  gone.
+  Nothing writes into the store directory without the store knowing: an
+  archive whose reply is lost is settled by looking, so a payload that arrived
+  is described and recorded, and a payload that did not is recorded as nothing,
+  with the manifest and the payload directory agreeing afterwards in both
+  cases.
+  The two processes cannot corrupt the manifest between them, which here is
+  structural rather than asserted: the helper has no path to the manifest at
+  all, and a test that gives it one fails to compile.
+  The helper refuses what it should refuse: a stored path outside the
+  connecting user's home, one that is not the shape of a store payload, one
+  whose last component is not the item identifier, one with a symbolic link in
+  any component, and one whose parent does not exist, each refused before
+  anything moves and with nothing created; and a describe, restore or discard
+  of a payload that is not root owned or carries no stamp.
+  A restore goes where the stamp says and nowhere else: a request naming a
+  different origin does not move it there, a payload planted in the store by
+  the user is never restored, and an origin that is occupied refuses rather
+  than replaces. The store checks the origin that comes back against the item
+  it holds and refuses to mark restored on a disagreement.
+  A privileged archive that would cross a volume is refused rather than
+  performed as a copy.
+  Deleting a directory whose execute bits are clear removes it, on the real
+  disk and in the fake alike, including when a directory inside it is stripped
+  too; a delete that cannot finish leaves no directory more permissive than it
+  found it; and a purge of a real uninstall archive names the true byte total
+  and actually removes the payload, which is the pair s4e could compute and
+  could not carry out.
+- Tier: verify. Human check: uninstall an application from /Applications on a
+  scratch account, confirm the archive is listed with a real size, restore it
+  and launch it; then quarantine something only root can move, confirm it
+  cannot be run from the store, and restore it.
+- Size note: this is at the top of the range for one slice. If it has to be
+  split, the line is archive first, then restore and discard, and the cost of
+  splitting is that the store spends the gap holding items it cannot put back,
+  which is why it is not the default.
+
+### s4g. the trash destination is chosen by the request
+- Contracts: C30, C31.
+- Depends on: s4f.
+- Why it exists: found 2026-08-11 while writing s4f's destination tests, and it
+  is the same defect on the path s4f does not touch.
+  `HelperRemovalDestination.userTrash(userHome:)` carries a home directory the
+  REQUEST supplies, and no admission stage compares it against the home of the
+  connecting user. So a client past the identity check can name any home and
+  have root move a system file into a trash directory it creates there. The
+  archive family gained a destination stage; the trash did not, because the
+  amendment moved the archive out of `remove` and left `remove` as it was.
+- Verification: a removal whose trash home is not the connecting user's own is
+  refused; the connecting user's own home is admitted, so the check is not
+  vacuous; the refusal sits in the contract's evaluation order; a home that
+  merely shares a string prefix with the real one is refused, since the
+  association rule and the store's own path checks have both been caught by
+  exactly that trap before.
+- Tier: auto.
 
 ### s4d. leftover sweep
 - Contracts: C26 (orphan sweep).
@@ -890,12 +1029,16 @@ is one edit, not an archaeology dig.
 11. Restoring an item that needs privilege. C18's `restore` moves a payload
     back to its origin through the file system the store was constructed
     with. An item quarantined from a system domain path was moved in by the
-    helper (C30's `safetyNetStore` destination) and cannot be moved back by
-    the user process, and no `HelperRequest` restores anything. Typed:
-    nothing, because nothing yet stores such an item. s5b is where a malware
-    finding outside the user domain first reaches the store, and it needs
-    either a restore request on the helper contract (version 3) or a rule
-    that the store only ever holds what the user process can move. Ownership
-    rides on the same decision: C8 dropped `ownerAccountName` in s4a because
-    nothing could read it, write it or restore it, and privileged restore is
-    the change that would bring all three back at once.
+    helper and cannot be moved back by the user process, and no
+    `HelperRequest` restored anything. RESOLVED 2026-08-11 in s4f, ahead of
+    s5b, because the same gap turned out to sit under the uninstall path as
+    well: every application outside the user's home is system domain, so the
+    archive that a restore has to reverse is already the common case rather
+    than a malware edge. The helper contract gains `restoreArchived` at
+    version 3, and the payload it restores stays root owned from the moment it
+    is taken, so the move back preserves the owner by construction. Ownership
+    therefore does not rejoin the snapshot: C8's `ownerAccountName` stays out,
+    because a rename does not change an owner and nothing in this design ever
+    copies a payload across a volume, which is refused for exactly that
+    reason. What s5b still owns is the product question of what a person is
+    shown for a quarantined system file, not the mechanism.

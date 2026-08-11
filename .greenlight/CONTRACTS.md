@@ -1123,6 +1123,18 @@ only. Without this method that requirement cannot be implemented and the
 reinstall survival guarantee cannot be tested. The migration note after this
 contract lists the source level costs.
 
+Amended 2026-08-11 in s4f: `delete` says what it does with a directory whose
+execute bits are clear, because it could not delete one and no test could see
+it. `FileManager.removeItem` on such a directory fails with permission denied
+on a real volume, verified on this machine, since removing a directory's
+children needs search permission on the directory holding them. The in memory
+file system deletes by dropping dictionary keys with no permission check at
+all, so the fake said yes to what the disk refused, and a purge that s4e had
+just taught to compute the right byte total would still have failed to delete
+the payload it was reporting. That is the second consequence of C18's execute
+strip the fake has hidden. The migration note after this contract lists the
+costs, and this time they land on both implementations.
+
 ```swift
 /// The write side. Held only by the executor (C17) and the SafetyNet store
 /// (C18) in the user process, and by the helper's own implementation in the
@@ -1137,6 +1149,35 @@ contract lists the source level costs.
 /// - `delete` is permanent and is only reachable from a plan carrying a
 ///   permanent deletion confirmation (enforced in C17, not here; this layer
 ///   stays mechanism).
+/// - `delete` removes a directory whose execute bits are clear, and it is the
+///   one method here that repairs a permission in order to do its work.
+///   Removing a directory's children needs search and write permission on the
+///   directory holding them, so a payload the SafetyNet store contained by
+///   stripping execute (C18) cannot be removed as it stands. `delete`
+///   therefore descends itself, adding owner search and write to each
+///   directory it must enter, and removing each directory immediately after
+///   its children. Three limits make that a repair rather than a hole. It
+///   changes no file's mode, ever, so nothing gains the ability to run that
+///   could not run before. It adds nothing for group and nothing for other, so
+///   the opening reaches only the process doing the deleting, which owns the
+///   payload and could have granted itself the same thing directly. And a
+///   delete that cannot complete clears every bit it added before it throws,
+///   so an interrupted purge leaves the payload as contained as it found it.
+/// - Restoring a payload's original mode before deleting it is the obvious
+///   alternative, and it is wrong twice over, which is why this clause is an
+///   instruction rather than a hint. It puts a runnable bundle back within
+///   reach for the length of the delete, granted to whoever the original mode
+///   granted it to, because the executable file inside a directory payload
+///   never lost its own execute bit: the strip removes the fence above it and
+///   nothing else, which is exactly why restore is faithful and exactly why
+///   reopening the fence undoes the containment whole. And it does not work.
+///   A payload holding a directory of its own that lacks execute still refuses
+///   to be deleted, verified on a real volume, and an uninstall archive is
+///   arbitrary user data rather than only well formed application bundles.
+/// - A directory the deleting process cannot repair, because it neither owns
+///   it nor is root, fails the delete rather than partially emptying it.
+///   SafetyNet's privileged payloads stay root owned for that reason among
+///   others, and are discarded through the helper instead (C18, C30).
 /// - `writeData` replaces the whole contents of the destination, creating it
 ///   when absent, and it is atomic: a reader through C13 sees the previous
 ///   contents or the new contents and never a prefix of the new ones. On any
@@ -1190,6 +1231,25 @@ format changes.
 - The shared conformance suite (s1b) gains it: write, read back through C13,
   overwrite, read back again, and a write into a missing directory that throws
   rather than creating one.
+
+Migration note for the C14 amendment (s4f). Nothing is persisted and no format
+changes. The costs are behavioural and both implementations move:
+
+- The disk implementation stops handing a subtree to `removeItem` and descends
+  itself: open the directory, remove its children, remove the directory, and
+  unwind every opening it made if it cannot finish.
+- The in memory file system has to refuse what the disk refuses. It drops
+  dictionary keys with no permission check, so it cannot see this defect and
+  could not fail against an implementation that does not repair. It applies to
+  removing a directory's children the same rule it already applies to listing
+  them, which is s4e's change extended from reading to writing. Without that,
+  the store's own purge tests stay blind and only the conformance suite can
+  see a regression, which is the wrong place for it to be caught.
+- The shared conformance suite (s1b) gains the case, anchored on the disk:
+  clear execute from a directory holding a file, delete it, and find both gone;
+  then the same with a directory inside it also stripped, which is the case a
+  single chmod at the root does not cover. A fake that passes because it never
+  checks is the failure mode that suite exists to prevent.
 
 ### C15. GleamEngine
 
@@ -1473,6 +1533,14 @@ Amended 2026-08-11 in s3d: launch item operations are handed to C24 rather
 than routed by path ownership, and they carry the plan and the operation as
 attribution. One clause, below.
 
+Amended 2026-08-11 in s4f: `quarantine` and `archive` stop being routed by path
+ownership too. This makes an existing clause true rather than adding a promise:
+the executor already claimed these route through the SafetyNet store, while
+sending a system domain target to the helper before the store was ever
+consulted, which is how a payload came to sit in the store with nothing
+recording it (C18, GRAPH.md s4f). The reclaimed figure for both changes basis
+in the same clause.
+
 ```swift
 /// The only component that performs destructive work in the user process.
 /// Routes each operation to the user process file system or to the helper
@@ -1507,8 +1575,21 @@ attribution. One clause, below.
 ///   cancellation.
 /// - Helper replies are validated against C30 before being trusted; a
 ///   malformed reply fails that operation, never the process.
-/// - `quarantine` and `archive` operations route through the SafetyNet
-///   store (C18); the executor never invents storage paths itself.
+/// - `quarantine` and `archive` operations route through the SafetyNet store
+///   (C18) whatever the path's ownership says, and the executor never invents
+///   storage paths itself. Ownership routing decides between this process and
+///   the helper for a trash move and a permanent deletion, and it decides
+///   nothing here: the store holds the manifest, so the store is the thing
+///   that must know an archive happened, and it does its own routing inside.
+///   An executor sending a system domain archive to the helper directly moves
+///   a file into the store without the store knowing, which is the defect s4f
+///   closes.
+/// - The bytes an archive or a quarantine reports reclaimed are the size the
+///   store recorded for the item it returned, never a figure the executor
+///   measured for itself. The executor cannot measure a system domain payload
+///   reliably, the store already holds an exact measurement taken at the
+///   origin before the move (C8), and two measurements of one file that could
+///   disagree are one measurement too many.
 public protocol PlanExecuting: Sendable {
     func execute(_ plan: OperationPlan) -> AsyncStream<ExecutionEvent>
 }
@@ -1553,14 +1634,40 @@ strip stays: it is the containment, and the clause below says so plainly so
 nobody reconciles the two by dropping it. The migration note after this
 contract carries the data question and what the tree still owes.
 
+Amended 2026-08-11 in s4f: the store gains its privileged half, because it
+never had one and the gap was a defect. No `SafetyNetStore` was constructed in
+production at all, and a system domain archive never reached this contract:
+the executor routed it to the helper by path ownership as a removal into the
+store directory, so the payload landed in that directory's root under its own
+name, with no manifest entry, no execute strip and no recorded size. Not
+listed, not restorable, not purgeable, not contained, which is every guarantee
+this contract exists to make, missing on exactly the path that handles the
+files a person cannot remove themselves. Three decisions close it. The store
+routes: `store`, `restore` and `purge` decide for themselves whether a payload
+needs privilege, so nothing upstream can route an archive past the store again.
+The manifest keeps exactly one writer, the user process, and the privileged
+side reports rather than records. And what root writes back is read from a
+record root itself wrote onto the payload, never from the request, so the app
+cannot direct the helper to put a file where it never came from. The reasoning
+is in DECISIONS.md and GRAPH.md s4f; the migration note after this contract
+lists the costs.
+
 ```swift
 /// The quarantine and archive store. Reversibility is the trust feature;
 /// this contract is where it lives.
 ///
-/// The store is constructed with a `FileSystem` (C13 and C14 together) and
-/// one store directory. Everything it reads and writes, payloads and manifest
-/// alike, goes through that file system and lives under that directory. It
-/// holds no second path and no private handle.
+/// The store is constructed with a `FileSystem` (C13 and C14 together), one
+/// store directory, the shared path ownership policy and its environment
+/// (C16), and the privileged half it delegates to for payloads it cannot move
+/// itself (`SafetyNetPrivilegedArchiving`, below). Everything it reads and
+/// writes, payloads and manifest alike, goes through that file system and
+/// lives under that directory. It holds no second path and no private handle.
+///
+/// The privileged half is optional in exactly the sense the helper is: a build
+/// or a test without one is a store that holds user domain payloads and
+/// refuses system domain ones with `privilegeUnavailable`, having moved
+/// nothing. It is never a store that quietly does the user domain part of a
+/// system domain job.
 ///
 /// Guarantees:
 /// - `store` moves the file into the store (never copies and deletes as two
@@ -1596,6 +1703,90 @@ contract carries the data question and what the tree still owes.
 ///   cost a defect: the in memory file system traversed a stripped directory
 ///   happily until C13's amendment, and the shared conformance suite now
 ///   carries the case that hid it.
+/// - Purging a contained payload does not reopen it. The store deletes through
+///   C14's `delete`, which descends adding owner search and write to the
+///   directories it must enter and clears every bit it added if it cannot
+///   finish. It never restores a payload's execute bits to make a delete
+///   possible, which is the same rule as the clause above read from the other
+///   end: the strip wins there so the sizing moved, and it wins here so the
+///   delete descends. Removing a directory's children needs search permission
+///   on the directory holding them, so without that rule a purge could compute
+///   the correct total and still be unable to delete what it counted.
+/// - The store routes, not its caller. `store` reads the origin's ownership
+///   through C16, and for a system domain path it does the whole operation
+///   through the privileged half rather than through the file system. The
+///   routing belongs here because this is the only thing that holds the
+///   manifest: an executor that sent an archive to the helper itself moves a
+///   file into this store without this store knowing, which is the defect s4f
+///   closes, and no clause here could have caught it. C17 says the same from
+///   the other side.
+/// - A privileged archive is one request and one recorded fact. The helper
+///   measures the payload and snapshots its metadata at the origin, moves it
+///   to the path this store named, strips its execute bits, stamps it with
+///   what it observed, and reports that; this store writes the manifest entry
+///   from the report. The division follows from what each process can do
+///   rather than from taste. The measurement has to happen at the origin
+///   before the move (C8), and the origin is a path the user process may not
+///   be able to read at all, which is the case a privileged archive exists
+///   for. The strip has to happen after the move, and after the move the
+///   payload is root owned, so the user process cannot change its mode: only
+///   the mover can contain what it moved. Recording is the reverse. Only one
+///   process can hold a manifest consistently, and it is the one that reads
+///   it, lists it, restores from it and does the purge arithmetic over it, so
+///   the root process reports and never writes here.
+/// - The store names the payload's path and the helper never chooses one. It
+///   is `payloads/<item identifier>` under the store directory, the same path
+///   a user domain payload gets, so a privileged item is indistinguishable
+///   from any other once it is in. The identifier is minted before the request
+///   and is what the request carries (C30), so the helper's log line, the
+///   reply and the manifest entry all name one archive, and they still do a
+///   year later when the plan that caused it is long gone.
+/// - A privileged archive is a rename within one volume or it is refused. A
+///   cross volume move is a copy, and a copy is where ownership, extended
+///   attributes and hard links are lost; a payload that comes back different
+///   from what left is not a restore. Origin and store share the data volume
+///   on every path this store is used on, so the refusal costs nothing that
+///   exists today and closes the case that would otherwise degrade fidelity
+///   quietly.
+/// - A privileged payload stays root owned, and that is a decision rather than
+///   an accident of the move. Handing it to the user account would let this
+///   store purge it without the helper, and would also let anything running as
+///   that user put the execute bits back on a quarantined bundle, which is the
+///   one thing the strip exists to prevent. Root ownership also makes restore
+///   exact for free: a rename does not change an owner, so a payload moved out
+///   by root and back by root lands owned by whoever owned it, and no snapshot
+///   field has to carry an account name nothing can write (C8, and GRAPH.md
+///   open question 11, which this answers). The cost is that purge and restore
+///   of such an item need the helper too, which is why the boundary below
+///   carries four verbs and not one.
+/// - What root writes back is root's own record, never the request. At archive
+///   time the helper stamps the payload with what it measured, what it
+///   snapshotted and where it took the payload from; at restore time it reads
+///   that stamp and reinstates exactly it. The manifest's copy is this store's
+///   index, for listing, grouping and arithmetic, and it is never the
+///   authority for a privileged write. The two must agree: a report or a
+///   restore naming an origin the item does not carry is
+///   `privilegedReportDisagreed`, and nothing is recorded and nothing is
+///   marked restored. C31 carries the other half, which is what the helper
+///   refuses to act on.
+/// - An interrupted privileged archive cannot leave a payload nobody names.
+///   The store chose the payload path before it asked, so when no reply
+///   arrives it settles the question before it answers its caller: the payload
+///   is absent, in which case nothing happened and nothing is recorded, or it
+///   is present, in which case the store asks the privileged half to describe
+///   it and records the entry from the stamp root wrote. A payload sitting in
+///   the store that no manifest entry names is the defect itself, so it is the
+///   one outcome this contract does not allow, whatever the transport did.
+/// - `restore` and `purge` follow the payload rather than the caller. An item
+///   whose payload is privileged is restored and discarded through the
+///   privileged half, and every other clause here holds unchanged: an occupied
+///   origin still refuses before anything moves, a group still restores whole
+///   or not at all, and the byte total is still the sum of recorded sizes.
+///   Without the privileged half such an item throws `privilegeUnavailable`
+///   and stays exactly where it is. It is never quietly skipped inside a group
+///   restore, because a group reporting success while half an uninstall stayed
+///   in the store is the reversibility promise broken silently, which is worse
+///   than the promise refused out loud.
 /// - `restore` reinstates the payload at its origin path with its original
 ///   permission mode, extended attributes and dates. The mode is the
 ///   snapshotted value bit for bit, never one inferred from
@@ -1704,6 +1895,57 @@ public protocol SafetyNetStoring: Sendable {
     func purgeEligibleItems(asOf now: Date) async throws -> [SafetyNetItem]
 }
 
+/// The one thing the store cannot do itself: hold a payload only root can
+/// move. Implemented by the helper client over C30's message set, and absent
+/// in a store that has no helper. Every method names the item, because a
+/// SafetyNet archive outlives the plan that caused it and the item identifier
+/// is the only name still true afterwards.
+///
+/// Guarantees, all of which are the helper's to keep (C30, C31):
+/// - `archive` measures and snapshots at the origin before anything moves,
+///   moves the payload to exactly `storedPath` and nowhere else, strips its
+///   execute bits, stamps it with what it measured, snapshotted and took it
+///   from, and reports that. It creates no directory. It fails whole: a
+///   payload it could not measure exactly, or could not move without copying,
+///   stays where it was and nothing is stamped.
+/// - `describeArchived` returns the stamp of a payload already archived, which
+///   is what lets the store recover an entry whose reply was lost. It reads
+///   and changes nothing, and it answers with the same value the archive
+///   reported.
+/// - `restoreArchived` moves the payload back to the origin its stamp names,
+///   reinstates the stamped mode, extended attributes and dates, removes the
+///   stamp, and returns where it went. It never restores to a path the request
+///   named, because the request is the part an attacker would choose.
+/// - `discardArchived` deletes the payload permanently. It is the purge of a
+///   root owned payload, which the user process cannot perform: removing the
+///   children of a root owned directory needs write permission on that
+///   directory (C14).
+public protocol SafetyNetPrivilegedArchiving: Sendable {
+    func archive(
+        _ path: AbsolutePath,
+        to storedPath: AbsolutePath,
+        itemID: UUID
+    ) async throws -> PrivilegedArchiveReport
+
+    func describeArchived(
+        at storedPath: AbsolutePath,
+        itemID: UUID
+    ) async throws -> PrivilegedArchiveReport
+
+    func restoreArchived(at storedPath: AbsolutePath, itemID: UUID) async throws -> AbsolutePath
+    func discardArchived(at storedPath: AbsolutePath, itemID: UUID) async throws
+}
+
+/// What the privileged half observed at the origin, and the whole of what the
+/// store records for a privileged item. These are the values the helper
+/// stamped onto the payload, so the report of making an archive and a later
+/// description of the same payload are equal.
+public struct PrivilegedArchiveReport: Codable, Sendable, Equatable {
+    public let originPath: AbsolutePath
+    public let metadata: FileMetadataSnapshot
+    public let allocatedBytes: UInt64
+}
+
 public struct PurgeConfirmation: Codable, Sendable, Equatable {
     /// The number of identifiers in the purge.
     public let itemCount: UInt32
@@ -1726,6 +1968,12 @@ public enum SafetyNetError: Error, Sendable, Equatable {
     case alreadyRestored(UUID)
     case confirmationMismatch
     case denylistedPath(AbsolutePath)
+    /// The payload needs the privileged half and this store has none, so
+    /// nothing moved. Names the path that needed it.
+    case privilegeUnavailable(AbsolutePath)
+    /// The privileged half described an archive that is not the one asked
+    /// about: another origin, or a report for another item. Names the item.
+    case privilegedReportDisagreed(UUID)
 }
 ```
 
@@ -1761,12 +2009,34 @@ the slice being written now:
 
 What this amendment does and does not close. The KNOWN DEFECT annotation that
 sat on the byte total clause is gone, because the contract no longer asks for a
-reading the disk cannot give. The tree still owes the work: as of this
-amendment the merged store sizes payloads at purge time by reading them,
-`SafetyNetItem` carries no recorded size, and the in memory file system still
-traverses a stripped directory, so a real purge of a real uninstall archive
-would still report nothing reclaimed. Closed in the contract, open in the code
-until slice s4e lands (GRAPH.md s4e).
+reading the disk cannot give. It was open in the code until s4e landed on
+2026-08-11: the store now records the size at store time, sums recorded sizes
+at purge, and the in memory file system refuses to traverse a stripped
+directory.
+
+Migration note for the C18 amendment (s4f). Nothing migrates, and the evidence
+is the same evidence as s4e's, rechecked: no build has been distributed, no
+`SafetyNetStore` is constructed in production, no store directory exists under
+Application Support, and no privileged archive has ever been made, because no
+production surface issues an archive or a quarantine operation yet. What the
+tree owes:
+
+- The composition builds a store and hands it to the executor. It builds none
+  today: `PlanExecutor` is constructed with no `safetyNet`, so a user domain
+  archive fails with the sentence about the store not being available in this
+  build, and a system domain one never reached the store at all. Wiring the
+  store is part of this slice rather than a later one, because until it is
+  wired every clause here describes a component nothing runs.
+- The store's construction takes the ownership policy, its environment and the
+  privileged half. The first two are pure and already shared with the helper;
+  the third is the helper client, which is already assembled per run
+  (`HelperSupply`) and now hands over two things rather than one.
+- `store` gains a routing decision and a second path through the privileged
+  half; `restore` and `purge` gain the same for a privileged item. The manifest
+  writing code is untouched: it still has one writer.
+- `SafetyNetError` gains two cases, so an exhaustive switch gains two arms.
+- The helper client implements `SafetyNetPrivilegedArchiving` over the four new
+  requests, which is where reply validation for the family lives (C30).
 
 ### C19. RuleCatalogProviding
 
@@ -2662,6 +2932,23 @@ unchanged: the executor is their only source, so a plan and an operation
 always exist for them. The migration note after the contract lists the source
 level costs.
 
+Amended 2026-08-11 in s4f: the SafetyNet archive becomes its own family of
+requests and stops being a removal. `HelperRemovalDestination.safetyNetStore`
+is gone, and with it the shape that produced the defect: a `remove` naming a
+directory, into which the helper moved the payload under its own name and
+answered with a byte figure, which is a removal that happens to land somewhere
+rather than an archive the store knows about. Four requests replace it, each
+naming the SafetyNet item it belongs to, and three replies. `restoreArchived`
+is the first request that puts something back rather than taking it away, and
+the guarantees below say what stops it being a way to write anywhere as root.
+
+`HelperContract.version` goes to 3 in the same commit, after s3f's move to 2.
+The version is one counter and two wire changes were pending against it, so
+s4f now depends on s3f and the numbers are fixed rather than decided by
+whichever slice lands first. The requests below are written with s3f's
+correlation identifier from the start, so nothing here is renamed afterwards.
+The migration note after the contract lists the source level costs.
+
 ```swift
 /// The complete XPC (inter process communication) message set between
 /// MacGleam.app and GleamHelper. Defined once, in a package both link, so the
@@ -2684,12 +2971,43 @@ level costs.
 ///   privileged change cannot be encoded.
 /// - `correlationID` is the identifier a reply echoes to tie itself to the
 ///   request that caused it: the operation identifier where the request
-///   belongs to a plan, the change identifier where it is a direct change.
-///   One name and one rule across every reply, so nothing has to remember
-///   which reply carries which kind, and no reply names an operation that
-///   does not exist.
+///   belongs to a plan, the change identifier where it is a direct change,
+///   the item identifier where it is one of the archive requests below. One
+///   name and one rule across every reply, so nothing has to remember which
+///   reply carries which kind, and no reply names an operation that does not
+///   exist.
+/// - The archive family's attribution is the SafetyNet item it belongs to. A
+///   plan and an operation would be wrong here rather than merely
+///   inconvenient: the archive outlives both, and a restore or a discard
+///   happens months later because somebody clicked a row, in no plan at all.
+///   The item identifier names the same archive at every one of those moments,
+///   it is what the manifest records (C18), and it is the `correlationID`
+///   every reply in the family echoes.
 /// - `remove` carries an explicit destination; the helper never chooses
-///   where a file goes.
+///   where a file goes. Its destinations are the user's trash and permanent
+///   deletion, and there is no third: an archive is not a removal and has its
+///   own requests.
+/// - The archive family is four requests over one payload path, and that path
+///   is always chosen by the SafetyNet store (C18) rather than by the helper.
+///   `archiveIntoSafetyNet` measures the payload, snapshots its metadata,
+///   moves it, strips its execute bits and stamps it with what was observed;
+///   `describeArchived` reads that stamp back; `restoreArchived` puts the
+///   payload back where the stamp says it came from; `discardArchived` deletes
+///   it, which is how a purge reaches a root owned payload the user process
+///   cannot remove.
+/// - Nothing in the archive family carries what the helper is to write. The
+///   mode, the extended attributes, the dates and the origin all come from the
+///   stamp the helper wrote itself, never from the request. A request able to
+///   name them would be an instruction to root to place chosen content, with
+///   chosen permissions, at a chosen system path, which is a far larger
+///   authority than removing files and is not one this contract grants. The
+///   app keeps its own copy of the same facts in the manifest and uses it to
+///   check what comes back, never to tell the helper what to do.
+/// - `archived` answers `archiveIntoSafetyNet` and `describeArchived` alike,
+///   because the report of making an archive and a description of that archive
+///   are one fact read at two moments. A store whose reply was lost asks again
+///   and gets the same answer, which is what makes an interrupted archive
+///   recoverable rather than an orphan (C18).
 /// - Version handshake: the app sends `handshake` first, naming the version
 ///   it compiles against, and the helper answers naming the version it
 ///   compiles against, whether the two agree or not. A helper whose contract
@@ -2710,22 +3028,37 @@ public enum HelperRequest: Codable, Sendable, Equatable {
     case setLaunchItemEnabled(item: LaunchItemID, enabled: Bool,
                               attribution: ChangeAttribution)
     case runMaintenance(task: MaintenanceTask, planID: UUID, operationID: UUID)
+    /// Take a system domain payload into the SafetyNet store at exactly
+    /// `storedPath`, contain it, and report what was measured and snapshotted
+    /// at the origin. The store chooses `storedPath` and `itemID`; the helper
+    /// chooses nothing (C18).
+    case archiveIntoSafetyNet(target: AbsolutePath, storedPath: AbsolutePath, itemID: UUID)
+    /// Read back the stamp of a payload already archived. The recovery path
+    /// for a store whose archive reply never arrived.
+    case describeArchived(storedPath: AbsolutePath, itemID: UUID)
+    /// Put the payload back where its own stamp says it came from. Carries no
+    /// origin and no metadata by design.
+    case restoreArchived(storedPath: AbsolutePath, itemID: UUID)
+    /// Delete the payload permanently. The purge of a root owned payload.
+    case discardArchived(storedPath: AbsolutePath, itemID: UUID)
 }
 
 /// Not a message: the one place the contract version is declared, in the
 /// package both processes link, so app and helper cannot disagree about what
 /// the current contract is without one of them being an older build.
 public enum HelperContract {
-    public static let version: UInt16 = 2
+    public static let version: UInt16 = 3
 }
 
+/// Where a removal puts what it removed. There are two, and an archive is
+/// not one of them: a `safetyNetStore(storeDirectory:)` case was removed in
+/// s4f because it named a directory for the helper to pick a name in, which is
+/// how a payload came to sit in the store with nothing recording it.
 public enum HelperRemovalDestination: Codable, Sendable, Equatable {
     /// Move into the requesting user's trash, transferring ownership so the
     /// user can restore it. See GRAPH.md open questions for the unresolved
     /// design point on root owned items and the Trash default.
     case userTrash(userHome: AbsolutePath)
-    /// Move into the SafetyNet store directory provided by the app.
-    case safetyNetStore(storeDirectory: AbsolutePath)
     case permanent
 }
 
@@ -2743,6 +3076,17 @@ public enum HelperResponse: Codable, Sendable, Equatable {
                           clientContractVersion: UInt16)
     case success(correlationID: UUID, bytesReclaimed: UInt64)
     case launchItemChanged(correlationID: UUID, change: LaunchItemChange)
+    /// Answers `archiveIntoSafetyNet` and `describeArchived` alike. The
+    /// correlation identifier is the item's (C18's `PrivilegedArchiveReport`).
+    case archived(correlationID: UUID, report: PrivilegedArchiveReport)
+    /// The payload went back to the origin its own stamp named, and that path
+    /// is carried here so the store can check it against the item it holds
+    /// rather than take the move on trust.
+    case restoredArchive(correlationID: UUID, originPath: AbsolutePath)
+    /// The payload is gone. It carries no byte figure: the purge total is the
+    /// sum of sizes recorded at store time (C18), and a second figure measured
+    /// here could only disagree with it.
+    case discardedArchive(correlationID: UUID)
     /// Every refusal that is not a version disagreement, including a
     /// handshake refused on identity. It names what it refused where there is
     /// something to name, so the app's report reconciles, and it names no
@@ -2760,6 +3104,12 @@ public enum HelperRefusal: String, Codable, Sendable, Equatable {
     case versionMismatch
     case identityRejected        // connecting client failed code signing verification
     case malformedRequest
+    /// The archive path in the request is not one the helper will write to or
+    /// act on: outside the connecting user's home, not the shape of a store
+    /// payload, a component that is a symbolic link, a parent that does not
+    /// exist, or a payload that is not root owned and stamped where the
+    /// request requires one (C31).
+    case destinationRejected
 }
 ```
 
@@ -2781,6 +3131,31 @@ stands:
   an operation at all: it takes an item and an attribution, and it is the
   privileged side C24 declares.
 - Every `HelperResponse` construction and pattern match takes the new label.
+
+Migration note for the C30 amendment (s4f). The wire encoding changes again,
+which is what the move to version 3 is for. Nothing is stored and no message is
+persisted, so nothing migrates, and no privileged archive exists anywhere to be
+read by a new build. The source level costs against the tree as it stands:
+
+- `HelperRemovalDestination` loses a case, so the helper's removal switch loses
+  its store arm and the helper client stops building a store destination for
+  `quarantine` and `archive` operations. Those operations stop reaching the
+  client as removals at all, because C17 routes them to the store and the store
+  routes them here through `SafetyNetPrivilegedArchiving` (C18).
+- The helper gains the archive family: measure and snapshot at the origin,
+  move to the named path, strip, stamp, and the three requests that act on a
+  payload already stamped. The measuring code exists (the removal already
+  measures allocated bytes before it moves) and the snapshotting code exists on
+  the store's side of the wall, so both are moved rather than invented.
+- The helper's `HelperRemoval` stops creating the destination directory. It
+  created one for the trash and for the store alike; the trash keeps that and
+  the archive family creates nothing, which is what makes C31's destination
+  stage enforceable.
+- Reply validation in the client gains three kinds and the mapping from
+  operation to expected reply gains the family, so an `archived` answering a
+  removal still fails that operation as a reply of the wrong kind.
+- Both processes are rebuilt together, as every version bump requires; a client
+  at version 2 is refused by the handshake with both numbers named.
 
 ### C31. Helper policy
 
@@ -2833,6 +3208,38 @@ stands:
 ///   denylist (embedded baseline united with any catalogue the helper has
 ///   itself verified per C10 and C19). The app's opinion is not trusted; a
 ///   compromised app process cannot make the helper cross the denylist.
+/// - Destination, for the archive family (C30): the helper checks where it is
+///   being asked to write as carefully as what it is being asked to touch.
+///   That stage did not exist while the store was a removal destination, and a
+///   client could name any directory at all, which made the helper a way to
+///   create a directory tree anywhere and move a system file into it, whatever
+///   the denylist said about the target. A `storedPath` must sit inside the
+///   connecting user's home, must not be denylisted, must be a file directly
+///   inside a directory named `payloads`, must have the request's item
+///   identifier as its last component, must have a parent that already exists,
+///   and must contain no symbolic link in any component. The helper creates no
+///   directory for it. Anything else is refused `destinationRejected` before
+///   anything moves.
+/// - Provenance, for the three requests that act on an archive already made:
+///   the payload must be root owned and must carry the stamp the helper wrote
+///   when it archived it. A payload failing either is refused
+///   `destinationRejected` and is never described, restored or discarded. The
+///   user owns the store directory, so anything running as that user can plant
+///   a file in it; what cannot be forged without root is a root owned file,
+///   and that is the whole basis of this check.
+/// - `restoreArchived` is the helper's first constructive privileged
+///   operation, and it is fenced accordingly. Every other request destroys or
+///   relocates something the system already had. This one puts a file back
+///   into the system domain, which in the wrong hands is a way to place
+///   content at a chosen path as root, and the baseline denylist does not
+///   cover every directory where that would matter. So the path is not chosen
+///   by the request: it is read from the stamp, which only root could have
+///   written, on a payload only root could own. The origin is then checked
+///   like any other target, systemDomain and not denylisted, and it must be
+///   vacant, so a restore can put back what was taken and can never replace
+///   what is there now. What remains is the authority to reverse exactly what
+///   this helper did, which is the authority the reversibility promise needs
+///   and nothing beyond it.
 /// - Only then does the operation run, atomically per item, with the same
 ///   atomicity guarantee as C17.
 /// - The helper performs no network activity, ever.
