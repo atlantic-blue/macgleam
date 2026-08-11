@@ -1,7 +1,7 @@
 import CleanupEngine
+import DiskMapEngine
 import Foundation
 import GleamCore
-import SpaceLensEngine
 import Testing
 
 // MARK: - Budgets
@@ -23,7 +23,7 @@ private let cleanupScanBudgetSeconds = 30.0
 
 /// C22 gives a full volume map 30 seconds, and the same scaling argument
 /// applies: half the contract budget over a fraction of the volume.
-private let spaceLensMapBudgetSeconds = 15.0
+private let diskMapMapBudgetSeconds = 15.0
 
 /// The DESIGN.md ceiling itself, not scaled down. Holding the full disk
 /// figure on a smaller fixture is the least a streaming design must manage,
@@ -114,10 +114,10 @@ struct PerformanceGateTests {
     #expect(elapsed < cleanupScanBudgetSeconds)
   }
 
-  // MARK: Space Lens map
+  // MARK: Disk Map map
 
-  @Test("the full space lens map of the typical fixture converges inside its budget")
-  func spaceLensMapConvergesInsideItsBudget() async throws {
+  @Test("the full disk map map of the typical fixture converges inside its budget")
+  func diskMapMapConvergesInsideItsBudget() async throws {
     let fixture = try SharedPerformanceFixture.get()
     let context = try makeRealDiskScanContext(for: fixture)
     let clock = ContinuousClock()
@@ -127,7 +127,7 @@ struct PerformanceGateTests {
     var revisionCount = 0
     var completions = 0
     var rootTotalBytes: UInt64 = 0
-    for try await update in SpaceLensEngine().map(volume: fixture.root, context: context) {
+    for try await update in DiskMapEngine().map(volume: fixture.root, context: context) {
       switch update {
       case .node(let node):
         nodeCount += 1
@@ -142,15 +142,15 @@ struct PerformanceGateTests {
     let elapsed = durationSeconds(start.duration(to: clock.now))
 
     print(
-      "PERFORMANCE GATE space lens map seconds: " + String(format: "%.2f", elapsed)
-        + " (budget \(spaceLensMapBudgetSeconds)) over \(fixture.fileCount) fixture files, "
+      "PERFORMANCE GATE disk map map seconds: " + String(format: "%.2f", elapsed)
+        + " (budget \(diskMapMapBudgetSeconds)) over \(fixture.fileCount) fixture files, "
         + "\(nodeCount) nodes, \(revisionCount) size revisions, root total \(rootTotalBytes) bytes"
     )
 
     #expect(nodeCount >= PerformanceFixture.intendedFileCount)
     #expect(rootTotalBytes > 0)
     #expect(completions == 1)
-    #expect(elapsed < spaceLensMapBudgetSeconds)
+    #expect(elapsed < diskMapMapBudgetSeconds)
   }
 
   // MARK: Memory
@@ -177,7 +177,7 @@ struct PerformanceGateTests {
     let mapSampler = FootprintSampler()
     await mapSampler.start(every: .milliseconds(50))
     var nodeCount = 0
-    for try await update in SpaceLensEngine().map(volume: fixture.root, context: mapContext) {
+    for try await update in DiskMapEngine().map(volume: fixture.root, context: mapContext) {
       if case .node = update { nodeCount += 1 }
     }
     let mapFootprint = await mapSampler.stop()
@@ -192,7 +192,7 @@ struct PerformanceGateTests {
         + ") over \(entryCount) entries"
     )
     print(
-      "PERFORMANCE GATE peak resident megabytes, space lens map: "
+      "PERFORMANCE GATE peak resident megabytes, disk map map: "
         + String(format: "%.0f", FootprintMeasurement.megabytes(mapFootprint.peakBytes))
         + " (ceiling 500, baseline "
         + String(format: "%.0f", FootprintMeasurement.megabytes(mapFootprint.baselineBytes))
@@ -256,7 +256,7 @@ struct PerformanceGateTests {
     let start = clock.now
     var firstNodeSeconds: Double?
     var nodeCount = 0
-    for try await update in SpaceLensEngine().map(volume: fixture.root, context: context) {
+    for try await update in DiskMapEngine().map(volume: fixture.root, context: context) {
       if case .node = update {
         if firstNodeSeconds == nil {
           firstNodeSeconds = durationSeconds(start.duration(to: clock.now))

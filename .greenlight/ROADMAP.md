@@ -18,8 +18,8 @@ flowchart TB
     subgraph packages["Swift packages"]
         design["GleamDesign (tokens, motion, status scene)"]
         core["GleamCore (domain, enumeration, SafetyNet)"]
-        engines["Engines: Cleanup, Protection, Performance, Applications, Clutter, SpaceLens"]
-        smartcare["SmartCareOrchestrator"]
+        engines["Engines: Cleanup, Protection, Performance, Applications, Leftovers, DiskMap"]
+        smartcare["FullSweepOrchestrator"]
         helpercore["GleamHelperCore (XPC contract and policy)"]
     end
 
@@ -67,10 +67,10 @@ flowchart TB
   executor).
 - Exit: a user can scan, review and reclaim space, and undo from the Trash.
 
-**M2. Clutter and Space Lens**
-- My Clutter: large and old files, downloads triage, duplicates by content
+**M2. Leftovers and Disk Map**
+- Leftovers: large and old files, downloads triage, duplicates by content
   hash (keep one copy invariant), similar photos.
-- Space Lens: streaming disk map with the shared zoom grammar.
+- Disk Map: streaming disk map with the shared zoom grammar.
 - Scan performance targets from DESIGN.md are measured and enforced in tests
   here, since these are the heaviest scans.
 
@@ -94,11 +94,11 @@ flowchart TB
 - Privacy cleanup (browsers, recent lists, Wi-Fi history), all opt in per item.
 - Signed rules channel live: Ed25519 manifest, independent publish workflow.
 
-**M6. Smart Care and the menu bar**
-- SmartCareOrchestrator composing deep clean, storage declutter and
+**M6. Full Sweep and the menu bar**
+- FullSweepOrchestrator composing deep clean, storage deleftovers and
   performance boost into one scan, one combined result, per job detail.
 - Menu bar scene: storage, memory, processor, one quick clean action.
-- The status scene now reflects live Smart Care state across all its moods.
+- The status scene now reflects live Full Sweep state across all its moods.
 
 **M7. Launch**
 - Sparkle 2 integration, beta then stable appcast channels, EdDSA keys in the
@@ -112,7 +112,7 @@ flowchart TB
 
 ## Product roadmap beyond launch
 
-- Application updater, then Smart Care jobs four (software updates) and five
+- Application updater, then Full Sweep jobs four (software updates) and five
   (threat scan folded into the combined scan).
 - Cloud Cleanup module.
 - Assistant and suggestions layer fed by real usage.

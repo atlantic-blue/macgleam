@@ -6,13 +6,13 @@ let allModulesEnabled = Set(HubModule.allCases)
 
 /// The rail, top to bottom, as the contract fixes it.
 let railTopToBottom: [HubDestination] =
-  HubModule.allCases.map(HubDestination.module) + [.spaceLens, .settings]
+  HubModule.allCases.map(HubDestination.module) + [.diskMap, .settings]
 
 /// The four arrow keys, for tests that walk the rail.
 let arrowKeys: [HubKeyEvent] = [.arrowUp, .arrowDown, .arrowLeft, .arrowRight]
 
 func makeNavigationState(
-  selection: HubDestination = .module(.smartCare),
+  selection: HubDestination = .module(.fullSweep),
   slots: [HubModule: ModuleStateSlot] = [:]
 ) -> HubNavigationState {
   HubNavigationState(selection: selection, moduleStateSlots: slots)

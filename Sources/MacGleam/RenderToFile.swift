@@ -1,7 +1,7 @@
 import AppKit
+import DiskMapModule
 import GleamCore
 import GleamHub
-import SpaceLensModule
 import SwiftUI
 
 /// Renders the shell to a PNG and exits, without ever showing a window.
@@ -46,12 +46,12 @@ enum RenderToFile {
   @MainActor
   static func render(
     _ request: Request, hub: HubModel, cleanup: CleanupDependencies,
-    spaceLens: SpaceLensDependencies
+    diskMap: DiskMapDependencies
   ) throws {
     let renderer = ImageRenderer(
       content:
         AppShellView(
-          model: hub, cleanup: cleanup, spaceLens: spaceLens, initialSelection: request.selection
+          model: hub, cleanup: cleanup, diskMap: diskMap, initialSelection: request.selection
         )
         .frame(width: request.size.width, height: request.size.height)
         .environment(\.colorScheme, request.appearance)
@@ -77,7 +77,7 @@ enum RenderToFile {
   /// having.
   @MainActor
   static func mapAndSettle(
-    _ model: SpaceLensModuleModel,
+    _ model: DiskMapModuleModel,
     folder: String,
     deadline: Duration = .seconds(20)
   ) async {

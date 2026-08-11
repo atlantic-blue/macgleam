@@ -1,6 +1,6 @@
 import GleamDesign
 
-/// Which way a zoom goes. Space Lens drills into a folder and back out with
+/// Which way a zoom goes. Disk Map drills into a folder and back out with
 /// this, so one motion grammar covers every place the app pushes the user
 /// deeper into something and returns them.
 public enum HubZoomDirection: String, CaseIterable, Codable, Sendable, Equatable {

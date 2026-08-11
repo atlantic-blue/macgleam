@@ -7,8 +7,8 @@ struct HubNavigationInitialStateTests {
 
   @Test("the app opens on the first destination in rail order")
   func theAppOpensOnTheFirstDestinationInRailOrder() {
-    #expect(HubDestination.allCases.first == .module(.smartCare))
-    #expect(HubNavigationState.initial.selection == .module(.smartCare))
+    #expect(HubDestination.allCases.first == .module(.fullSweep))
+    #expect(HubNavigationState.initial.selection == .module(.fullSweep))
   }
 
   @Test("initial carries no stored module slots")

@@ -6,7 +6,7 @@ gets its own entry pointing at the one it supersedes.
 
 - 2026-08-09. Hub with zoom navigation, no sidebar. The signature interaction:
   status scene centre, six module cards, matched geometry zoom with one shared
-  navigation grammar across hub and Space Lens. Rejected the CleanMyMac style
+  navigation grammar across hub and Disk Map. Rejected the CleanMyMac style
   sidebar as safer but undifferentiated. Status: locked.
 - 2026-08-09. macOS 14 (Sonoma) floor. The animation stack (phaseAnimator,
   keyframeAnimator, shader view effects, Observation) requires 14; SMAppService
@@ -23,13 +23,13 @@ gets its own entry pointing at the one it supersedes.
   Status: locked, revisit the commercial feed if field reports show misses.
 - 2026-08-09. Quarantine only for malware findings, never silent delete.
   SafetyNet store with 30 day retention and one click restore. Status: locked.
-- 2026-08-09. Deletion defaults to the macOS Trash for junk and clutter;
+- 2026-08-09. Deletion defaults to the macOS Trash for junk and leftovers;
   permanent delete is opt in and confirmed with counts. Uninstalls archive to
   SafetyNet before removal. Reversibility is a trust feature. Status: locked.
 - 2026-08-09. Sparkle 2 for updates, EdDSA signed appcast, beta and stable
   channels. Rejected a custom updater as undifferentiated risk. Status: locked.
-- 2026-08-09. Smart Care ships three of five jobs (deep clean, storage
-  declutter, performance boost). Threat scan and software updates join when
+- 2026-08-09. Full Sweep ships three of five jobs (deep clean, storage
+  deleftovers, performance boost). Threat scan and software updates join when
   Protection and Applications exist; no stub jobs ever. Status: locked.
 - 2026-08-09. Privileged operations via an SMAppService root daemon with a
   typed XPC contract, closed operation set, denylist enforced in both
@@ -92,7 +92,7 @@ gets its own entry pointing at the one it supersedes.
   carried, and the pane holds what the module is for, the jobs it runs and
   their live figures instead. The orb survives at 40 points in the rail as a
   live health light. Matched geometry zoom between hub and module is removed
-  with the hexagon; the zoom grammar itself stays, because Space Lens drills
+  with the hexagon; the zoom grammar itself stays, because Disk Map drills
   into folders with it. Status: locked.
 - 2026-08-10. The Lumina Utility specification is the visual source of truth
   for tokens: the palette, the eight text roles, three nested radii and the

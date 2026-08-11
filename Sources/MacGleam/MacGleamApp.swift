@@ -23,17 +23,17 @@ final class MacGleamAppDelegate: NSObject, NSApplicationDelegate {
   @MainActor
   private func renderAndExit(_ request: RenderToFile.Request) {
     let onboarding = DiskAccessOnboardingModel(monitor: RealFullDiskAccessMonitor())
-    let spaceLens = SpaceLensComposition.make()
+    let diskMap = DiskMapComposition.make()
     Task { @MainActor in
       if let folder = request.mapFolder {
-        await RenderToFile.mapAndSettle(spaceLens.model, folder: folder)
+        await RenderToFile.mapAndSettle(diskMap.model, folder: folder)
       }
       do {
         try RenderToFile.render(
           request,
           hub: HubModel(state: .firstRun(now: Date())),
           cleanup: CleanupComposition.make(onboarding: onboarding),
-          spaceLens: spaceLens
+          diskMap: diskMap
         )
         FileHandle.standardOutput.write(Data("rendered \(request.destination.path)\n".utf8))
         exit(0)
@@ -55,13 +55,13 @@ struct MacGleamApp: App {
   @State private var hubModel = HubModel(state: .firstRun(now: Date()))
   @State private var onboardingModel: DiskAccessOnboardingModel
   @State private var cleanup: CleanupDependencies
-  @State private var spaceLens: SpaceLensDependencies
+  @State private var diskMap: DiskMapDependencies
 
   init() {
     let onboarding = DiskAccessOnboardingModel(monitor: RealFullDiskAccessMonitor())
     _onboardingModel = State(initialValue: onboarding)
     _cleanup = State(initialValue: CleanupComposition.make(onboarding: onboarding))
-    _spaceLens = State(initialValue: SpaceLensComposition.make())
+    _diskMap = State(initialValue: DiskMapComposition.make())
   }
 
   var body: some Scene {
@@ -70,7 +70,7 @@ struct MacGleamApp: App {
         hubModel: hubModel,
         onboardingModel: onboardingModel,
         cleanup: cleanup,
-        spaceLens: spaceLens
+        diskMap: diskMap
       )
       .frame(minWidth: 1120, minHeight: 760)
     }
@@ -88,7 +88,7 @@ struct RootView: View {
   let hubModel: HubModel
   let onboardingModel: DiskAccessOnboardingModel
   let cleanup: CleanupDependencies
-  let spaceLens: SpaceLensDependencies
+  let diskMap: DiskMapDependencies
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   private static let hubBlurWhileOnboarding: CGFloat = 8
@@ -100,7 +100,7 @@ struct RootView: View {
 
   var body: some View {
     ZStack {
-      AppShellView(model: hubModel, cleanup: cleanup, spaceLens: spaceLens)
+      AppShellView(model: hubModel, cleanup: cleanup, diskMap: diskMap)
         .blur(radius: showsExplanation ? Self.hubBlurWhileOnboarding : 0)
         .allowsHitTesting(!showsExplanation)
       if let sentence = degradedSentence {

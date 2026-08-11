@@ -19,7 +19,7 @@ open dist/MacGleam.app
 
 ```
 .build/debug/MacGleam --render shot.png --size 1280x900 \
-  --selection "Space Lens" --appearance dark --map /opt/homebrew
+  --selection "Disk Map" --appearance dark --map /opt/homebrew
 ```
 
 This draws the composed interface to a PNG and exits, which is how a screen

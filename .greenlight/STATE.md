@@ -21,7 +21,7 @@ steps:
   - [x] s2a large and old files (atlantic-blue/macgleam#11)
   - [x] s2b duplicates (atlantic-blue/macgleam#12)
   - [x] s2c similar photos (atlantic-blue/macgleam#13)
-  - [x] s2d space lens (atlantic-blue/macgleam#14)
+  - [x] s2d disk map (atlantic-blue/macgleam#14)
   - [x] s2e performance gates (atlantic-blue/macgleam#16)
   - [x] s2f Lumina tokens and the navigation rail (this branch)
   - [x] s2g the disk map as a treemap (this branch)
@@ -102,7 +102,7 @@ breathing is part of the s2f check above.
   view model needed a typed surface for isolated test writing; GRAPH.md s0b
   entry updated accordingly.
 - The render harness is in the app: `MacGleam --render out.png --size WxH
-  [--appearance light] [--selection "Space Lens"] [--map /some/folder]`
+  [--appearance light] [--selection "Disk Map"] [--map /some/folder]`
   draws the composed shell to a PNG and exits. It exists because a screen
   capture of a live window needs Screen Recording, which a terminal does not
   have. It draws the view, not the window: no chrome, and ScrollView, TextField

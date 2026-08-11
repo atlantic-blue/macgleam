@@ -19,7 +19,7 @@ public enum ModulePaneResolver {
     switch destination {
     case .module(let module):
       return modulePane(module, summary: summaries.first { $0.module == module })
-    case .spaceLens:
+    case .diskMap:
       return ModulePane(
         title: destination.title,
         sentence: "See where the space went, folder by folder.",
@@ -54,10 +54,10 @@ public enum ModulePaneResolver {
   private static func jobs(for module: HubModule, figure: String) -> [ModulePaneJob] {
     let named: [(String, String)]
     switch module {
-    case .smartCare:
+    case .fullSweep:
       named = [
         ("Deep clean", "wand.and.sparkles"),
-        ("Storage declutter", "internaldrive"),
+        ("Storage deleftovers", "internaldrive"),
         ("Performance boost", "bolt"),
       ]
     case .cleanup:
@@ -83,7 +83,7 @@ public enum ModulePaneResolver {
         ("Full uninstall with leftovers", "trash.square"),
         ("Leftover sweep", "shippingbox"),
       ]
-    case .myClutter:
+    case .leftovers:
       named = [
         ("Duplicates", "doc.on.doc"),
         ("Similar photos", "photo.stack"),
@@ -98,12 +98,12 @@ public enum ModulePaneResolver {
 
   private static func actionTitle(for module: HubModule) -> String {
     switch module {
-    case .smartCare: return "Run Smart Care"
+    case .fullSweep: return "Run Full Sweep"
     case .cleanup: return "Scan"
     case .protection: return "Check"
     case .performance: return "Scan"
     case .applications: return "Scan"
-    case .myClutter: return "Scan"
+    case .leftovers: return "Scan"
     }
   }
 

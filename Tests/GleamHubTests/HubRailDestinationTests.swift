@@ -9,13 +9,13 @@ struct HubRailDestinationTests {
   func theRailIsEveryModuleInOrderThenTheDiskMapThenSettings() {
     #expect(
       HubDestination.allCases == [
-        .module(.smartCare),
+        .module(.fullSweep),
         .module(.cleanup),
         .module(.protection),
         .module(.performance),
         .module(.applications),
-        .module(.myClutter),
-        .spaceLens,
+        .module(.leftovers),
+        .diskMap,
         .settings,
       ])
   }
@@ -24,7 +24,7 @@ struct HubRailDestinationTests {
   func hubModuleAllCasesIsTheFixedRailOrder() {
     #expect(
       HubModule.allCases == [
-        .smartCare, .cleanup, .protection, .performance, .applications, .myClutter,
+        .fullSweep, .cleanup, .protection, .performance, .applications, .leftovers,
       ])
   }
 
@@ -63,7 +63,7 @@ struct HubRailDestinationTests {
   /// has nothing to offer yet.
   @Test("a module that is not built is still selectable", arguments: HubModule.allCases)
   func aModuleThatIsNotBuiltIsStillSelectable(module: HubModule) {
-    let above = makeNavigationState(selection: .module(.smartCare))
+    let above = makeNavigationState(selection: .module(.fullSweep))
     var state = above
     while state.selection != .module(module) {
       let next = HubNavigationResolver.transition(state, applying: .arrowDown).next

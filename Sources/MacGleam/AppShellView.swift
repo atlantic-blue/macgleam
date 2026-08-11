@@ -13,7 +13,7 @@ import SwiftUI
 struct AppShellView: View {
   let model: HubModel
   let cleanup: CleanupDependencies
-  let spaceLens: SpaceLensDependencies
+  let diskMap: DiskMapDependencies
   @State private var navigation: HubNavigationState
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -22,12 +22,12 @@ struct AppShellView: View {
   init(
     model: HubModel,
     cleanup: CleanupDependencies,
-    spaceLens: SpaceLensDependencies,
+    diskMap: DiskMapDependencies,
     initialSelection: HubDestination = HubNavigationState.initial.selection
   ) {
     self.model = model
     self.cleanup = cleanup
-    self.spaceLens = spaceLens
+    self.diskMap = diskMap
     _navigation = State(
       initialValue: HubNavigationState(selection: initialSelection, moduleStateSlots: [:]))
   }
@@ -70,9 +70,9 @@ struct AppShellView: View {
       case .module(.cleanup) where content.action != nil:
         CleanupModuleView(
           model: cleanup.model, executor: cleanup.executor, idlePane: content)
-      case .spaceLens:
-        SpaceLensView(
-          model: spaceLens.model, executor: spaceLens.executor, idlePane: content)
+      case .diskMap:
+        DiskMapView(
+          model: diskMap.model, executor: diskMap.executor, idlePane: content)
       default:
         ModulePaneView(pane: content, onActivate: {})
       }

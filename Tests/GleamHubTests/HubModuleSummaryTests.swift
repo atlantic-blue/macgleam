@@ -16,7 +16,7 @@ struct HubModuleSummaryTests {
   func hubModuleAllCasesIsTheFixedHexagonalOrder() {
     #expect(
       HubModule.allCases == [
-        .smartCare, .cleanup, .protection, .performance, .applications, .myClutter,
+        .fullSweep, .cleanup, .protection, .performance, .applications, .leftovers,
       ]
     )
   }
@@ -71,7 +71,7 @@ struct HubModuleSummaryTests {
 
   @Test("enabled flags flow from enabledModules")
   func enabledFlagsFlowFromEnabledModules() {
-    let enabled: Set<HubModule> = [.smartCare, .cleanup]
+    let enabled: Set<HubModule> = [.fullSweep, .cleanup]
     let state = makeHubMachineState(enabledModules: enabled)
     let summaries = HubModel.summaries(for: state)
     for summary in summaries {
