@@ -39,30 +39,50 @@ import SwiftUI
 /// constants.
 ///
 /// Revised 2026-08-10 to carry the Lumina Utility design specification
-/// (`.desings/lumina_utility/DESIGN.md`). The palette, the type scale and the
-/// radius scale all grew; the guarantees below are the current ones.
+/// (`.desings/lumina_utility/DESIGN.md`), and again 2026-08-11 when light
+/// became a specified appearance in its own right. The guarantees below are
+/// the current ones.
 ///
 /// Guarantees:
-/// - Colour tokens resolve for both dark and light appearances from day one.
-///   Dark is the specified appearance and its values are the specification's
-///   hexes exactly; light is derived to hold the same contrast.
+/// - Colour tokens resolve for both dark and light appearances from day one,
+///   and each appearance has its own specification: Lumina Utility for dark,
+///   Clinical Precision (`.desings/lumina_utility/DESIGN-light.md`) for light.
+///   Neither appearance is derived from the other, and no token is the same
+///   colour in both.
+/// - Dark resolves every token the Lumina specification names to that hex
+///   exactly, asserted token by token. Light does the same for the Clinical
+///   Precision hexes that serve the role, and departs where the prose
+///   governs: a card is white, and the canvas and the two text roles are
+///   pinned to hold the contrast the prose demands. Every departure is a
+///   pinned value with its own assertion, never a value free to drift. The
+///   three health colours are ours in both appearances, because neither
+///   specification names them.
+/// - Where a specification's palette and its prose disagree, the prose wins,
+///   because the prose is the part that says what a colour is for.
 /// - Semantic colours (safe, review, dangerous) and every text role meet Web
 ///   Content Accessibility Guidelines AA contrast against the surfaces they
 ///   appear on, in both appearances. This is a testable threshold, not an
-///   aspiration.
+///   aspiration: safe, review, dangerous, textPrimary, textSecondary, primary
+///   and accent each hold at least 4.5 to 1 over baseBackground, surfaceLow,
+///   surface and surfaceHigh, and onPrimary holds it over primary.
+///   surfaceLowest and surfaceBright are wells that hold a glyph or an image,
+///   never running text, so they are outside that matrix.
 /// - Layout spacing is an 8 point grid. `GleamSpacing.points(n)` returns
 ///   exactly `n * 8`. Control level padding may sit on the half step,
 ///   `GleamSpacing.half(n)` returning exactly `n * 4`, because the
 ///   specification pads cards and controls at 20 and 4 points. No view uses a
 ///   spacing value off both steps.
 /// - Exactly three corner radii and three elevation levels exist. The radii
-///   nest: control inside item inside card.
-/// - The type scale has exactly seven roles. Every role carries its point
+///   nest: control (6) inside item (8) inside card (12).
+/// - The type scale has exactly eight roles. Every role carries its point
 ///   size, weight, tracking and line height, so a view never restates them.
-///   SF Pro and SF Mono only; the specification names Inter and JetBrains Mono
-///   solely because a web page cannot use SF Pro, and a native app can.
+///   The text roles descend in size with no two the same (mono sits outside
+///   that ordering), only the three largest carry negative tracking, and every
+///   role resolves a distinct font. SF Pro and SF Mono only; the specification
+///   names Inter and JetBrains Mono solely because a web page cannot use SF
+///   Pro, and a native app can.
 public enum GleamColorToken: CaseIterable, Sendable {
-    // Canvas and surfaces, lowest to highest.
+    // Canvas and surfaces, lowest to highest. Hexes are the dark values.
     case baseBackground      // #0A0E1A, the canvas
     case surfaceLowest       // #050E1E
     case surfaceLow          // #121C2C, the navigation rail
@@ -105,32 +125,70 @@ public enum GleamRadius: CaseIterable, Sendable {
     public var value: CGFloat { fatalError("contract") }
 }
 
-/// Depth comes from tonal layering and luminous outlines, not heavy shadows.
-/// Each level carries the hairline it draws at its edge and the shadow it
-/// casts; `low` casts none at all.
+/// A surface's shadow, as data, so a test asserts on it rather than on a
+/// screenshot.
+public struct GleamShadow: Sendable, Equatable {
+    public let color: Color
+    public let opacity: Double
+    public let radius: CGFloat
+    public let offsetY: CGFloat
+    public init(color: Color, opacity: Double, radius: CGFloat, offsetY: CGFloat)
+    /// No shadow at all, which is what a resting surface casts in dark.
+    public static let none: GleamShadow
+}
+
+/// How far a surface sits above the one behind it.
+///
+/// Elevation is appearance aware, and this is not a detail that can be
+/// averaged: the two specifications genuinely disagree. Dark separates layers
+/// by tone and a luminous hairline, so a resting card casts nothing and only a
+/// lifted one casts, sharply. Light has no tone left to spend above white, so
+/// every level casts, softly and in the text navy rather than in black.
+///
+/// Guarantees, each of them a value a test reads directly:
+/// - `low.shadow(for: .dark)` is exactly `GleamShadow.none`. Dark's lifted
+///   levels cast black at opacity 0.5, radius 12, offset 4.
+/// - Every level casts something in light: opacity and radius are both above
+///   zero, at 0.05 / 12 / 4 resting, 0.08 / 20 / 8 hovered and
+///   0.12 / 32 / 12 floating.
+/// - A light shadow's colour is the text navy #16213A; a dark one's is black.
+/// - Shadow opacity and radius never fall as the level rises, in either
+///   appearance.
+/// - A resting surface draws an edge in both appearances, white in dark and
+///   the specified separator #E1E5ED in light, and a dark edge never exceeds
+///   0.2 opacity, so it reads as an edge rather than as a border.
 public enum GleamElevation: CaseIterable, Sendable {
     case low                 // a resting card
     case medium              // a hovered or focused card
-    case high                // a floating menu or popover
-    public var borderOpacity: Double { fatalError("contract") }
-    public var shadowOpacity: Double { fatalError("contract") }
-    public var shadowRadius: CGFloat { fatalError("contract") }
-    public var shadowOffsetY: CGFloat { fatalError("contract") }
+    case high                // a floating menu, popover or modal
+    /// The hairline at the surface's edge, already carrying its opacity.
+    public func edge(for appearance: ColorScheme) -> Color { fatalError("contract") }
+    public func shadow(for appearance: ColorScheme) -> GleamShadow { fatalError("contract") }
 }
 
 public enum GleamTypeToken: CaseIterable, Sendable {
-    case display     // 56, the hub number
-    case title       // 22, view and card headings
-    case headline    // 15, the brand line
-    case label       // 14, navigation and control labels
-    case body        // 13, descriptions and list items
-    case caption     // 11, metadata
-    case mono        // 12, file paths
+    case display     // 56 over 64
+    case heading     // 34 over 40
+    case title       // 22 over 28, view and card headings
+    case headline    // 15 over 20, the brand line
+    case label       // 14 over 20, navigation and control labels
+    case body        // 13 over 18, descriptions and list items
+    case caption     // 11 over 14, metadata
+    case mono        // 12 over 16, file paths
     public var font: Font { fatalError("contract") }
     public var size: CGFloat { fatalError("contract") }
+    public var weight: Font.Weight { fatalError("contract") }
     public var tracking: CGFloat { fatalError("contract") }
     /// Line height minus point size, which is what SwiftUI's lineSpacing takes.
     public var lineSpacing: CGFloat { fatalError("contract") }
+}
+
+extension View {
+    /// Applies a text role whole: its face, its tracking and its line height,
+    /// so no view restates a metric.
+    public func gleamType(_ role: GleamTypeToken) -> some View
+    /// Applies an elevation's shadow for the given appearance.
+    public func gleamShadow(_ level: GleamElevation, for appearance: ColorScheme) -> some View
 }
 ```
 
@@ -2136,6 +2194,27 @@ Revised 2026-08-10. The hexagon of six cards and the hub to module zoom are
 gone; the rail replaces them. `HubZoomDirection` and `HubZoomResolver` stay
 because Disk Map drills into folders with the same grammar (C39).
 
+**Two parts of this contract are specified and not yet wired**, as of the
+document reconciliation of 2026-08-11 and against what has merged. They are
+named here rather than weakened, because the specification is what the app
+should do and the gap is what it does today. Both belong to s2i (GRAPH.md),
+which carries them in its verification list.
+
+- `HubIntent` is wired as of 2026-08-11. The rail resolves a key press
+  through `HubKeyResolver.outcome(_:applying:pane:)`, which takes what the
+  open pane can actually do, and returns a moved state, an intent the pane
+  runs, or ignored. A press is claimed only when it moves the rail or carries
+  an intent the pane can run, so a key that does nothing is reported as
+  ignored and the system gives its own feedback. Return runs the pane's
+  primary action, escape runs a dismissal where one exists and never cancels
+  or destroys work.
+- `ModuleStateSlot` and `HubNavigationState.storingSlot`. The slot type, the
+  store and the pass through property all exist and are tested, but nothing
+  outside the tests calls `storingSlot`, so no module encodes its state on
+  leaving and module state does not in fact survive navigating away and back.
+  The slots the shell carries forward are always empty. Slice s2i carries
+  this one.
+
 ```swift
 import Foundation
 import GleamDesign
@@ -2185,6 +2264,9 @@ public enum HubDestinationGroup: CaseIterable, Sendable, Equatable {
 /// would make the navigation state's type depend on every module's state
 /// type. The cost is stated plainly: nothing at compile time proves a module
 /// decodes the type it encoded. Each module owns that round trip.
+///
+/// Specified, not yet wired: no module encodes into a slot today, so module
+/// state does not survive navigation. Wired in s2i.
 public struct ModuleStateSlot: Codable, Sendable, Equatable {
     public let payload: Data
     public init(payload: Data)
@@ -2223,6 +2305,11 @@ public struct HubNavigationTransition: Sendable, Equatable {
 
 /// What a key press asks of the pane. The rail owns the selection; anything
 /// beyond moving it belongs to whatever is on screen.
+///
+/// Specified, not yet wired as of 2026-08-11: the shell discards the intent
+/// and marks the key handled, so return and escape do nothing at all. An
+/// intent nothing can run should leave the press unclaimed rather than
+/// swallow it. s2i.
 public enum HubIntent: String, CaseIterable, Sendable, Equatable {
     case activatePrimaryAction
     case dismiss
@@ -2249,6 +2336,8 @@ public enum HubIntent: String, CaseIterable, Sendable, Equatable {
 /// - No transition creates, drops or alters a module state slot:
 ///   `next.moduleStateSlots` always equals the input's, over any key
 ///   sequence, as a property test.
+/// - The resolver's half of the intent guarantee holds today; the pane's half
+///   does not exist yet. Return and escape reaching the open pane is s2i.
 public enum HubNavigationResolver {
     public static func transition(
         _ state: HubNavigationState,
@@ -2786,10 +2875,11 @@ public enum DiskMapModuleState: Sendable, Equatable {
 
 /// One drill step, as data, for the view to animate. Reuses the C37 zoom
 /// grammar: the view resolves `direction` through HubZoomResolver, so
-/// drilling into a folder uses exactly the animation tokens the hub zoom
-/// uses (snappy matched geometry, crossfade under Reduce Motion) and the
-/// whole app keeps one navigation language. HubZoom itself is not reused:
-/// it names a HubModule, and a folder is not a module.
+/// drilling into a folder runs on the shared navigation tokens (snappy
+/// matched geometry, crossfade under Reduce Motion) and the whole app keeps
+/// one navigation language. That grammar was written for the hub to module
+/// zoom, which is gone; this is where it still runs. HubZoom itself is not
+/// reused: it names a HubModule, and a folder is not a module.
 public struct DiskMapDrill: Sendable, Equatable {
     public let target: AbsolutePath
     public let direction: HubZoomDirection

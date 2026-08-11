@@ -16,14 +16,14 @@ Reading a slice entry:
 
 ## Dependency diagram
 
-Validated with the mermaid command line renderer on 2026-08-09.
+Validated with the mermaid command line renderer on 2026-08-11.
 
 ```mermaid
 flowchart TB
-    subgraph m0["M0 foundation and hub shell"]
+    subgraph m0["M0 foundation and shell"]
         s0a["s0a tokens and workspace"]
-        s0b["s0b hub shell"]
-        s0c["s0c hub zoom"]
+        s0b["s0b shell model"]
+        s0c["s0c navigation model"]
     end
     subgraph m1["M1 the first clean"]
         s1a["s1a domain model"]
@@ -40,6 +40,10 @@ flowchart TB
         s2c["s2c similar photos"]
         s2d["s2d disk map"]
         s2e["s2e performance gates"]
+        s2f["s2f tokens and the navigation rail"]
+        s2g["s2g the disk map as a treemap"]
+        s2h["s2h the specified light appearance"]
+        s2i["s2i rail intents and module state"]
     end
     subgraph m3["M3 performance and helper"]
         s3a["s3a helper contract"]
@@ -87,6 +91,10 @@ flowchart TB
     s1g --> s2d
     s2a --> s2e
     s2d --> s2e
+    s2e --> s2f
+    s2f --> s2g
+    s2f --> s2h
+    s2f --> s2i
     s1a --> s3a
     s1c --> s3a
     s3a --> s3b
@@ -124,7 +132,12 @@ s7a can start in parallel the moment the workspace exists.
 
 ---
 
-## M0. Foundation and the hub shell
+## M0. Foundation and the shell
+
+The two interface slices here shipped as the hexagonal hub. The rail replaced
+that surface in s2f, so their entries below describe what survives, and their
+human checks are retired without a verdict rather than left standing against a
+screen nobody can open. DECISIONS.md carries the reversal and its reasons.
 
 ### s0a. tokens and workspace
 - Contracts: C1, C2.
@@ -139,27 +152,39 @@ s7a can start in parallel the moment the workspace exists.
   integration runs the suite on a macOS runner and fails on an empty test run.
 - Tier: auto.
 
-### s0b. hub shell
+### s0b. the shell model (shipped as the hub shell)
 - Contracts: C36 (hub shell model), consuming C1, C2.
 - Depends on: s0a.
-- Verification: the hub renders the orb with its two idle states (healthy,
-  attention needed) and six placeholder cards in the hexagonal layout; mood,
-  status line and card derivation are pure functions of HubMachineState,
-  driven in tests without any view; the appearance resolver is total over
-  every mood and Reduce Motion pair and never returns a spring under Reduce
-  Motion; the card order is the fixed HubModule order.
-- Tier: verify. Human check: the orb breathes at roughly a 6 second period,
-  the sheen reads as calm not busy, both appearances look intentional.
+- What survives: the model. The hexagon of six cards around a centre orb was
+  deleted in s2f; the moods, the status line, the module summaries and the orb
+  appearance resolver were not, and the rail's health light is the orb.
+- Verification: the orb renders its two idle states (healthy, attention
+  needed); mood, status line and summary derivation are pure functions of
+  HubMachineState, driven in tests without any view; the appearance resolver
+  is total over every mood and Reduce Motion pair and never returns a spring
+  under Reduce Motion; the module order is the fixed HubModule order.
+- Tier: was verify; the human check is retired without a verdict, because the
+  hexagonal layout it asked about no longer exists (STATE.md). The orb's
+  breathing and the two appearances carried into s2f's check. What is left of
+  this slice stands on tests alone.
 
-### s0c. hub zoom
-- Contracts: C37 (hub navigation model), consuming C1, C2, C36.
+### s0c. the navigation model (shipped as the hub zoom)
+- Contracts: C37, which this slice wrote as the hub navigation model and s2f
+  rewrote as the rail navigation model. Consumes C1, C2, C36.
 - Depends on: s0b.
-- Verification: entering and leaving a card round trips with matched
-  geometry; module state survives the round trip; arrow keys walk the cards,
-  Return enters, Escape leaves; full operation without a pointer; Reduce
-  Motion replaces the zoom with a crossfade.
-- Tier: verify. Human check: the zoom is one continuous motion with no
-  crossfade seams and no dropped frames on a 60 hertz display.
+- What survives: the navigation model and the zoom resolver. The card to
+  module matched geometry zoom went with the hexagon in s2f; the zoom grammar
+  itself did not, because Disk Map drills into folders with it (C39). s2f
+  rewrote the rest of C37 into the rail. The slices downstream that depend on
+  s0c depend on there being a navigation surface at all, which is why the edge
+  outlives the zoom.
+- Verification: the key transition is total and deterministic and drives every
+  destination without a view; module state passes through untouched over any
+  key sequence; Reduce Motion replaces the zoom with a crossfade and the zoom
+  resolver never returns a spring under it.
+- Tier: was verify; the human check is retired without a verdict, because the
+  hub to module zoom it asked about no longer exists (STATE.md). The surviving
+  zoom is judged where it is still used, in s2d and s2g.
 
 ## M1. The first clean
 
@@ -240,6 +265,12 @@ s7a can start in parallel the moment the workspace exists.
 
 ## M2. Leftovers and Disk Map
 
+M2 also carries the interface slices that landed with it: s2f to s2i, which
+replaced the hub with the rail, the disk map with a treemap, and the derived
+light appearance with a specified one. They were appended under M3 by the pull
+requests that shipped them; they belong here, with the milestone whose work
+they were done alongside.
+
 ### s2a. large and old files
 - Contracts: C21 (large, old, downloads triage portions).
 - Depends on: s1g.
@@ -281,7 +312,9 @@ s7a can start in parallel the moment the workspace exists.
   process wide cache; the s1a Finding pins named in C5's migration note are
   updated deliberately in this slice.
 - Tier: verify. Human check: the map builds outward from the root while
-  scanning and drilling in feels identical to the hub zoom.
+  scanning, and drilling into a folder is one continuous motion rather than a
+  cut. The hub this zoom was shared with is gone; the grammar is not, and the
+  Disk Map is now the only place it runs.
 
 ### s2e. performance gates
 - Contracts: amends C4 (itemCount), C5, C15 (ScanStreamPolicy, the streaming
@@ -300,8 +333,6 @@ s7a can start in parallel the moment the workspace exists.
   findings; the gates run in continuous integration and fail on regression.
   The C15 migration note lists the existing pins this breaks.
 - Tier: auto.
-
-## M3. Performance and the privileged helper
 
 ### s2f. Lumina tokens and the navigation rail
 - Contracts: rewrites C1 (the Lumina Utility palette, eight text roles, three
@@ -339,6 +370,41 @@ s7a can start in parallel the moment the workspace exists.
   shadow is cast in the text navy and a dark one in black.
 - Tier: verify. Human check: the light appearance reads as deliberate rather
   than as the dark one with the lights turned up.
+- Two of those five had no test at the 2026-08-11 reconciliation, so they were
+  not read as done: light was not asserted hex for hex the way dark is, resting
+  instead on the contrast matrix, the named shadows and the named edge, and
+  nothing asserted that a token differs between the two appearances. Both are
+  unfinished verification of shipped values, not unfinished values. Both were
+  closed on 2026-08-11: light is now pinned hex for hex where the specification
+  names a value and pinned as a shipping value where it does not, and a test
+  asserts no token resolves to the same colour in both appearances.
+
+### s2i. the rail's intents and preserved module state
+- Contracts: C37 (HubIntent reaching the pane, ModuleStateSlot and
+  storingSlot), consuming C38 and C39 for the panes that act on an intent.
+- Depends on: s2f.
+- Why it exists: C37 specifies both and, as of 2026-08-11, neither is wired in
+  anything that has merged. The resolver returns an intent for return and
+  escape and nothing reads it, so the shell consumes both keys and does
+  nothing with them; `storingSlot` has no caller outside the tests, so module
+  state does not survive navigation. The first is a live defect a keyboard
+  only user hit, and it was closed on 2026-08-11 through `HubKeyResolver`,
+  which claims a press only when it moves the rail or carries an intent the
+  open pane can run. What remains of this slice is the module state half.
+- Verification: return over a built module runs that pane's primary action and
+  escape dismisses whatever the pane has open, both driven through the shell
+  rather than asserted at the resolver; a key the open pane does not use is
+  reported unhandled rather than swallowed, so the system beep and the
+  responder chain still work; leaving a module and coming back restores what
+  the module put in its slot, proved through the shell for at least Cleanup
+  and Disk Map, with the slot round trip carried to what the user sees next
+  rather than stopping at the store; a module with nothing to preserve stores
+  nothing and is unaffected.
+- Tier: verify. Human check: drive the whole app with the keyboard alone,
+  starting a scan and dismissing a result without touching the pointer, and
+  confirm a review selection survives navigating away and back.
+
+## M3. Performance and the privileged helper
 
 ### s3a. helper contract
 - Contracts: C30, C31 (types, policy, contract tests against a test double

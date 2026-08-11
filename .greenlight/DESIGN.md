@@ -5,19 +5,45 @@ interaction and motion quality. MacGleam is the working name through development
 trademark search happens before launch. Everything here was agreed with Julian in
 the design session of 2026-08-09.
 
+Two documents share authority and they do not overlap. The design
+specifications in `.desings/` are the authority for appearance: the palette,
+the type scale, the radii and the elevation set, one document per appearance.
+This file is the authority for behaviour, safety, privacy and the non
+functional targets. Where a section here describes an interface, it describes
+what the interface does; what it looks like is settled next door.
+
+The interface sections were rewritten on 2026-08-11 to describe the navigation
+rail that replaced the hexagonal hub. Nothing is being quietly erased: the hub,
+what it was for and why it was reversed are both in DECISIONS.md, which is
+append only. This file states the current design plainly so that a reader
+building from it builds the thing that exists.
+
 ## Requirements
 
 ### Functional
 
-**Hub (the signature surface)**
-- One window. A living status scene (the orb) in the centre, six module cards
-  arranged around it: Full Sweep, Cleanup, Protection, Performance, Applications,
-  Leftovers. Disk Map and Settings reachable from the hub chrome.
-- Selecting a card zooms into the module with a matched geometry transition. Escape
-  or the back control zooms out. The hub is never more than one gesture away.
-- The status scene reflects real machine state: last scan time, reclaimable space
-  estimate, threat state, and it changes visibly with each app state (see the
-  Interaction and Motion section).
+**The window: a navigation rail and a pane**
+- One window in two parts. A rail down the left carries every destination in a
+  fixed order: the six modules (Full Sweep, Cleanup, Protection, Performance,
+  Applications, Leftovers), then Disk Map and Settings in a group that sits
+  apart. The rest of the window is the pane for whatever is selected, with a
+  status line along the bottom of it.
+- Exactly one destination is selected at all times. There is no overview screen
+  and nothing to zoom back out to, so no state exists in which nothing is
+  chosen.
+- Every destination is reachable whether or not its module is built. A module
+  that has not shipped still gets a pane: it says what the module is for and
+  admits plainly that it cannot do it yet. An action that does nothing is worse
+  than an empty pane that explains itself.
+- A built module's pane carries what the module is for, the jobs it runs with
+  their live figures, and one primary action.
+- The status scene lives at the top of the rail as a 40 point health light,
+  reading real machine state: last scan time, reclaimable space estimate,
+  threat state (see the Interaction and Motion section). The status line under
+  the pane carries the sentence that goes with it.
+- Keyboard: up and down walk the rail and clamp at its ends, Return activates
+  the pane's primary action, Escape dismisses. Full operation without a
+  pointer.
 
 **Full Sweep (v1 ships three of five jobs)**
 - One scan runs deep clean (Cleanup), storage declutter (Leftovers large and old
@@ -101,23 +127,24 @@ the design session of 2026-08-09.
 ### Non Functional
 
 - Scan performance: a full Cleanup scan of a typical 512 GB system disk completes
-  in under 60 seconds; Disk Maps a full volume in under 30 seconds on Apple
-  silicon. Directory enumeration uses getattrlistbulk with 4 to 8 concurrent
-  readers per volume (APFS serialises directory reads past that).
-- Animation: no dropped frames during the hub zoom and scan progress on a 60 Hz
-  display, and ProMotion aware on 120 Hz. Motion honours Reduce Motion.
+  in under 60 seconds; the Disk Map maps a full volume in under 30 seconds on
+  Apple silicon. Directory enumeration uses getattrlistbulk with 4 to 8
+  concurrent readers per volume (APFS serialises directory reads past that).
+- Animation: no dropped frames when the pane changes, when the Disk Map drills
+  into a folder, or during scan progress on a 60 Hz display, and ProMotion
+  aware on 120 Hz. Motion honours Reduce Motion.
 - Memory: under 500 MB resident during the largest scan; results stream and
   aggregate rather than accumulate full file lists in memory.
-- App size: under 80 MB installed. Launch to interactive hub in under one second
-  on Apple silicon.
+- App size: under 80 MB installed. Launch to an interactive window in under one
+  second on Apple silicon.
 - Reliability: a crashed or cancelled scan never leaves partial deletions; all
   destructive work happens after scanning, from an explicit plan, atomically per
   item.
 - Privacy: no analytics by default, no file names or paths ever leave the machine.
   Network traffic is limited to the Sparkle appcast, the signed rules channel and
   licence activation. This is a stated product promise.
-- Accessibility: WCAG AA contrast, full keyboard navigation of the hub and
-  modules, VoiceOver labels on every finding row, Reduce Motion and Reduce
+- Accessibility: WCAG AA contrast, full keyboard navigation of the rail and the
+  panes, VoiceOver labels on every finding row, Reduce Motion and Reduce
   Transparency respected.
 
 ### Constraints
@@ -168,9 +195,14 @@ Each decision as: what was decided, what was rejected, and why.
 - **Full Sweep ships three of five jobs.** Rejected: shipping all five with
   stubbed threat scan and updater. Jobs appear only when their backing module is
   real.
-- **Hub with zoom navigation, no sidebar.** Rejected: CleanMyMac style sidebar
-  (safer, less distinctive). The hub is the signature interaction and the
-  differentiator made visible.
+- **A navigation rail, not a hub.** Rejected: the hexagonal hub of six cards
+  around a central orb, which is what shipped first and was reversed on
+  2026-08-10; DECISIONS.md carries both entries. The orb held one line of text
+  the cards already carried, so the centre of the window earned nothing. The
+  rail spends that space on what a module is for, the jobs it runs and their
+  live figures. The differentiator moves from the layout, which any competitor
+  can copy, to the motion and to every pane telling the truth about what it can
+  do. The zoom grammar survives the hub: Disk Map drills into folders with it.
 - **SMAppService daemon for privileged operations, XPC between app and helper.**
   Rejected: SMJobBless (deprecated), shelling out with AppleScript authorization
   (fragile, poor UX). XPC is Apple's inter process communication mechanism; the
@@ -273,13 +305,22 @@ binding, not decorative.
 
 ### Design tokens (GleamDesign package)
 
-- Colour: a deep neutral base (near black blues), one iridescent accent drawn
-  from the orb motif, semantic colours for safe, review and dangerous. Dark
-  and light appearances from day one. WCAG AA minimum contrast.
-- Type: SF Pro with a modular scale (one display size for the hub number, three
-  text sizes, one mono size for paths). No custom typeface in v1.
-- Spacing on an 8 point grid, two corner radii (cards, controls), three
-  elevation levels expressed as material plus shadow tokens.
+The values live in `.desings/`, one document per appearance, and are typed in
+C1. What follows is the shape of the set, not the numbers.
+
+- Colour: sixteen semantic tokens covering the canvas, five surface levels,
+  three accent tokens in two never interchangeable roles, two text roles, two
+  line roles and the three health colours (safe, review, dangerous). Dark and
+  light are separate specifications from day one, neither derived from the
+  other. WCAG AA minimum contrast in both, as a test rather than an intention.
+- Type: SF Pro and SF Mono, eight roles, each carrying its own size, weight,
+  tracking and line height so a view applies a role and never restates a
+  number. No custom typeface in v1.
+- Spacing on an 8 point grid, with a 4 point half step for padding inside a
+  card or a control. Three nested corner radii (card, item, control) and three
+  elevation levels. Elevation resolves per appearance, because the two
+  appearances raise a surface differently: dark separates by tone so a resting
+  card casts nothing, light has no tone left above white so every card casts.
 - Motion tokens, the canonical spring set used everywhere:
   - snappy: response 0.30, damping 0.85. Navigation, selection, toggles.
   - gentle: response 0.55, damping 0.90. Layout settles, list reflow.
@@ -290,8 +331,11 @@ binding, not decorative.
 
 ### The status scene (the orb)
 
-A Metal shaded orb (colorEffect and layerEffect shaders on a SwiftUI canvas)
-that is the emotional centre of the app. Its states:
+The orb reads machine state at a glance. It sits at the top of the rail at 40
+points, beside the app's mark, and the sentence that goes with it runs along
+the status line under the pane. It draws today as a layered radial gradient;
+the Metal shader path (colorEffect and layerEffect on a SwiftUI canvas) is
+open, not spent. Its states:
 
 - **Idle, healthy**: slow breathing scale (about 6 second period), soft
   iridescent sheen drifting across the surface. Below it, one line: last scan
@@ -299,9 +343,9 @@ that is the emotional centre of the app. Its states:
 - **Idle, attention needed**: the sheen warms toward the review colour, the
   breathing quickens slightly, a single line names the top issue. Never red,
   never alarmist.
-- **Scanning**: the orb becomes the progress surface: a shimmer band orbits it,
-  a live counter of bytes found ticks with a numeric text content transition,
-  and the module cards dim except the ones being scanned.
+- **Scanning**: the orb becomes the progress surface: a shimmer band orbits it
+  and a live counter of bytes found ticks with a numeric text content
+  transition. In the rail, destinations not being scanned recede.
 - **Result**: the orb pulses once with the lively spring and presents the
   summary number; particles are allowed here and nowhere else.
 - **Clean sweep** (nothing found): a calm lustre bloom. An empty result is a
@@ -310,20 +354,26 @@ that is the emotional centre of the app. Its states:
 Reduce Motion replaces the orb's animation with a static gradient and
 crossfades; the shimmer becomes a determinate ring.
 
-### Hub choreography
+### Rail and pane choreography
 
-- The six cards orbit the orb in a fixed hexagonal layout, each carrying its
-  own live figure (Cleanup: reclaimable estimate; Protection: last scan;
-  Performance: memory pressure; and so on). Cards breathe subtly on hover
-  (scale 1.02, snappy).
-- Entering a module: matched geometry zoom. The card expands to fill the window
-  (snappy spring), the hub scales down to 0.94 and blurs behind it, the card's
-  title travels to the module header. Target: one continuous motion, no
-  crossfade seams.
-- Leaving: exact reverse, triggered by Escape, the back control, or a trackpad
-  swipe. State inside a module survives the round trip.
-- Keyboard: arrow keys walk the cards, Return enters, Escape leaves. Full
-  operation without a pointer.
+- The rail is one column in a fixed order, drawn as a translucent panel over
+  the canvas, with a gap before the group that sits apart. The selected row
+  carries the accent; no row ever moves.
+- Changing destination: the outgoing pane leaves and the incoming pane arrives
+  with the snappy spring, which C2 assigns to navigation. The rail itself does
+  not animate, so the eye stays on the thing that changed.
+- Every module's pane opens on the same shape: what it is for, the jobs it
+  runs with their live figures, and one primary action or one plain sentence
+  saying it is not built yet.
+- State inside a module survives leaving it and coming back. The mechanism is
+  contracted in C37 as an opaque per module slot; it is specified and not yet
+  wired, and s2i wires it.
+- Keyboard: up and down walk the rail and clamp at both ends, so walking never
+  leaves it. Left and right belong to the pane, not the rail. Return activates
+  the pane's primary action and Escape dismisses; neither moves the selection.
+  Full operation without a pointer. Return and Escape are specified and not yet
+  wired: today the shell consumes both and does nothing with them, which is a
+  live defect, and s2i wires them.
 
 ### Per module choreography
 
@@ -341,9 +391,11 @@ crossfades; the shimmer becomes a determinate ring.
   figure as they complete (keyframeAnimator, capped particle count), the
   reclaimed number ticks up in real time. Failures stay in place with the
   review colour and a plain sentence saying why.
-- **Disk Map**: the disk map builds outward from the root as data streams,
-  blocks growing with the gentle spring; drilling in is the same zoom grammar
-  as the hub so the whole app has one navigation language.
+- **Disk Map**: a treemap, where a tile's area is its share of the parent's
+  bytes. It builds as data streams, tiles growing with the gentle spring, and a
+  folder holding almost everything never squeezes the rest out of sight.
+  Drilling into a tile uses the zoom grammar, which is why that grammar
+  outlived the hub it was designed for.
 - **Uninstall**: the app icon and its leftover rows gather into a single stack
   before moving to the SafetyNet, making visible that the removal is one
   reversible unit.
@@ -435,7 +487,10 @@ mechanisms, by operation:
 
 Locked with Julian, 2026-08-09:
 
-- Hub with zoom navigation is the signature interaction; sidebar rejected.
+- A navigation rail carries every destination and a pane shows the selected
+  one. This reverses the hub with zoom navigation locked on 2026-08-09;
+  DECISIONS.md carries the original decision, the reversal and the reasons for
+  both. Reversed 2026-08-10, after the hub shipped.
 - One time licence, 14 day full trial, 29 to 39 dollars at launch, paid major
   upgrades, processor likely Paddle (deferred to launch milestone).
 - macOS 14 floor.

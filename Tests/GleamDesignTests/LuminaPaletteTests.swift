@@ -4,9 +4,25 @@ import GleamDesign
 import SwiftUI
 import Testing
 
-/// Each appearance has a specification, so each is checked hex for hex:
-/// Lumina Utility for dark, Clinical Precision for light. A drive by tweak to
-/// any of them fails here.
+/// Both appearances are checked hex for hex against their own specification,
+/// Lumina Utility for dark and Clinical Precision for light, so a drive by
+/// tweak to either fails here. Two things the tables below do not cover, said
+/// plainly because a comment nobody can turn into a test is a comment that
+/// gets deleted:
+///
+/// Three light values are pinned to what the code ships rather than to a
+/// specification hex, because the Clinical Precision specification does not
+/// name them. They live in their own table and their own test, and they prove
+/// no conformance at all.
+///
+/// The dark semantic trio, safe, review and dangerous, is named in Lumina
+/// Utility only as green, amber and red, so it carries no dark hex to check
+/// against and none is pinned. What holds it is the contrast suite and the
+/// cross appearance check below.
+///
+/// Where a specification's palette and its prose disagree, the prose wins,
+/// per DECISIONS.md, 2026-08-11. The light rows that take a prose value say so
+/// and give the frontmatter value they passed over.
 @Suite("Lumina palette")
 struct LuminaPaletteTests {
 
@@ -26,6 +42,47 @@ struct LuminaPaletteTests {
     (.outlineVariant, "3D494A"),
   ]
 
+  /// Light values the Clinical Precision specification names. The trailing
+  /// comment on each row is the key or the sentence it comes from.
+  static let specifiedLightHexes: [(GleamColorToken, String)] = [
+    // Prose, level 0 of the elevation ladder. Frontmatter background is FAF8FF.
+    (.baseBackground, "F5F7FB"),
+    (.surfaceLowest, "FFFFFF"),  // surface-container-lowest
+    (.surfaceLow, "F2F3FF"),  // surface-container-low
+    // Prose, level 1, "pure white card surfaces". Frontmatter
+    // surface-container is E9EDFF.
+    (.surface, "FFFFFF"),
+    (.surfaceHigh, "E1E7FF"),  // surface-container-high
+    (.primary, "005767"),  // primary
+    (.onPrimary, "FFFFFF"),  // on-primary
+    // Prose, "a professional Teal accent". Frontmatter carries the same value
+    // under primary-container, and its own primary is the darker 005767.
+    (.accent, "0A7185"),
+    // Prose, "a deep Navy primary text". Frontmatter on-surface is 101B34.
+    (.textPrimary, "16213A"),
+    // Prose, "use Secondary text for metadata, labels, and helper text".
+    // Frontmatter on-surface-variant is 3F484B.
+    (.textSecondary, "4A566E"),
+    (.outline, "6F797C"),  // outline
+    (.outlineVariant, "BEC8CC"),  // outline-variant
+    (.dangerous, "BA1A1A"),  // error
+  ]
+
+  /// The light values the Clinical Precision specification does not give.
+  /// These are pinned to the hex the code ships today, which stops one drifting
+  /// unnoticed; none of them is evidence that the code matches a design,
+  /// because there is no design value to match. Safe and review are named in
+  /// the specification as the words green and amber and nothing more, so both
+  /// were picked by hand to clear contrast on white. The specification's own
+  /// surface-bright, FAF8FF, is a shade off its canvas, which would leave the
+  /// top of the light container ramp indistinguishable from the bottom, so the
+  /// ramp takes surface-container-highest instead.
+  static let unspecifiedLightHexes: [(GleamColorToken, String)] = [
+    (.surfaceBright, "D9E2FF"),  // surface-container-highest, not surface-bright
+    (.safe, "1B6F40"),
+    (.review, "7A5200"),
+  ]
+
   @Test(
     "every specified token resolves to its specification hex in dark", arguments: specifiedDarkHexes
   )
@@ -34,6 +91,53 @@ struct LuminaPaletteTests {
     expected: String
   ) throws {
     #expect(try hexString(of: token.color(for: .dark)) == expected)
+  }
+
+  @Test(
+    "every specified token resolves to its specification hex in light",
+    arguments: specifiedLightHexes
+  )
+  func everySpecifiedTokenResolvesToItsSpecificationHexInLight(
+    token: GleamColorToken,
+    expected: String
+  ) throws {
+    #expect(try hexString(of: token.color(for: .light)) == expected)
+  }
+
+  /// Pinning, not conformance. See the table's own note.
+  @Test(
+    "every light token the specification leaves unnamed still ships its pinned hex",
+    arguments: unspecifiedLightHexes
+  )
+  func everyUnspecifiedLightTokenShipsItsPinnedHex(
+    token: GleamColorToken,
+    expected: String
+  ) throws {
+    #expect(try hexString(of: token.color(for: .light)) == expected)
+  }
+
+  /// Without this, a token added later would resolve in light with nothing
+  /// checking the value, which is the hole these tables exist to close.
+  @Test("every colour token has a light value in exactly one of the two tables")
+  func everyColourTokenHasALightValueInExactlyOneTable() {
+    let specified = Self.specifiedLightHexes.map(\.0)
+    let pinned = Self.unspecifiedLightHexes.map(\.0)
+    #expect(Set(specified).isDisjoint(with: Set(pinned)))
+    #expect(Set(specified).union(pinned) == Set(GleamColorToken.allCases))
+    #expect(specified.count + pinned.count == GleamColorToken.allCases.count)
+  }
+
+  /// Light is a specified appearance rather than the dark one with the lights
+  /// turned up, so no token carries a value through unchanged. A token that
+  /// legitimately should would be listed here as an exception; today none is.
+  @Test(
+    "no token resolves to the same colour in both appearances",
+    arguments: GleamColorToken.allCases
+  )
+  func noTokenResolvesToTheSameColourInBothAppearances(token: GleamColorToken) throws {
+    let dark = try hexString(of: token.color(for: .dark))
+    let light = try hexString(of: token.color(for: .light))
+    #expect(dark != light, "\(token) is \(dark) in both appearances")
   }
 
   @Test("the colour token case list is exactly the contract list")
