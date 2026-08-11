@@ -303,7 +303,9 @@ public struct ScanCounters: Codable, Sendable, Equatable {
     public var filesSeen: UInt64
     public var bytesReclaimable: UInt64
     /// Path entries across the findings emitted so far, not findings. Rises
-    /// by a finding's entry count in the same step that emits that finding.
+    /// by a finding's entry count in the same step that emits that finding,
+    /// and by one for a finding that carries no entries (C5), where the
+    /// finding is itself the item.
     public var itemCount: UInt32
     public static let zero: ScanCounters
 }
@@ -324,6 +326,13 @@ public enum GleamModule: String, Codable, Sendable, CaseIterable {
 
 ### C5. Finding
 
+Amended 2026-08-11 in s3c: a finding may carry no path entries, and
+the categories that carry none are named exactly. Adds the Performance
+category `maintenanceTask`, without which s3c has no finding to emit,
+and the preselection rule for tasks that clear user visible data. Both
+clauses are below; neither changes the stored shape of an existing
+finding, so nothing migrates.
+
 Amended 2026-08-09 in s2e: a finding is a bounded batch, not a whole
 category. See the second migration note after this contract.
 
@@ -337,8 +346,21 @@ note after this contract lists the existing test pins that change.
 /// is a Finding.
 ///
 /// Guarantees:
-/// - `entries` is never empty. Every entry's path is inspectable in the UI
-///   down to the full path string (mono type token).
+/// - `entries` is empty exactly for the categories that name no file,
+///   and never empty for any other. Today the exception is one
+///   category, `maintenanceTask` (C7, C23): a maintenance finding names
+///   a task the machine performs, not files it removes, so there is no
+///   path to itemise. Any further Performance category added later
+///   joins the exception, because no Performance finding names a path
+///   (C23).
+/// - The exception is deliberate and load bearing, not an oversight. A
+///   Performance finding that carried a path would be one careless plan
+///   builder away from becoming a file removal. With no path to expand,
+///   "no PerformanceEngine plan ever contains a file removal" (C23) is
+///   a structural property of the data rather than a rule somebody has
+///   to keep obeying, and it holds for code nobody has written yet.
+/// - Every entry of every other finding is inspectable in the UI down
+///   to the full path string (mono type token).
 /// - A finding is a bounded unit of review, never a whole category. Every
 ///   finding a scan emits carries at most
 ///   `ScanStreamPolicy.maximumFindingEntries` entries (C15), so one category
@@ -354,6 +376,17 @@ note after this contract lists the existing test pins that change.
 /// - `byteSize` and `paths` are pure derivations of `entries`: byteSize is
 ///   the sum of allocatedBytes over entries, paths is the entries' paths in
 ///   entry order. There are no stored copies to drift.
+/// - The derivation needs no special case for a finding with no
+///   entries, and reads correctly for one: `paths` is empty and
+///   `byteSize` is the empty sum, zero. Zero here is an exact promise,
+///   not a missing measurement. The task reclaims nothing because it
+///   removes nothing, so nothing may read the zero as unknown,
+///   substitute an estimate for it, or drop such a finding from a byte
+///   total on the grounds that its size has not been computed yet.
+/// - A finding with no entries counts as one item toward
+///   `ScanCounters.itemCount` (C4): the finding is its own item.
+///   Counting its entries instead would report five maintenance rows
+///   as zero items.
 /// - Byte totals derive from the finding's own entries, at scan, review and
 ///   plan time alike. A finding is self contained; no process wide cache
 ///   carries sizes from scan to plan. (Retired invariant: the s2b
@@ -366,6 +399,19 @@ note after this contract lists the existing test pins that change.
 ///   risk is `.safe`. Protection malware and adware findings are preselected
 ///   (quarantine is reversible). Privacy cleanup findings are never
 ///   preselected. Leftover sweep findings are never preselected.
+/// - A finding that clears user visible data is never preselected,
+///   whatever its risk. Concretely: `isPreselected` is false for any
+///   finding whose selection would run a `MaintenanceTask` whose
+///   `clearsUserVisibleData` is true (C7). Risk `.safe` describes what
+///   the task does to the machine, not what the person loses, so safe
+///   alone does not license preselection here and this rule overrides
+///   it. Preselection is consent inferred from somebody having read the
+///   row, and a preselected finding is swept into the Full Sweep
+///   performance boost job (C29) and planned without its row ever being
+///   opened, so the warning C23 requires before such a task runs would
+///   never be seen. The rule is stated over the flag rather than over
+///   today's task list, so a task added later inherits it with no
+///   further amendment.
 /// - For `duplicateSet` and `similarPhotoSet`, `keptPath` is a member of
 ///   `paths` and `entries.count >= 2`. The kept copy is shown before
 ///   anything moves and no plan ever targets it (see C21).
@@ -419,6 +465,8 @@ public enum FindingCategory: Codable, Sendable, Equatable, Hashable {
     case orphanedLeftover
     // Disk Map
     case diskMapSelection
+    // Performance
+    case maintenanceTask(task: MaintenanceTask)
 }
 ```
 
@@ -561,6 +609,12 @@ public struct ExecutionReport: Codable, Sendable, Equatable {
 /// - `clearsUserVisibleData` is true for any task whose effect a user can
 ///   notice as lost data (the Domain Name System cache flush). The UI must
 ///   say so before running such a task.
+/// - The flag, not a list of task names, is what every rule about these
+///   tasks is stated over, so a case added to this enum inherits those
+///   rules by setting it. Two of them bind now: such a task is never
+///   preselected (C5, C23) and never runs inside a Full Sweep (C29).
+///   The warning is the point of the flag, and a task selected on
+///   somebody's behalf is a task whose warning was never read.
 /// - Tasks are idempotent: running one twice is safe and equivalent to once.
 public enum MaintenanceTask: String, Codable, Sendable, CaseIterable, Equatable {
     case flushDomainNameSystemCache
@@ -958,9 +1012,10 @@ public enum FileSystemError: Error, Sendable, Equatable {
 ///   scans what the user domain allows and reports what it skipped through
 ///   `ScanEvent.degraded`, so the honest banner has real content.
 /// - `plan` includes only selected findings, expands each finding into one
-///   operation per path, never emits an operation for a denylisted path,
-///   and chooses operation kinds per module contract (C20 to C29) and
-///   `context.settings.deletionMode`.
+///   operation per path (or into exactly one operation for a finding that
+///   carries no path entries, C5 and C23), never emits an operation for a
+///   denylisted path, and chooses operation kinds per module contract
+///   (C20 to C29) and `context.settings.deletionMode`.
 /// - `plan` throws `PlanningError` rather than producing a partial plan.
 public protocol GleamEngine: Sendable {
     var module: GleamModule { get }
@@ -992,6 +1047,13 @@ public enum ScanEvent: Sendable {
 
 public enum PlanningError: Error, Sendable, Equatable {
     case emptySelection
+    /// The identifier of the OFFENDING FINDING, never of the session it
+    /// came from. The error is named for the finding, and a caller
+    /// reconciling a refusal needs to know which finding to drop, which
+    /// the session identifier cannot tell them. Every engine carries the
+    /// same identifier here; two carried the finding and one the session
+    /// before this was written down, and nothing failed either way, which
+    /// is exactly why it is stated rather than left to each engine.
     case findingFromDifferentSession(UUID)
     case keptCopyMissing(findingID: UUID)
 }
@@ -1472,6 +1534,21 @@ public struct DiskMapNode: Sendable, Equatable {
 ///   enabled false. Disable, never delete: no PerformanceEngine plan ever
 ///   contains a file removal operation. A test asserts this over the whole
 ///   generated plan space.
+/// - A Performance finding never names a path. Every finding this
+///   engine emits carries no path entries (C5): a maintenance finding
+///   names a task, a login item finding names a registration. So there
+///   is nothing for a plan builder to turn into a removal, which is
+///   what makes the clause above structural rather than a promise, and
+///   `plan` emits one operation per selected finding rather than one
+///   per path (C15).
+/// - A maintenance task whose `clearsUserVisibleData` is true (C7) is
+///   never preselected, whatever its risk. Maintenance findings sit at
+///   risk `.safe`, which would otherwise permit preselection; this rule
+///   overrides it (C5). A preselected finding is swept into the Full
+///   Sweep performance boost job (C29) and planned without its row
+///   being opened, so the person would never see the warning the clause
+///   below requires. The rule binds any task that clears user visible
+///   data, not only today's Domain Name System cache flush.
 /// - Tasks that clear user visible data are flagged per C7 and the finding
 ///   explanation says what will be cleared before the user runs it.
 public struct PerformanceEngine: GleamEngine { /* module == .performance */ }
@@ -1695,6 +1772,19 @@ public enum YaraError: Error, Sendable, Equatable {
 /// - The combined review supports deselection per finding, and `plan`
 ///   produces one combined OperationPlan whose operations preserve each
 ///   underlying engine's plan invariants (C20, C21, C23).
+/// - Full Sweep never selects what an engine did not preselect. The
+///   combined review starts from each finding's own `isPreselected`
+///   (C5) and offers deselection only. The orchestrator holds no
+///   preselection policy of its own, so it cannot widen one, and that
+///   is what stops the sweep reintroducing from its end what C5 and
+///   C23 forbid at the engine's end.
+/// - No plan this orchestrator produces contains a `runMaintenance`
+///   operation whose task has `clearsUserVisibleData` true (C7). A Full
+///   Sweep runs without anybody opening a single row, so a task that
+///   needs its warning read is unreachable here by construction, and it
+///   stays available in the Performance module where the warning is
+///   shown. A test asserts this over the whole generated plan space,
+///   not over the selection path alone.
 public protocol FullSweepOrchestrating: Sendable {
     func scan(_ context: ScanContext) -> AsyncThrowingStream<FullSweepEvent, Error>
     func plan(selection: [Finding], context: PlanContext) throws -> OperationPlan
@@ -3113,3 +3203,12 @@ These span boundaries and get their own always true tests:
   GleamDesign.
 - Counters shown to the user only count up during a scan (C4), and phases
   only advance (C4).
+- Nothing that clears user visible data is ever preselected, and nothing
+  that clears it is reachable from a scan nobody opened. The rule is
+  stated over `MaintenanceTask.clearsUserVisibleData` (C7) rather than
+  over a list of tasks, so a task added later inherits it: the engine
+  never preselects such a finding (C5, C23), and no Full Sweep plan ever
+  contains one (C29). Preselection is consent inferred from somebody
+  having read the row, so a warning that exists to be read cannot sit
+  behind a row that is never opened. Four contracts carry a piece of
+  this, which is why it is written here as well.

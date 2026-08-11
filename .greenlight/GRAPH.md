@@ -436,13 +436,24 @@ they were done alongside.
   is refused.
 
 ### s3c. maintenance
-- Contracts: C23 (maintenance portion), first real helper consumer.
+- Contracts: C23 (maintenance portion), first real helper consumer;
+  amends C5 (a maintenance finding carries no path entries, plus the
+  `maintenanceTask` category), C4 (itemCount for a pathless finding),
+  C7, C15 and C29.
 - Depends on: s3b, s1g.
 - Verification: each maintenance task runs through the helper and is
   idempotent; tasks that clear user visible data say so before running; no
-  PerformanceEngine plan ever contains a file removal operation.
-- Tier: verify. Human check: run the Domain Name System cache flush and
-  confirm the warning sentence appears first.
+  PerformanceEngine plan ever contains a file removal operation; a
+  maintenance finding carries no path entries, so its `paths` is empty
+  and its `byteSize` is zero, asserted over every MaintenanceTask case
+  and over the whole generated plan space rather than over the tasks a
+  test happens to name; no finding whose task has `clearsUserVisibleData`
+  true is ever preselected and no Full Sweep plan ever contains one,
+  asserted over the flag so a task added later is covered without a new
+  test.
+- Tier: verify. Human check: the Domain Name System cache flush arrives
+  deselected, and running it deliberately shows the warning sentence
+  first.
 
 ### s3d. login items
 - Contracts: C24, C23 (login item portion). LaunchItemID and LaunchItemChange

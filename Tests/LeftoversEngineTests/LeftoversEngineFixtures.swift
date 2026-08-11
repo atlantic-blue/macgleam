@@ -33,6 +33,7 @@ enum LeftoversFixture {
   static let downloadsFolder = path("/Users/test/Downloads")
 
   static let sessionID = uuid(0xC1)
+  static let foreignSessionID = uuid(0xC2)
 
   static func uuid(_ suffix: UInt8) -> UUID {
     UUID(uuidString: String(format: "00000000-0000-0000-0000-0000000000%02X", suffix))!
