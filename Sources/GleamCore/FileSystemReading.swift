@@ -15,6 +15,11 @@ public protocol FileSystemReading: Sendable {
   ) -> AsyncThrowingStream<EnumerationEvent, Error>
 
   func metadata(at path: AbsolutePath) async throws -> FileRecord
+  /// The file's permission mode, exact: the three permission triples plus
+  /// setuid, setgid and the sticky bit, never the file type bits. The
+  /// SafetyNet store snapshots this value and restores it bit for bit, so an
+  /// unreadable mode throws rather than defaulting.
+  func posixPermissions(at path: AbsolutePath) async throws -> UInt16
   /// Reads at most maxBytes. Used by hashing and YARA scanning.
   func readData(at path: AbsolutePath, maxBytes: UInt64) async throws -> Data
   func extendedAttributes(at path: AbsolutePath) async throws -> [String: Data]

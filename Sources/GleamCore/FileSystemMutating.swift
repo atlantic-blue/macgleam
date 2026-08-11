@@ -13,6 +13,11 @@ public protocol FileSystemMutating: Sendable {
   func move(_ source: AbsolutePath, to destination: AbsolutePath) async throws
   func delete(_ path: AbsolutePath) async throws
   func createDirectory(at path: AbsolutePath) async throws
+  /// Replaces the file's contents whole, creating it when absent, and
+  /// atomically: a reader sees the previous contents or the new contents and
+  /// never a prefix. Writes a file and only a file, so a missing parent
+  /// directory throws `notFound` rather than growing a tree.
+  func writeData(_ data: Data, to path: AbsolutePath) async throws
   func setPosixPermissions(_ mode: UInt16, at path: AbsolutePath) async throws
   func setExtendedAttributes(_ attributes: [String: Data], at path: AbsolutePath) async throws
 }

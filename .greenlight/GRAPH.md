@@ -570,14 +570,43 @@ they were done alongside.
 ## M4. Applications
 
 ### s4a. safety net store
-- Contracts: C18 in full.
+- Contracts: C18 in full. Amends C13 (adds `posixPermissions(at:)`, without
+  which the store is required to restore a mode it cannot read), C14 (adds
+  `writeData(_:to:)`, without which the manifest cannot be written through the
+  injected file system at all), C8 (`FileMetadataSnapshot` loses
+  `ownerAccountName`, which nothing could read, write or restore) and C18
+  itself on five points: the expiry boundary, the purge byte basis, restored
+  items and purging, `restoreGroup` on an unknown group, and the manifest as a
+  requirement rather than an implementation detail.
 - Depends on: s1b.
 - Verification: store strips execute permission and preserves extended
   attributes; restore reinstates path, permissions, attributes and dates
-  exactly (fidelity asserted attribute by attribute); an occupied origin
-  refuses and changes nothing; group restore is all or nothing; expiry marks
-  eligibility only and purge demands matching counts; the manifest survives
-  simulated app removal and reinstall.
+  exactly (fidelity asserted attribute by attribute), including modes
+  `FileRecord.isExecutable` cannot tell apart, so 0o755 and 0o700 each come
+  back as themselves and a 0o600 payload does not return as 0o644; an occupied
+  origin refuses and changes nothing; group restore is all or nothing;
+  `restoreGroup` throws `groupNotFound` for an identifier no item carries and
+  `alreadyRestored` for a group whose items have all been restored, and
+  neither moves anything; expiry marks eligibility only and purge demands
+  matching counts; an item whose `expiresAt` equals the instant asked about is
+  eligible, asserted at the instant itself and not only one second either side
+  of it, which is the case the suite as first written left open; a purge whose
+  `byteTotal` is the allocated total of the stored payloads is accepted and
+  one a byte out is refused, with a directory payload counted as its subtree
+  total; a restored item never appears in `purgeEligibleItems` whatever its
+  dates, and purging one throws `alreadyRestored` and changes nothing; `purge`
+  rejects an unknown or restored identifier before it looks at the counts, so
+  a caller with both problems is told about the identifiers first; the
+  manifest is readable through the same file system at a path inside the store
+  directory, and a second store constructed over that file system and that
+  directory lists everything the first one wrote, which is the reinstall
+  survival guarantee in its testable form; the manifest survives simulated app
+  removal and reinstall. The two file system additions join s1b's shared
+  conformance suite, real implementation and fake alike: a permission mode
+  reads back exactly and an absent path throws rather than defaulting; a write
+  replaces contents whole, is visible through C13 immediately, and throws
+  `notFound` for a missing parent instead of creating one. The surface split
+  test gains both on their own side, reading and writing.
 - Tier: auto.
 
 ### s4b. app inventory
@@ -777,3 +806,15 @@ is one edit, not an archaeology dig.
     2026-08-09: surviving reinstall is a goal. The trial start lives in
     Application Support beside the SafetyNet manifest, which already
     carries the reinstall survival requirement.
+11. Restoring an item that needs privilege. C18's `restore` moves a payload
+    back to its origin through the file system the store was constructed
+    with. An item quarantined from a system domain path was moved in by the
+    helper (C30's `safetyNetStore` destination) and cannot be moved back by
+    the user process, and no `HelperRequest` restores anything. Typed:
+    nothing, because nothing yet stores such an item. s5b is where a malware
+    finding outside the user domain first reaches the store, and it needs
+    either a restore request on the helper contract (version 3) or a rule
+    that the store only ever holds what the user process can move. Ownership
+    rides on the same decision: C8 dropped `ownerAccountName` in s4a because
+    nothing could read it, write it or restore it, and privileged restore is
+    the change that would bring all three back at once.

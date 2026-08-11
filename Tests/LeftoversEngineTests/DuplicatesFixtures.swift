@@ -117,6 +117,12 @@ struct DuplicatesFakeFileSystem: FileSystemReading {
     throw FileSystemError.notFound(path)
   }
 
+  func posixPermissions(at path: AbsolutePath) async throws -> UInt16 {
+    if filesByPath[path] != nil { return 0o644 }
+    if directoryIDs[path] != nil { return 0o755 }
+    throw FileSystemError.notFound(path)
+  }
+
   func readData(at path: AbsolutePath, maxBytes: UInt64) async throws -> Data {
     guard let file = filesByPath[path] else {
       if directoryIDs[path] != nil {

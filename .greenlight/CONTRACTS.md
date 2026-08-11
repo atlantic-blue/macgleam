@@ -653,6 +653,16 @@ public enum MaintenanceTask: String, Codable, Sendable, CaseIterable, Equatable 
 
 ### C8. SafetyNetItem
 
+Amended 2026-08-11 in s4a: `FileMetadataSnapshot` loses `ownerAccountName`.
+Nothing can read it (C13 offers no owner accessor) and nothing can write it
+(C14 offers no owner setter, and changing a file's owner to another account
+needs root, which this store does not have), so the field could only ever hold
+nil inside a struct documented as everything restore fidelity needs. A promise
+nothing can keep is worse than a smaller promise, so the snapshot now carries
+exactly what restore reinstates. The reversal is cheap on the day privileged
+restore exists (GRAPH.md open question 11). The migration note after this
+contract lists the source level costs.
+
 ```swift
 /// One quarantined or archived file in the SafetyNet store.
 ///
@@ -660,9 +670,22 @@ public enum MaintenanceTask: String, Codable, Sendable, CaseIterable, Equatable 
 /// - `expiresAt` is exactly 30 days after `storedAt`. Expiry marks purge
 ///   eligibility only; nothing is ever purged without explicit confirmation
 ///   (C18).
-/// - `metadata` snapshots everything restore fidelity needs: permission
-///   mode, extended attributes, creation and modification dates, owning
-///   account name where resolvable.
+/// - `metadata` snapshots exactly what restore reinstates and nothing more:
+///   permission mode, extended attributes, creation and modification dates.
+///   Every field in the snapshot is a field `restore` puts back (C18), so
+///   restore fidelity is the whole struct rather than a subset somebody has
+///   to keep track of.
+/// - The owning account is deliberately absent. There is no way to read it
+///   (C13) and no way to write it (C14, and changing a file's owner to
+///   another account needs root), and no privileged restore path exists (C30
+///   carries no restore request), so a snapshot field for it could only ever
+///   be nil while sitting in a struct that claims to carry what restore
+///   needs. A restore therefore lands the file owned by whoever ran it, which
+///   for the user domain items this store holds is the account that owned it
+///   before. Ownership joins the promise when privileged restore does, as a
+///   reader, a setter and an optional field added in one change; old manifest
+///   entries would decode as nil, so that is an added property rather than a
+///   data migration.
 /// - `groupID` links the items of one uninstall so they restore as one unit.
 /// - `isRestored` items remain listed (history), are excluded from restore,
 ///   and their stored payload has been moved back, not copied.
@@ -683,13 +706,26 @@ public struct SafetyNetItem: Identifiable, Codable, Sendable, Equatable {
 }
 
 public struct FileMetadataSnapshot: Codable, Sendable, Equatable {
+    /// The mode read through `FileSystemReading.posixPermissions` (C13)
+    /// before the file was moved into the store. Exact, because C18 restores
+    /// exactly this.
     public let posixPermissions: UInt16
-    public let ownerAccountName: String?
     public let extendedAttributes: [String: Data]
     public let created: Date?
     public let modified: Date?
 }
 ```
+
+Migration note for the C8 amendment (s4a). No shipped build has persisted this
+type: the SafetyNet store does not exist yet, so no manifest anywhere holds an
+owning account name and nothing migrates. The source level costs against the
+tree as it stands:
+
+- `FileMetadataSnapshot` loses the stored property and its initialiser
+  parameter.
+- The domain fixture drops its `ownerAccountName` default and the one snapshot
+  built by hand in the C8 suite drops the argument. Neither asserts the field,
+  so no assertion changes.
 
 ### C9. AppInventoryEntry
 
@@ -867,6 +903,17 @@ public struct MotionPreferences: Codable, Sendable, Equatable {
 
 ### C13. FileSystemReading
 
+Amended 2026-08-11 in s4a: adds `posixPermissions(at:)`. The read side had no
+way to observe a permission mode, while C18 requires the SafetyNet store to
+snapshot one before it moves a file and to reinstate exactly that mode on
+restore, so the store was contractually bound to restore a value it had no
+contract visible way to read. `FileRecord.isExecutable` is not that value and
+never was: it is a derived convenience for scanning that collapses every mode
+sharing an execute bit onto one boolean, so 0o755 and 0o700 are the same
+through it and setuid is invisible. Read only, so C13 stays a read only
+protocol and the surface split holds. The migration note after this contract
+lists the source level costs.
+
 ```swift
 /// The read side of the file system. The only view of the disk any engine
 /// ever gets, which is what makes every engine testable against an in memory
@@ -888,6 +935,18 @@ public struct MotionPreferences: Codable, Sendable, Equatable {
 /// - Errors: a directory that cannot be read (permissions) is skipped and
 ///   reported through `EnumerationEvent.inaccessible`, not thrown, so one
 ///   locked folder never sinks a scan. Only volume level failures throw.
+/// - `posixPermissions` returns the twelve meaningful bits of the mode (the
+///   three permission triples plus setuid, setgid and the sticky bit) and
+///   never the file type bits. It is the observation side of C18's restore
+///   fidelity promise, so it is exact by definition: a restore reinstates the
+///   value this method returned, bit for bit. `FileRecord.isExecutable` is a
+///   lossy derivation of the same source, kept because scanning asks only
+///   whether a file can run, and it is never the basis of a restore.
+/// - `posixPermissions` throws for the reasons `metadata` throws, `notFound`
+///   for an absent path and `permissionDenied` for an unreadable parent, and
+///   it never substitutes a default. A mode nobody could read is an error and
+///   not 0o644, because a guessed mode written back onto somebody's file is a
+///   silent permission change.
 /// - Order is not guaranteed and tests must not depend on it.
 public protocol FileSystemReading: Sendable {
     func enumerate(
@@ -896,6 +955,9 @@ public protocol FileSystemReading: Sendable {
     ) -> AsyncThrowingStream<EnumerationEvent, Error>
 
     func metadata(at path: AbsolutePath) async throws -> FileRecord
+    /// The file's permission mode, exact. The only way to observe what C18
+    /// snapshots and restores.
+    func posixPermissions(at path: AbsolutePath) async throws -> UInt16
     /// Reads at most maxBytes. Used by hashing and YARA scanning.
     func readData(at path: AbsolutePath, maxBytes: UInt64) async throws -> Data
     func extendedAttributes(at path: AbsolutePath) async throws -> [String: Data]
@@ -937,7 +999,28 @@ public struct VolumeInfo: Sendable, Equatable {
 }
 ```
 
+Migration note for the C13 amendment (s4a). Adding a method to a protocol
+breaks every conformance at compile time. Nothing is persisted and no format
+changes.
+
+- Both implementations already hold the value the method returns, so neither
+  gains a lookup it was not already making.
+- The in memory implementation's seeding surface needs a way to set a mode
+  directly rather than deriving one from an executable flag. A mode the fake
+  cannot hold is a mode no test can prove restored, which is the whole point
+  of the addition.
+- The shared conformance suite (s1b) gains the method, and the surface split
+  test gains it on the reading side.
+
 ### C14. FileSystemMutating
+
+Amended 2026-08-11 in s4a: adds `writeData(_:to:)`. C18 requires the SafetyNet
+store to persist its manifest through the file system it was constructed with
+rather than through a private path, and the write side offered no way to write
+a byte anywhere: it could move, delete, create directories and set attributes
+only. Without this method that requirement cannot be implemented and the
+reinstall survival guarantee cannot be tested. The migration note after this
+contract lists the source level costs.
 
 ```swift
 /// The write side. Held only by the executor (C17) and the SafetyNet store
@@ -953,6 +1036,16 @@ public struct VolumeInfo: Sendable, Equatable {
 /// - `delete` is permanent and is only reachable from a plan carrying a
 ///   permanent deletion confirmation (enforced in C17, not here; this layer
 ///   stays mechanism).
+/// - `writeData` replaces the whole contents of the destination, creating it
+///   when absent, and it is atomic: a reader through C13 sees the previous
+///   contents or the new contents and never a prefix of the new ones. On any
+///   failure the previous contents are intact. This is what makes a manifest
+///   safe to rewrite on every mutation (C18); a torn manifest is a lost
+///   SafetyNet.
+/// - `writeData` writes a file and only a file. It creates no intermediate
+///   directories and throws `notFound` when the parent is missing, so a
+///   mistyped path cannot quietly grow a tree. `createDirectory` stays the
+///   only way a directory comes into existence.
 /// - All methods throw typed `FileSystemError` values whose messages are
 ///   plain sentences.
 public protocol FileSystemMutating: Sendable {
@@ -960,6 +1053,9 @@ public protocol FileSystemMutating: Sendable {
     func move(_ source: AbsolutePath, to destination: AbsolutePath) async throws
     func delete(_ path: AbsolutePath) async throws
     func createDirectory(at path: AbsolutePath) async throws
+    /// Replaces the file's contents whole and atomically. The manifest of
+    /// C18 is written with this and nothing else.
+    func writeData(_ data: Data, to path: AbsolutePath) async throws
     func setPosixPermissions(_ mode: UInt16, at path: AbsolutePath) async throws
     func setExtendedAttributes(_ attributes: [String: Data], at path: AbsolutePath) async throws
 }
@@ -974,6 +1070,25 @@ public enum FileSystemError: Error, Sendable, Equatable {
     case ioFailure(AbsolutePath, description: String)
 }
 ```
+
+Migration note for the C14 amendment (s4a). Adding a method to a protocol
+breaks every conformance at compile time. Nothing is persisted and no wire
+format changes.
+
+- The disk implementation writes to a temporary file in the destination's own
+  directory and renames it into place, which is where the atomicity comes
+  from. A temporary file on another volume would be a copy, not a rename, and
+  would defeat the guarantee.
+- The in memory implementation replaces the node's contents, creates the node
+  when absent, and throws `notFound` when the parent directory is not there,
+  so the fake refuses the same mistyped path the disk refuses. A fake looser
+  than the real thing manufactures a green suite over a broken write.
+- The helper's own implementation gains the method. It is reachable from no
+  `HelperRequest`, so the message set does not change and
+  `HelperContract.version` does not move.
+- The shared conformance suite (s1b) gains it: write, read back through C13,
+  overwrite, read back again, and a write into a missing directory that throws
+  rather than creating one.
 
 ### C15. GleamEngine
 
@@ -1312,27 +1427,104 @@ public enum ExecutionRefusal: Sendable, Equatable {
 
 ### C18. SafetyNetStoring
 
+Amended 2026-08-11 in s4a: five points the suite could not test as written,
+each a decision rather than a clarification. The expiry boundary is inclusive.
+`PurgeConfirmation.byteTotal` gets a basis, the allocated bytes of the stored
+payloads read through C13, which is C6's basis. A restored item is not purge
+eligible and purging one is an error. `restoreGroup` on an identifier naming
+nothing to restore is an error, and `SafetyNetError` gains `groupNotFound` for
+it. The manifest is persisted through the injected file system as a
+requirement of this contract, which is what makes the reinstall survival
+clause testable and what `writeData` was added to C14 for. The store's
+construction is stated with it, because every one of those clauses is about
+the file system and the directory the store was handed. The migration note
+after this contract lists the costs.
+
 ```swift
 /// The quarantine and archive store. Reversibility is the trust feature;
 /// this contract is where it lives.
+///
+/// The store is constructed with a `FileSystem` (C13 and C14 together) and
+/// one store directory. Everything it reads and writes, payloads and manifest
+/// alike, goes through that file system and lives under that directory. It
+/// holds no second path and no private handle.
 ///
 /// Guarantees:
 /// - `store` moves the file into the store (never copies and deletes as two
 ///   visible steps), snapshots metadata per C8, strips execute permissions
 ///   on the stored payload so quarantined malware cannot run, and preserves
-///   extended attributes for restore fidelity.
+///   extended attributes for restore fidelity. The snapshotted mode is what
+///   C13's `posixPermissions` returns for the origin path before the move,
+///   read exactly. Stripping execute changes the stored payload and never the
+///   snapshot, so the mode restore puts back is the mode the file had.
 /// - `restore` reinstates the payload at its origin path with its original
-///   permission mode, extended attributes and dates. If the origin path is
-///   now occupied it throws `originOccupied` and changes nothing.
+///   permission mode, extended attributes and dates. The mode is the
+///   snapshotted value bit for bit, never one inferred from
+///   `FileRecord.isExecutable`, which cannot tell 0o755 from 0o700. If the
+///   origin path is now occupied it throws `originOccupied` and changes
+///   nothing.
 /// - `restoreGroup` restores every unrestored item of the group or throws
 ///   before moving anything if any origin is occupied; an uninstall restores
 ///   as one unit or not at all.
+/// - `restoreGroup` on an identifier that names nothing to restore is an
+///   error and never a quiet success: `groupNotFound` when no item carries
+///   the identifier at all, `alreadyRestored` naming the group when the group
+///   exists and every item in it has already been restored. A caller reads a
+///   success as its uninstall being back on disk, so nothing may answer that
+///   way without having moved a file.
 /// - Retention: items become purge eligible 30 days after storage. Nothing
 ///   is purged automatically. `purge` requires a confirmation whose counts
 ///   match the items being purged, mirroring C6.
-/// - Reinstall survival: the manifest and payloads live in Application
-///   Support. Deleting and reinstalling the app then listing items returns
-///   the same items. This is a tested behaviour, not a hope.
+/// - The expiry boundary is inclusive. An item is purge eligible when the
+///   instant asked about is at or after its `expiresAt`, so
+///   `purgeEligibleItems(asOf:)` returns an item whose `expiresAt` equals
+///   that instant exactly. `expiresAt` is the moment the 30 days are up, and
+///   an item that is not yet expired at the instant it expires would make the
+///   field name a lie. Eligibility is not removal: the confirmation still
+///   gates the purge, so the inclusive edge costs nobody a file.
+/// - `PurgeConfirmation.byteTotal` is the sum, over the items named in the
+///   purge, of the allocated bytes their stored payloads occupy, read through
+///   C13 when the confirmation is built: the allocated size of a file, the
+///   subtree allocated total of a directory. The same basis as C6's
+///   `totalBytes` and C5's entries, allocated never logical, so one number
+///   means one thing across the app and the figure in the confirmation is the
+///   figure the volume gets back. `itemCount` is the number of identifiers in
+///   the purge. Nothing is apportioned or estimated, and a payload whose size
+///   cannot be read fails the purge rather than counting as zero.
+/// - A restored item is outside the purge story entirely. Its payload has
+///   already moved back to its origin, so the store holds nothing to reclaim
+///   for it: `purgeEligibleItems` never returns one whatever its dates say,
+///   and `purge` throws `alreadyRestored` naming the first restored
+///   identifier and changes nothing. A silent success would let a caller
+///   believe it reclaimed space that was not there, and there is no honest
+///   byte total it could have been shown to confirm.
+/// - `purge` validates in a fixed order and changes nothing until all of it
+///   passes: every identifier exists (`itemNotFound`), none is restored
+///   (`alreadyRestored`), then the confirmation matches
+///   (`confirmationMismatch`). The counts come last because a total computed
+///   over a set the store has already rejected means nothing, and a caller
+///   told its arithmetic was wrong would go and correct the arithmetic.
+/// - `SafetyNetError`'s identifier payloads name an item, except in the two
+///   cases that are about a group, `groupNotFound` and an `alreadyRestored`
+///   thrown by `restoreGroup`, where they name the group. Every throw site is
+///   named in the guarantee that raises it, so which one a case carries is
+///   never left to be inferred.
+/// - Reinstall survival: the manifest and payloads live under the store
+///   directory, which the app locates in Application Support so it outlives
+///   the application bundle. Deleting and reinstalling the app then listing
+///   items returns the same items. This is a tested behaviour, not a hope.
+/// - The manifest is persisted through the injected file system, at a path
+///   inside the store directory. That is a requirement of this contract and
+///   not an implementation detail, because it is what makes the clause above
+///   testable: a second store constructed over the same file system and the
+///   same directory lists everything the first one wrote, and a deleted and
+///   reinstalled app is exactly that. A store keeping its manifest somewhere
+///   the injected file system cannot see would satisfy every other clause
+///   here, lose a user's quarantine on reinstall, and no test could say so.
+/// - The manifest is written whole with C14's `writeData`, atomically, after
+///   every mutation that changes it, so an interrupted store, restore or
+///   purge leaves a readable manifest describing either the state before it
+///   or the state after it.
 /// - The store refuses to store a path the denylist blocks (defence in
 ///   depth; such a path should never reach it).
 /// - All mutations are serialised within the store (it is an actor or
@@ -1353,7 +1545,10 @@ public protocol SafetyNetStoring: Sendable {
 }
 
 public struct PurgeConfirmation: Codable, Sendable, Equatable {
+    /// The number of identifiers in the purge.
     public let itemCount: UInt32
+    /// The allocated bytes the purge reclaims, on C5's and C6's basis. See
+    /// the guarantee above for how it is computed and when it is read.
     public let byteTotal: UInt64
     public let confirmedAt: Date
 }
@@ -1361,11 +1556,30 @@ public struct PurgeConfirmation: Codable, Sendable, Equatable {
 public enum SafetyNetError: Error, Sendable, Equatable {
     case originOccupied(AbsolutePath)
     case itemNotFound(UUID)
+    /// No item carries this group identifier. Names a group.
+    case groupNotFound(UUID)
+    /// The item has already been restored, or, from `restoreGroup`, every
+    /// item of the group has. Names an item in the first case and a group in
+    /// the second; the guarantee that raises it says which.
     case alreadyRestored(UUID)
     case confirmationMismatch
     case denylistedPath(AbsolutePath)
 }
 ```
+
+Migration note for the C18 amendment (s4a). No implementation of
+`SafetyNetStoring` exists and no manifest has ever been written, so nothing
+migrates. The costs land in the slice being written now:
+
+- `SafetyNetError` gains a case, so an exhaustive switch over it gains an arm.
+  None exists yet outside the s4a suite.
+- The store's construction takes a store directory as well as a file system.
+  A test supplies a temporary directory inside the in memory file system;
+  Application Support is where the app supplies it, not where the contract
+  puts it.
+- The suite's expiry cases sit one second either side of `expiresAt`, so they
+  assert neither boundary. The inclusive instant needs a case of its own
+  (GRAPH.md s4a).
 
 ### C19. RuleCatalogProviding
 

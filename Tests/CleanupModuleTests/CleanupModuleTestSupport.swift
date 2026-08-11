@@ -239,6 +239,11 @@ final class RefusingFileSystem: FileSystemReading, @unchecked Sendable {
     throw RefusedFileSystemAccess()
   }
 
+  func posixPermissions(at path: AbsolutePath) async throws -> UInt16 {
+    refuse("posixPermissions")
+    throw RefusedFileSystemAccess()
+  }
+
   func readData(at path: AbsolutePath, maxBytes: UInt64) async throws -> Data {
     refuse("readData")
     throw RefusedFileSystemAccess()

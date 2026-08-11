@@ -1,21 +1,24 @@
 import Foundation
 
+/// Exactly what a restore reinstates and nothing more. The owning account is
+/// deliberately absent: nothing can read it and nothing can write it without
+/// root, so a field for it could only ever be nil inside a struct that claims
+/// to carry what restore needs.
 public struct FileMetadataSnapshot: Codable, Sendable, Equatable {
+  /// The mode read before the file moved into the store, exact, because a
+  /// restore reinstates this value bit for bit.
   public let posixPermissions: UInt16
-  public let ownerAccountName: String?
   public let extendedAttributes: [String: Data]
   public let created: Date?
   public let modified: Date?
 
   public init(
     posixPermissions: UInt16,
-    ownerAccountName: String?,
     extendedAttributes: [String: Data],
     created: Date?,
     modified: Date?
   ) {
     self.posixPermissions = posixPermissions
-    self.ownerAccountName = ownerAccountName
     self.extendedAttributes = extendedAttributes
     self.created = created
     self.modified = modified

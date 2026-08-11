@@ -207,6 +207,12 @@ extension DiskFileSystem: FileSystemReading {
       lastOpened: Self.date(from: status.st_atimespec))
   }
 
+  public func posixPermissions(at path: AbsolutePath) async throws -> UInt16 {
+    var status = stat()
+    guard lstat(path.value, &status) == 0 else { throw Self.posixError(errno, at: path) }
+    return UInt16(status.st_mode & 0o7777)
+  }
+
   public func readData(at path: AbsolutePath, maxBytes: UInt64) async throws -> Data {
     guard FileManager.default.fileExists(atPath: path.value) else {
       throw FileSystemError.notFound(path)
@@ -345,6 +351,30 @@ extension DiskFileSystem: FileSystemMutating {
         atPath: path.value, withIntermediateDirectories: true)
     } catch {
       throw Self.cocoaError(error, at: path)
+    }
+  }
+
+  /// Writes a temporary file in the destination's own directory and renames it
+  /// into place. The rename is where the atomicity comes from, so the
+  /// temporary file must share the destination's volume.
+  public func writeData(_ data: Data, to path: AbsolutePath) async throws {
+    guard let parent = path.parent else { throw FileSystemError.destinationOccupied(path) }
+    var parentIsDirectory: ObjCBool = false
+    let parentExists = FileManager.default.fileExists(
+      atPath: parent.value, isDirectory: &parentIsDirectory)
+    guard parentExists, parentIsDirectory.boolValue else {
+      throw FileSystemError.notFound(parent)
+    }
+    let temporary = parent.value + "/.\(path.lastComponent).macgleam-\(UUID().uuidString)"
+    do {
+      try data.write(to: URL(fileURLWithPath: temporary))
+    } catch {
+      throw Self.cocoaError(error, at: path)
+    }
+    guard rename(temporary, path.value) == 0 else {
+      let failure = Self.posixError(errno, at: path)
+      unlink(temporary)
+      throw failure
     }
   }
 

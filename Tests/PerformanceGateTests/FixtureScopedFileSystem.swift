@@ -54,6 +54,10 @@ struct FixtureScopedDiskFileSystem: FileSystemReading {
     try await disk.metadata(at: path)
   }
 
+  func posixPermissions(at path: AbsolutePath) async throws -> UInt16 {
+    try await disk.posixPermissions(at: path)
+  }
+
   func readData(at path: AbsolutePath, maxBytes: UInt64) async throws -> Data {
     try await disk.readData(at: path, maxBytes: maxBytes)
   }

@@ -113,3 +113,16 @@ gets its own entry pointing at the one it supersedes.
   palette and its prose disagree, the prose wins, because it is the part that
   says what a colour is for. Status: locked.
 
+- 2026-08-11. Removed `ownerAccountName` from the file metadata snapshot,
+  which shrinks a stated promise and is why it is recorded here. Restore
+  fidelity claimed to reinstate a file's owning account, and nothing could
+  keep that claim: the reading contract had no accessor for it, the mutating
+  contract had no setter, and no privileged request moves a root owned file
+  back out of the store. So the field would have been nil forever inside a
+  structure documented as everything a restore needs. A promise nothing can
+  keep is worse than a smaller promise kept exactly, because the first is
+  discovered by whoever relies on it. Re-adding it later is an optional
+  property whose existing entries decode as nil, so this reverses in a line
+  rather than a migration. Ownership rides on the same decision as privileged
+  restore, recorded as open question 11 in GRAPH.md and opening at s5b.
+  Status: locked, revisit with privileged restore.
