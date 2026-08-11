@@ -326,6 +326,13 @@ public enum GleamModule: String, Codable, Sendable, CaseIterable {
 
 ### C5. Finding
 
+Amended 2026-08-11 in s3d: the pathless exception is stated over the
+Performance module rather than over a list of categories, and the new
+Performance category `launchItem` joins it. Adds that category to
+`FindingCategory`. Neither clause changes the stored shape of an existing
+finding, so nothing migrates; the source level cost of the new case is in
+C24's migration note.
+
 Amended 2026-08-11 in s3c: a finding may carry no path entries, and
 the categories that carry none are named exactly. Adds the Performance
 category `maintenanceTask`, without which s3c has no finding to emit,
@@ -347,12 +354,29 @@ note after this contract lists the existing test pins that change.
 ///
 /// Guarantees:
 /// - `entries` is empty exactly for the categories that name no file,
-///   and never empty for any other. Today the exception is one
-///   category, `maintenanceTask` (C7, C23): a maintenance finding names
-///   a task the machine performs, not files it removes, so there is no
-///   path to itemise. Any further Performance category added later
-///   joins the exception, because no Performance finding names a path
-///   (C23).
+///   and never empty for any other. The rule is stated over the module,
+///   not over a list of cases: no Performance finding names a path
+///   (C23), so every Performance category is pathless, and a category
+///   added to that module inherits the exception with no further
+///   amendment here. Today the Performance categories are
+///   `maintenanceTask` (C7, C23), which names a task the machine
+///   performs rather than files it removes, and `launchItem` (C24,
+///   C23), which names a registration to disable rather than a file to
+///   delete. No category of any other module is pathless.
+/// - A launch item does have a path, and it never travels as a finding
+///   entry. `LaunchItem.path` (C24) exists so the row can be revealed in
+///   Finder, and it stays on the item. A `PathEntry` is a removal target
+///   and a byte source, and a launch item is neither: disabling a
+///   registration reclaims nothing and removes nothing. So the pathless
+///   rule is about what a finding offers for action, not about whether
+///   the module knows where anything lives.
+/// - The test form is an exhaustive switch over `FindingCategory` in the
+///   suite, classifying every case as pathless or path carrying, with a
+///   finding built for each case and asserted against its
+///   classification. A case added later fails to compile until somebody
+///   classifies it. Listing the pathless cases by hand instead would let
+///   a Performance category be added and quietly missed, which is the
+///   one failure this clause exists to prevent.
 /// - The exception is deliberate and load bearing, not an oversight. A
 ///   Performance finding that carried a path would be one careless plan
 ///   builder away from becoming a file removal. With no path to expand,
@@ -467,6 +491,7 @@ public enum FindingCategory: Codable, Sendable, Equatable, Hashable {
     case diskMapSelection
     // Performance
     case maintenanceTask(task: MaintenanceTask)
+    case launchItem(item: LaunchItemID, scope: LaunchItem.Scope)
 }
 ```
 
@@ -1228,6 +1253,10 @@ public struct OwnershipEnvironment: Codable, Sendable, Equatable {
 
 ### C17. PlanExecuting
 
+Amended 2026-08-11 in s3d: launch item operations are handed to C24 rather
+than routed by path ownership, and they carry the plan and the operation as
+attribution. One clause, below.
+
 ```swift
 /// The only component that performs destructive work in the user process.
 /// Routes each operation to the user process file system or to the helper
@@ -1240,6 +1269,17 @@ public struct OwnershipEnvironment: Codable, Sendable, Equatable {
 /// - Before every operation, in this order: denylist check (skip as
 ///   `skippedDenylisted` when blocked), ownership routing (userDomain runs
 ///   in process, systemDomain goes to the helper as a typed request, C30).
+/// - `setLaunchItemEnabled` operations are the exception to that routing,
+///   because a launch item names no path and path ownership has nothing to
+///   decide from. The executor hands every one of them to
+///   `LaunchItemManaging` (C24) carrying
+///   `ChangeAttribution.operation(planID:operationID:)`, and that contract
+///   routes by the item's scope. So the app has one privileged launch item
+///   path rather than one for planned changes and another for a switch in
+///   the interface, and the executor supplies the attribution because it is
+///   the only thing that knows both identifiers. The helper still re checks
+///   the domain itself (C31), so the two enforcement points stay
+///   independent.
 /// - A plan with any `deletePermanently` operation and a missing or
 ///   mismatched `permanentDeletionConfirmation` is refused whole with
 ///   `ExecutionRefusal.permanentDeletionUnconfirmed` before anything runs.
@@ -1556,6 +1596,17 @@ public struct PerformanceEngine: GleamEngine { /* module == .performance */ }
 
 ### C24. LaunchItemManaging
 
+Amended 2026-08-11 in s3d, the slice that implements it. Three changes, all
+of them closing a gap the contract described but gave nothing to stand on.
+Attribution: `setEnabled` requires a `ChangeAttribution`, so a change that
+reaches the privileged boundary can always be tied back to what asked for it,
+including a switch a person flipped outside any plan. Boundaries: the
+inventory source, the two changing sides and the store of prior state are
+declared rather than referred to. Errors: `LaunchItemError` is declared, so
+the `itemNotFound` this contract has always named has a type. The migration
+note after the contract lists the source level costs, including the
+`FindingCategory` case added by C5 in the same slice.
+
 ```swift
 /// Inventory and state changes for login and background items: SMAppService
 /// registrations and legacy launch agents and daemons, per owning app.
@@ -1564,17 +1615,69 @@ public struct PerformanceEngine: GleamEngine { /* module == .performance */ }
 /// - `list` attributes every item to its owning app where the owner is
 ///   resolvable, with the item's kind, scope and current enabled state, and
 ///   the path that can be revealed in Finder.
+/// - `LaunchItemID.value` is opaque. It is built from the label and the
+///   scope so that it is stable across launches, and nothing anywhere takes
+///   it apart again. Everything that needs the scope reads it from the
+///   `LaunchItem`, or from the `launchItem` finding category that carries it
+///   (C5), which is why that category carries a scope that looks redundant
+///   beside the identifier and is not.
 /// - `setEnabled` disables or enables, never deletes, and returns a
 ///   `LaunchItemChange` recording the prior state. The app persists these
-///   records so re enabling is one click and survives relaunch.
+///   records through `LaunchItemChangeRecording` so re enabling is one click
+///   and survives relaunch.
 /// - User scope items change in process; system scope items route through
-///   the helper (C30). The caller does not choose; the implementation
-///   routes by scope.
+///   the helper (C30). The caller does not choose; the implementation routes
+///   by scope, and it reads the scope from the current inventory rather than
+///   from the plan or the view that asked, so a stale caller cannot decide
+///   which side of the privileged boundary a change lands on.
+/// - Every change is attributable, and the type system is what makes it so.
+///   `setEnabled` requires a `ChangeAttribution`; the parameter carries no
+///   default and the type has no case meaning none, so the unattributed call
+///   does not compile. The manager cannot fill it in on the caller's behalf,
+///   because attribution is knowledge only the caller has. The caller cannot
+///   decide it is unnecessary, because the caller does not know the item's
+///   scope and therefore cannot know whether this change is about to cross
+///   the privileged boundary.
+/// - The two callers, and what each supplies. The executor (C17) supplies
+///   `.operation(planID:operationID:)` for a change it is running as part of
+///   a plan, because it is the only thing that knows both identifiers. The
+///   Performance module supplies `.directChange(changeID:)` for a switch a
+///   person flipped in the interface, which belongs to no plan. A direct
+///   change is attributable to itself: the identifier is minted at the
+///   moment of the change and names nothing else, and no plan is fabricated
+///   to carry it. A synthetic single operation plan would put an identifier
+///   in the helper's log that matches no plan the app ever built, which is a
+///   worse answer than no attribution at all, because it reconciles to
+///   something that did not happen.
+/// - On the privileged path the attribution travels to the helper as C30's
+///   `setLaunchItemEnabled` attribution, and the helper echoes it back as
+///   the reply's `correlationID`. So every refusal reconciles with the thing
+///   that caused it: a plan operation for a planned change, the change
+///   itself for a direct one.
 /// - Changing an item that no longer exists throws `itemNotFound` and
-///   changes nothing. For a system scope item that is the helper refusing
-///   `malformedRequest` because it cannot resolve the item (C31); this
-///   contract maps that refusal onto `itemNotFound`, so the caller is told
-///   the item is gone rather than shown a protocol error.
+///   changes nothing. On the user scope path that is the manager failing to
+///   find the item in the current inventory before it attempts anything. On
+///   the system scope path it is the helper refusing `malformedRequest`
+///   because it cannot resolve the item (C31); this contract maps that
+///   refusal onto `itemNotFound`, so the caller is told the item is gone
+///   rather than shown a protocol error.
+/// - Every other helper refusal (denylisted, notSystemDomain,
+///   versionMismatch, identityRejected) surfaces as `changeRefused` with a
+///   plain sentence. Refusal reasons are helper vocabulary and stay in
+///   GleamHelperCore; nothing in GleamCore imports them, which is also why
+///   `LaunchItemError` names none of them.
+///
+/// Boundaries. This contract described behaviour with nothing to hang it on:
+/// it named an inventory, a privileged side and a store of records without
+/// declaring any of them. All four are declared below and the manager holds
+/// them; it discovers, mutates and stores nothing itself.
+/// `LaunchItemEnumerating` is the inventory source.
+/// `UserScopeLaunchItemChanging` and `PrivilegedLaunchItemChanging` are the
+/// two sides the manager routes between. `LaunchItemChangeRecording` is the
+/// store of prior state. The two changing sides are separate protocols
+/// rather than one protocol with a scope property, so a manager built with
+/// two user scope sides does not compile, and the routing test reads as two
+/// test doubles, one of which must stay untouched.
 ///
 /// Types landing ahead of this slice: `LaunchItemID` and `LaunchItemChange`
 /// are plain value types carrying no behaviour, and both ship into GleamCore
@@ -1587,22 +1690,52 @@ public struct PerformanceEngine: GleamEngine { /* module == .performance */ }
 /// change is produced, recorded, persisted or replayed belongs to this
 /// contract's slice; s3a adds none of it and asserts none of it beyond the
 /// round trip through the wire encoding.
+///
+/// `ChangeAttribution` goes the other way. It is declared here because this
+/// is the contract that needs it, and it lands in GleamCore during this
+/// slice, below C30 in the package graph, so GleamHelperCore can carry it on
+/// the wire. GleamCore does not import GleamHelperCore and this does not
+/// change that.
 public protocol LaunchItemManaging: Sendable {
     func list() async throws -> [LaunchItem]
-    func setEnabled(_ enabled: Bool, item: LaunchItemID) async throws -> LaunchItemChange
+    func setEnabled(
+        _ enabled: Bool,
+        item: LaunchItemID,
+        attribution: ChangeAttribution
+    ) async throws -> LaunchItemChange
+}
+
+/// What a change is attributable to. There is no case meaning unknown and no
+/// optional field: which of the two it is, is a fact about how the change was
+/// asked for, recorded at that moment, never inferred afterwards.
+public enum ChangeAttribution: Codable, Sendable, Equatable, Hashable {
+    /// One operation of a plan the executor is running (C6, C17).
+    case operation(planID: UUID, operationID: UUID)
+    /// One change a person made directly in the interface, outside any plan.
+    /// `changeID` is minted at the moment of the change and identifies
+    /// nothing else: no plan carries it and no `ExecutionReport` names it.
+    case directChange(changeID: UUID)
+
+    /// The identifier a reply echoes to tie itself to the request that caused
+    /// it: the operation identifier for a plan operation, the change
+    /// identifier for a direct change. Never nil, so reconciliation needs no
+    /// special case for either kind.
+    public var correlationID: UUID { get }
 }
 
 public struct LaunchItemID: Codable, Sendable, Hashable {
-    public let value: String   // stable identifier: label plus scope
+    public let value: String   // stable identifier: label plus scope, opaque
 }
 
 public struct LaunchItem: Codable, Sendable, Equatable, Identifiable {
-    public enum Kind: String, Codable, Sendable, Equatable {
+    public enum Kind: String, Codable, Sendable, Equatable, Hashable {
         case appService          // SMAppService registration
         case legacyLaunchAgent
         case legacyLaunchDaemon
     }
-    public enum Scope: String, Codable, Sendable, Equatable {
+    /// Hashable because `FindingCategory` is Hashable and now carries a scope
+    /// (C5).
+    public enum Scope: String, Codable, Sendable, Equatable, Hashable {
         case user, system
     }
     public var id: LaunchItemID { identifier }
@@ -1622,7 +1755,91 @@ public struct LaunchItemChange: Codable, Sendable, Equatable {
     public let newEnabled: Bool
     public let changedAt: Date
 }
+
+/// The inventory source. Reads registrations and their current state and
+/// mutates nothing. The manager's `list` is this plus owner resolution.
+public protocol LaunchItemEnumerating: Sendable {
+    func enumerate() async throws -> [LaunchItem]
+}
+
+/// The in process side, for user scope items only. It takes no attribution:
+/// nothing privileged happens here, no log outside this process records it,
+/// and the change it returns is recorded by the manager either way. The
+/// attribution the manager was given is dropped on this path deliberately,
+/// which is why it is absent from the signature rather than ignored in the
+/// body.
+public protocol UserScopeLaunchItemChanging: Sendable {
+    func setEnabled(
+        _ enabled: Bool,
+        item: LaunchItem
+    ) async throws -> LaunchItemChange
+}
+
+/// The privileged side, for system scope items only. Sends C30's
+/// `setLaunchItemEnabled` to the helper and maps the reply onto this
+/// contract's errors. It is the only place in the app that can change a
+/// system scope registration, and it cannot build the request without an
+/// attribution because the request case requires one.
+public protocol PrivilegedLaunchItemChanging: Sendable {
+    func setEnabled(
+        _ enabled: Bool,
+        item: LaunchItem,
+        attribution: ChangeAttribution
+    ) async throws -> LaunchItemChange
+}
+
+/// The store of prior state. Lives in Application Support beside the
+/// SafetyNet manifest, so it survives relaunch, and survives reinstall the
+/// same way the manifest does (C18, C34).
+///
+/// Guarantees:
+/// - `record` is append only. Nothing is deleted or rewritten, so a change a
+///   person later reverses leaves both records.
+/// - `changes` returns the most recent record per item, which is what one
+///   click re enabling needs: a row can say what MacGleam changed and when
+///   without reading a history.
+/// - A missing or corrupt store reads as empty and never as a crash. Losing
+///   the records loses the convenience, never the items, which the inventory
+///   always reports live.
+public protocol LaunchItemChangeRecording: Sendable {
+    func record(_ change: LaunchItemChange) async throws
+    func changes() async throws -> [LaunchItemID: LaunchItemChange]
+}
+
+public enum LaunchItemError: Error, Sendable, Equatable {
+    /// The item is not on the machine any more. On the system scope path this
+    /// is the helper's `malformedRequest` mapped on.
+    case itemNotFound(LaunchItemID)
+    /// The privileged side refused for a reason that is not the item being
+    /// gone. A plain sentence that names no path.
+    case changeRefused(reason: String)
+    /// The helper is unreachable or not registered yet (C17).
+    case privilegedChangeUnavailable(reason: String)
+    /// The change reached the machine and did not take effect.
+    case changeFailed(reason: String)
+}
 ```
+
+Migration note for the C24 amendment (s3d). Three source level costs, none
+behavioural, all landing in this slice.
+
+- `FindingCategory` gains `launchItem` (C5), so every exhaustive switch over
+  it stops compiling until the new case is handled. That is a mechanical
+  break and it is expected: whoever hits it has not found a defect, and the
+  fix is to write the arm. Against the tree as it stands the break does not
+  bite, because the three switch sites over `FindingCategory` outside
+  GleamCore all carry a `default`: `CleanupEngine.isCleanupCategory`,
+  `LeftoversEngine`'s plan builder, and `FindingCategory.cleanupTitle` in
+  `CleanupReviewView`. So the thing to check at those sites is the quieter
+  one. A launch item finding falls into the default arm and renders under the
+  generic title, which is right for a cleanup review screen it never reaches,
+  and wrong anywhere a `default` was standing in for a case nobody had
+  written yet.
+- `LaunchItem.Scope` gains `Hashable`, because `FindingCategory` is Hashable
+  and now carries a scope. `Kind` gains it for symmetry. `LaunchItemID` is
+  already Hashable.
+- `HelperContract.version` goes from 1 to 2 with C30's attribution change, in
+  the same commit, as C30 requires.
 
 ### C25. ProcessMonitoring
 
@@ -1824,6 +2041,16 @@ public struct FullSweepJobOutcome: Codable, Sendable, Equatable {
 
 ### C30. Helper message contract
 
+Amended 2026-08-11 in s3d: `setLaunchItemEnabled` carries a
+`ChangeAttribution` (C24) in place of the plan and operation identifier pair,
+because it is the only request with a caller outside any plan, and every
+reply names a `correlationID` in place of an `operationID` so that caller's
+replies reconcile too. `HelperContract.version` goes to 2 in the same commit,
+as the last guarantee below requires. `remove` and `runMaintenance` are
+unchanged: the executor is their only source, so a plan and an operation
+always exist for them. The migration note after the contract lists the source
+level costs.
+
 ```swift
 /// The complete XPC (inter process communication) message set between
 /// MacGleam.app and GleamHelper. Defined once, in a package both link, so the
@@ -1835,8 +2062,21 @@ public struct FullSweepJobOutcome: Codable, Sendable, Equatable {
 /// - Closed set. The helper is not a general file service: there is no
 ///   request carrying a command string, a shell fragment or an arbitrary
 ///   verb. Adding a case is an API review event in both processes.
-/// - Every mutating request names the plan and operation it belongs to, so
-///   the helper's log and the app's report reconcile one to one.
+/// - Every mutating request names what it is attributable to, so the helper's
+///   log and the app's report reconcile one to one. For `remove` and
+///   `runMaintenance` that is the plan and the operation, which always exist,
+///   because the executor is the only thing that sends them. For
+///   `setLaunchItemEnabled` it is a `ChangeAttribution` (C24), which is
+///   either a plan operation or a direct change somebody made in the
+///   interface, because that request has a caller outside any plan. No case
+///   means unattributed and no field is optional, so an unattributed
+///   privileged change cannot be encoded.
+/// - `correlationID` is the identifier a reply echoes to tie itself to the
+///   request that caused it: the operation identifier where the request
+///   belongs to a plan, the change identifier where it is a direct change.
+///   One name and one rule across every reply, so nothing has to remember
+///   which reply carries which kind, and no reply names an operation that
+///   does not exist.
 /// - `remove` carries an explicit destination; the helper never chooses
 ///   where a file goes.
 /// - Version handshake: the app sends `handshake` first, naming the version
@@ -1857,7 +2097,7 @@ public enum HelperRequest: Codable, Sendable, Equatable {
     case remove(target: AbsolutePath, destination: HelperRemovalDestination,
                 planID: UUID, operationID: UUID)
     case setLaunchItemEnabled(item: LaunchItemID, enabled: Bool,
-                              planID: UUID, operationID: UUID)
+                              attribution: ChangeAttribution)
     case runMaintenance(task: MaintenanceTask, planID: UUID, operationID: UUID)
 }
 
@@ -1865,7 +2105,7 @@ public enum HelperRequest: Codable, Sendable, Equatable {
 /// package both processes link, so app and helper cannot disagree about what
 /// the current contract is without one of them being an older build.
 public enum HelperContract {
-    public static let version: UInt16 = 1
+    public static let version: UInt16 = 2
 }
 
 public enum HelperRemovalDestination: Codable, Sendable, Equatable {
@@ -1890,15 +2130,16 @@ public enum HelperResponse: Codable, Sendable, Equatable {
     /// never equal in this reply.
     case handshakeRefused(helperContractVersion: UInt16,
                           clientContractVersion: UInt16)
-    case success(operationID: UUID, bytesReclaimed: UInt64)
-    case launchItemChanged(operationID: UUID, change: LaunchItemChange)
+    case success(correlationID: UUID, bytesReclaimed: UInt64)
+    case launchItemChanged(correlationID: UUID, change: LaunchItemChange)
     /// Every refusal that is not a version disagreement, including a
-    /// handshake refused on identity. It names the operation it refused
-    /// where there is one, so the app's report reconciles, and it names no
+    /// handshake refused on identity. It names what it refused where there is
+    /// something to name, so the app's report reconciles, and it names no
     /// version: a client the helper could not verify is told nothing about
-    /// the helper.
-    case refused(operationID: UUID?, reason: HelperRefusal)
-    case failed(operationID: UUID, reason: String)
+    /// the helper. The identifier is nil only where no request was decoded,
+    /// which is the handshake and identity cases.
+    case refused(correlationID: UUID?, reason: HelperRefusal)
+    case failed(correlationID: UUID, reason: String)
 }
 
 public enum HelperRefusal: String, Codable, Sendable, Equatable {
@@ -1910,6 +2151,25 @@ public enum HelperRefusal: String, Codable, Sendable, Equatable {
     case malformedRequest
 }
 ```
+
+Migration note for the C30 amendment (s3d). The wire encoding changes, which
+is what the version bump is for. Nothing is stored and no message is
+persisted, so nothing migrates. The source level costs against the tree as it
+stands:
+
+- `HelperRequest`'s `planID` accessor cannot answer for every mutating
+  request any more, because a direct change has no plan. It becomes a
+  `correlationID` accessor that always answers, plus an optional `planID` for
+  the two requests that still carry one.
+- The helper's message handler reads an operation identifier out of
+  `setLaunchItemEnabled` to build its reply. It reads the attribution's
+  `correlationID` instead, and the same value comes back on refusal, so the
+  handler needs no case analysis to answer a direct change.
+- The helper client builds `setLaunchItemEnabled` from an operation and a
+  plan identifier. Under C17's amendment it does not build this request from
+  an operation at all: it takes an item and an attribution, and it is the
+  privileged side C24 declares.
+- Every `HelperResponse` construction and pattern match takes the new label.
 
 ### C31. Helper policy
 
@@ -3188,6 +3448,26 @@ These span boundaries and get their own always true tests:
   fails a signed build whose expected team identifier is not the Developer ID
   team (s7b). Every other guarantee in the helper assumes this check bites,
   so a placeholder left here removes all of them at once and breaks no test.
+- Every privileged launch item change is attributable, and a direct toggle
+  is attributable to itself. `ChangeAttribution` (C24) has no case meaning
+  none and no optional field, the manager's parameter carries no default, and
+  C30's request cannot be constructed without one, so an unattributed change
+  fails to compile rather than failing a test. A planned change names the plan
+  and the operation the executor is running (C17). A switch flipped in the
+  interface names a change identifier minted at that moment, which appears in
+  no plan and in no ExecutionReport, so nothing is ever reconciled to a plan
+  that never existed. The helper echoes whichever it was as the reply's
+  `correlationID`, which is how a refusal finds its way back to the thing that
+  caused it.
+  NOT YET TRUE END TO END, as of 2026-08-11. Attribution is mandatory on the
+  manager and the executor supplies it, so no planned change reaches the
+  manager unattributed. It stops there: the C30 version 2 migration that puts
+  a `ChangeAttribution` on the wire and renames the reply slot to
+  `correlationID` is not in the tree, because it breaks seven helper test
+  files at compile time and those suites must move to version 2 first. So
+  today no privileged launch item change has a production path at all, which
+  is why nothing is silently unattributed; the gap would open the moment one
+  is wired. Slice s3f carries the migration, and this note goes when it lands.
 - The denylist is enforced at three independent points: engine plan time
   (C15), executor run time (C17), helper admission (C31). Removing any one
   enforcement still leaves a blocked path unremovable.
