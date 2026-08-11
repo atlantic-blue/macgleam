@@ -57,7 +57,8 @@ struct CleanupModuleView: View {
       Spacer()
       if model.hubEstimateBytes > 0 {
         Text(ByteFigure.string(model.hubEstimateBytes))
-          .font(GleamTypeToken.body.font.weight(.semibold))
+          .gleamType(.body)
+          .fontWeight(.semibold)
           .foregroundStyle(GleamColorToken.accent.color(for: colorScheme))
           .contentTransition(.numericText())
           .animation(
@@ -152,7 +153,7 @@ struct CleanupNoticeCard: View {
     VStack(alignment: .leading, spacing: GleamSpacing.points(1) / 2) {
       ForEach(sentences, id: \.self) { sentence in
         Text(sentence)
-          .font(GleamTypeToken.caption.font)
+          .gleamType(.caption)
           .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
       }
     }
@@ -184,7 +185,7 @@ struct CleanupIdleInvitation: View {
       Text(
         "Caches, logs, broken downloads, developer leftovers and every trash bin, itemised for your review before anything moves."
       )
-      .font(GleamTypeToken.body.font)
+      .gleamType(.body)
       .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       .multilineTextAlignment(.center)
       .frame(maxWidth: 420)

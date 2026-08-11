@@ -130,7 +130,7 @@ struct SpaceLensView: View {
   private func footer(_ map: SpaceLensMapState, isStreaming: Bool) -> some View {
     HStack {
       Text(selectionLine(map))
-        .font(GleamTypeToken.body.font)
+        .gleamType(.body)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
         .contentTransition(.numericText())
         .animation(
@@ -141,7 +141,7 @@ struct SpaceLensView: View {
       if !isStreaming {
         Button("Remap") { model.startMapping(volume: map.volume) }
           .buttonStyle(.plain)
-          .font(GleamTypeToken.caption.font)
+          .gleamType(.caption)
           .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       }
       PrimaryButton(
@@ -235,12 +235,12 @@ struct SpaceLensIdleInvitation: View {
     VStack(spacing: GleamSpacing.points(2)) {
       Spacer()
       Text("See where your space went")
-        .font(GleamTypeToken.title.font)
+        .gleamType(.title)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
       Text(
         "The map builds outward from the volume root while scanning, sized by what each folder actually takes on disk. Drill in, select what should go, and review before anything moves."
       )
-      .font(GleamTypeToken.body.font)
+      .gleamType(.body)
       .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       .multilineTextAlignment(.center)
       .frame(maxWidth: 460)
@@ -270,18 +270,18 @@ struct SpaceLensBreadcrumb: View {
         .buttonStyle(.plain)
       }
       Text(map.focusPath.value)
-        .font(GleamTypeToken.mono.font)
+        .gleamType(.mono)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
         .lineLimit(1)
         .truncationMode(.middle)
       Spacer()
       if isStreaming {
         Text("Mapping\u{2026}")
-          .font(GleamTypeToken.caption.font)
+          .gleamType(.caption)
           .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
         Button("Cancel") { onCancel() }
           .buttonStyle(.plain)
-          .font(GleamTypeToken.caption.font)
+          .gleamType(.caption)
           .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       }
     }
@@ -300,7 +300,7 @@ struct SpaceLensExecutionView: View {
     VStack(spacing: GleamSpacing.points(2)) {
       Spacer()
       Text("Removing\u{2026}")
-        .font(GleamTypeToken.title.font)
+        .gleamType(.title)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
       ProgressView(
         value: Double(progress.finishedOperations),
@@ -308,10 +308,11 @@ struct SpaceLensExecutionView: View {
       )
       .frame(maxWidth: 320)
       Text("\(progress.finishedOperations) of \(progress.totalOperations) items")
-        .font(GleamTypeToken.body.font)
+        .gleamType(.body)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       Text("\(ByteFigure.string(progress.bytesReclaimed)) reclaimed")
-        .font(GleamTypeToken.body.font.weight(.semibold))
+        .gleamType(.body)
+        .fontWeight(.semibold)
         .foregroundStyle(GleamColorToken.accent.color(for: colorScheme))
         .contentTransition(.numericText())
         .animation(
@@ -320,7 +321,7 @@ struct SpaceLensExecutionView: View {
         )
       Button("Cancel") { onCancel() }
         .buttonStyle(.plain)
-        .font(GleamTypeToken.caption.font)
+        .gleamType(.caption)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       Spacer()
     }
@@ -338,10 +339,10 @@ struct SpaceLensResultView: View {
     VStack(spacing: GleamSpacing.points(2)) {
       Spacer()
       Text("\(ByteFigure.string(summary.bytesReclaimed)) reclaimed")
-        .font(GleamTypeToken.title.font)
+        .gleamType(.title)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
       Text(outcomeLine)
-        .font(GleamTypeToken.body.font)
+        .gleamType(.body)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       if !summary.failures.isEmpty {
         CleanupNoticeCard(

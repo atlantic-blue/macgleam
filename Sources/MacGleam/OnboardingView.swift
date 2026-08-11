@@ -14,7 +14,7 @@ struct OnboardingView: View {
         .font(.system(size: 40, weight: .light))
         .foregroundStyle(GleamColorToken.accent.color(for: colorScheme))
       Text("Let MacGleam see the whole disk")
-        .font(GleamTypeToken.title.font)
+        .gleamType(.title)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
       Text(
         """
@@ -26,26 +26,16 @@ struct OnboardingView: View {
         showing you first.
         """
       )
-      .font(GleamTypeToken.body.font)
+      .gleamType(.body)
       .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       .multilineTextAlignment(.center)
       .fixedSize(horizontal: false, vertical: true)
       VStack(spacing: GleamSpacing.points(2)) {
-        Button(action: { model.openSystemSettings() }) {
-          Text("Open System Settings")
-            .font(GleamTypeToken.body.font.weight(.semibold))
-            .foregroundStyle(GleamColorToken.baseBackground.color(for: colorScheme))
-            .padding(.vertical, GleamSpacing.points(1))
-            .padding(.horizontal, GleamSpacing.points(3))
-            .background(
-              RoundedRectangle(cornerRadius: GleamRadius.control.value)
-                .fill(GleamColorToken.accent.color(for: colorScheme))
-            )
-        }
-        .buttonStyle(.plain)
+        PrimaryButton(
+          title: "Open System Settings", action: { model.openSystemSettings() })
         Button(action: { model.continueWithoutAccess() }) {
           Text("Continue without access")
-            .font(GleamTypeToken.caption.font)
+            .gleamType(.caption)
             .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
             .underline()
         }
@@ -58,7 +48,16 @@ struct OnboardingView: View {
     .background(
       RoundedRectangle(cornerRadius: GleamRadius.card.value)
         .fill(GleamColorToken.surface.color(for: colorScheme))
-        .shadow(color: .black.opacity(0.35), radius: 24, y: 8)
+        .shadow(
+          color: .black.opacity(GleamElevation.high.shadowOpacity),
+          radius: GleamElevation.high.shadowRadius,
+          y: GleamElevation.high.shadowOffsetY
+        )
+    )
+    .overlay(
+      RoundedRectangle(cornerRadius: GleamRadius.card.value)
+        .strokeBorder(
+          Color.white.opacity(GleamElevation.high.borderOpacity), lineWidth: 1)
     )
   }
 }
@@ -77,12 +76,13 @@ struct DiskAccessDegradedBanner: View {
       Image(systemName: "exclamationmark.triangle")
         .foregroundStyle(GleamColorToken.review.color(for: colorScheme))
       Text(sentence)
-        .font(GleamTypeToken.caption.font)
+        .gleamType(.caption)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
         .fixedSize(horizontal: false, vertical: true)
       Button(action: onOpenSettings) {
         Text("Grant access")
-          .font(GleamTypeToken.caption.font.weight(.semibold))
+          .gleamType(.caption)
+          .fontWeight(.semibold)
           .foregroundStyle(GleamColorToken.accent.color(for: colorScheme))
       }
       .buttonStyle(.plain)
@@ -90,11 +90,11 @@ struct DiskAccessDegradedBanner: View {
     .padding(.vertical, GleamSpacing.points(2))
     .padding(.horizontal, GleamSpacing.points(3))
     .background(
-      RoundedRectangle(cornerRadius: GleamRadius.card.value)
+      RoundedRectangle(cornerRadius: GleamRadius.item.value)
         .fill(GleamColorToken.surface.color(for: colorScheme))
     )
     .overlay(
-      RoundedRectangle(cornerRadius: GleamRadius.card.value)
+      RoundedRectangle(cornerRadius: GleamRadius.item.value)
         .strokeBorder(
           GleamColorToken.review.color(for: colorScheme).opacity(0.4),
           lineWidth: 1
