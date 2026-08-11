@@ -342,13 +342,18 @@ s7a can start in parallel the moment the workspace exists.
 
 ### s3a. helper contract
 - Contracts: C30, C31 (types, policy, contract tests against a test double
-  transport).
+  transport). Also lands C24's LaunchItemChange in GleamCore as a plain value
+  type, because C30's launchItemChanged reply carries it; the behaviour around
+  it stays in s3d.
 - Depends on: s1a, s1c.
 - Verification: every message round trips the wire encoding losslessly; the
   policy refuses in the contract's evaluation order (identity, handshake,
   domain, denylist) with the right refusal each time; a user domain target
   is refused notSystemDomain; a denylisted target is refused whatever the
-  request claims; version mismatch refuses everything after handshake.
+  request claims; version mismatch refuses everything after handshake, and
+  the handshake refusal names both versions so the app can say which side is
+  behind; a request arriving before any handshake is refused versionMismatch;
+  a launch item the helper cannot resolve is refused malformedRequest.
 - Tier: auto.
 
 ### s3b. helper daemon
@@ -374,7 +379,8 @@ s7a can start in parallel the moment the workspace exists.
   confirm the warning sentence appears first.
 
 ### s3d. login items
-- Contracts: C24, C23 (login item portion).
+- Contracts: C24, C23 (login item portion). LaunchItemID and LaunchItemChange
+  already exist as value types (s1a, s3a); this slice gives them behaviour.
 - Depends on: s3c.
 - Verification: inventory attributes items to owning apps; disable then re
   enable round trips through the recorded prior state and survives relaunch;
@@ -530,7 +536,10 @@ s7a can start in parallel the moment the workspace exists.
 - Verification: on tag, continuous integration archives, signs app and
   helper, notarizes, staples, builds the disk image and publishes the
   signed appcast entry; the built artefact passes Gatekeeper assessment on
-  a clean machine; no signing key ever exists on a laptop.
+  a clean machine; no signing key ever exists on a laptop; the build fails
+  when ExpectedClientIdentity.macGleamApp (C31) does not carry the Developer
+  ID team identifier, so the helper's client check cannot ship as a
+  formality.
 - Tier: auto.
 
 ### s7c. licensing

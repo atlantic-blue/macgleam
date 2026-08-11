@@ -32,6 +32,16 @@ let package = Package(
             path: "Tests/GleamCoreTests"
         ),
         .target(
+            name: "GleamHelperCore",
+            dependencies: ["GleamCore"],
+            path: "Sources/GleamHelperCore"
+        ),
+        .testTarget(
+            name: "GleamHelperCoreTests",
+            dependencies: ["GleamHelperCore", "GleamCore"],
+            path: "Tests/GleamHelperCoreTests"
+        ),
+        .target(
             name: "CleanupEngine",
             dependencies: ["GleamCore"],
             path: "Sources/CleanupEngine"
