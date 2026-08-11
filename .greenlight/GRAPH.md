@@ -628,6 +628,36 @@ they were done alongside.
 - Tier: verify. Human check: uninstall a scratch app, watch the gather
   choreography present it as one reversible unit, restore it, launch it.
 
+### s4e. the store sizes what it stored
+- Contracts: C18, C13.
+- Depends on: s4a, s4c.
+- Why it exists: found on 2026-08-11 while proving s4c's directory handling.
+  C18 strips execute from a stored payload so a quarantined bundle cannot run
+  from the store. On a real disk, stripping execute from a DIRECTORY removes
+  traversal, so the store can no longer read inside its own payload: sizing a
+  directory payload yields nothing and throws permissionDenied. The in memory
+  file system does both happily, which is why nothing failed. Restore is
+  unaffected, because a rename needs permission on the parent rather than on
+  the directory being moved, so every s4a and s4c test passes and the human
+  check works. Purge is where it bites, and C18 is explicit that a payload
+  whose size cannot be read must fail the purge rather than count as zero, so
+  today the choice is a mismatch nobody can satisfy or deleting a bundle while
+  reporting nothing reclaimed.
+- The fix, decided: the item records its allocated size at the moment it is
+  stored, measured BEFORE the execute strip, and purge sums the recorded sizes
+  rather than re-reading the store. That keeps the containment (a stripped
+  directory stays unreadable) and makes the byte total exact and cheap, since
+  the size of what was stored is a fact about the store rather than something
+  to recompute. The alternative, not taken, was to stop stripping execute from
+  directory payloads, which would trade a real containment guarantee for an
+  arithmetic convenience.
+- Verification: the shared conformance suite gains the case that hid this, so
+  stripping execute from a directory behaves identically in the fake and on
+  the real disk; a stored directory payload records its allocated size at
+  store time; a purge of an uninstall archive names the true byte total and
+  never zero; the fake cannot pass a case the real disk fails.
+- Tier: auto.
+
 ### s4d. leftover sweep
 - Contracts: C26 (orphan sweep).
 - Depends on: s4c.

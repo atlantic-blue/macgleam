@@ -49,21 +49,26 @@ public struct ApplicationsEngine: GleamEngine {
     }
   }
 
-  /// Uninstall planning belongs to the uninstall slice, which is where the
-  /// archive operations and their shared group are contracted (C26). What this
-  /// method owes every engine is here: an empty selection and a finding from
-  /// another session are refused rather than half planned.
+  /// An uninstall: one archive operation per selected path, the bundle and its
+  /// leftovers sharing one group so the whole application restores as a unit
+  /// (C26). There is no separate delete step, so no window exists where a file
+  /// is gone from disk and not yet in the SafetyNet store.
+  ///
+  /// MacGleam is filtered here as well as at the offer, on the identity a
+  /// finding claims rather than on a path, so a forged finding naming
+  /// MacGleam's own bundle beside a real application plans the real one and
+  /// nothing at all against MacGleam. The denylist is the codebase's precedent
+  /// for holding one rule at several independent points.
   public func plan(selection: [Finding], context: PlanContext) throws -> OperationPlan {
     guard !selection.isEmpty else { throw PlanningError.emptySelection }
     for finding in selection where finding.sessionID != context.sessionID {
       throw PlanningError.findingFromDifferentSession(finding.id)
     }
-    return OperationPlan(
-      id: UUID(),
-      sessionID: context.sessionID,
-      operations: [],
-      totalBytes: 0,
-      permanentDeletionConfirmation: nil)
+    var builder = UninstallPlanBuilder(context: context, excluding: runningApplicationBundleID)
+    for finding in selection {
+      builder.add(finding)
+    }
+    return builder.build(sessionID: context.sessionID)
   }
 }
 

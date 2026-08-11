@@ -1491,6 +1491,16 @@ after this contract lists the costs.
 ///   figure the volume gets back. `itemCount` is the number of identifiers in
 ///   the purge. Nothing is apportioned or estimated, and a payload whose size
 ///   cannot be read fails the purge rather than counting as zero.
+///   KNOWN DEFECT as of 2026-08-11, carried by slice s4e. On a real disk,
+///   stripping execute from a DIRECTORY payload removes traversal, so the
+///   store cannot size its own payload and every directory archive hits the
+///   clause above. The in memory file system traverses a stripped directory
+///   happily, which is why no test caught it. Every uninstall archives
+///   directories, so this is the common case rather than an edge. The fix is
+///   to record the allocated size at store time, measured before the strip,
+///   and to sum recorded sizes at purge rather than re-reading the store.
+///   Restore is unaffected: a rename needs permission on the parent, not on
+///   the directory being moved.
 /// - A restored item is outside the purge story entirely. Its payload has
 ///   already moved back to its origin, so the store holds nothing to reclaim
 ///   for it: `purgeEligibleItems` never returns one whatever its dates say,
