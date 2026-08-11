@@ -19,6 +19,7 @@ public struct PlanExecutor: PlanExecuting {
   private let environment: OwnershipEnvironment
   private let now: @Sendable () -> Date
   private let isCancelled: @Sendable () -> Bool
+  private let launchItems: (any LaunchItemManaging)?
 
   public init(
     fileSystem: any FileSystem,
@@ -27,7 +28,8 @@ public struct PlanExecutor: PlanExecuting {
     ownershipPolicy: any PathOwnershipPolicy,
     environment: OwnershipEnvironment,
     now: @escaping @Sendable () -> Date,
-    isCancelled: @escaping @Sendable () -> Bool
+    isCancelled: @escaping @Sendable () -> Bool,
+    launchItems: (any LaunchItemManaging)? = nil
   ) {
     self.fileSystem = fileSystem
     self.denylist = denylist
@@ -36,6 +38,7 @@ public struct PlanExecutor: PlanExecuting {
     self.environment = environment
     self.now = now
     self.isCancelled = isCancelled
+    self.launchItems = launchItems
   }
 
   public func execute(_ plan: OperationPlan) -> AsyncStream<ExecutionEvent> {
@@ -83,6 +86,13 @@ public struct PlanExecutor: PlanExecuting {
       yield(.operationFinished(operationID: operation.id, result: .skippedDenylisted))
       return .skippedDenylisted
     }
+    if case .setLaunchItemEnabled(let item, let enabled) = operation.kind, let launchItems {
+      yield(.operationStarted(operationID: operation.id))
+      let result = await changeLaunchItem(
+        item, to: enabled, launchItems: launchItems, planID: planID, operationID: operation.id)
+      yield(.operationFinished(operationID: operation.id, result: result))
+      return result
+    }
     let needsPrivilege = routedPrivilege(of: operation) == .root
     if needsPrivilege, helper == nil {
       halted = true
@@ -107,6 +117,46 @@ public struct PlanExecutor: PlanExecuting {
   ) async -> OperationResult {
     guard needsPrivilege, let helper else { return await perform(operation) }
     return await helper.perform(operation, planID: planID)
+  }
+
+  // MARK: - Launch items
+
+  /// A launch item names no path, so ownership routing has nothing to decide
+  /// from and this operation is the exception to it: the manager routes by the
+  /// scope it reads from the current inventory, and the executor supplies the
+  /// attribution because it is the only thing that knows both identifiers.
+  /// Turning a registration off frees nothing, so a completed change promises
+  /// no bytes.
+  private func changeLaunchItem(
+    _ item: LaunchItemID,
+    to enabled: Bool,
+    launchItems: any LaunchItemManaging,
+    planID: UUID,
+    operationID: UUID
+  ) async -> OperationResult {
+    do {
+      _ = try await launchItems.setEnabled(
+        enabled,
+        item: item,
+        attribution: .operation(planID: planID, operationID: operationID))
+      return .completed(bytesReclaimed: 0)
+    } catch let error as LaunchItemError {
+      return .failed(reason: Self.sentence(for: error, item: item))
+    } catch {
+      return .failed(reason: failureSentence(for: error))
+    }
+  }
+
+  /// A launch item failure in the report's words. The item is named where it
+  /// has gone, because a row saying only that something failed is no use for
+  /// finding out what; every other failure already arrives as a sentence.
+  private static func sentence(for error: LaunchItemError, item: LaunchItemID) -> String {
+    switch error {
+    case .itemNotFound:
+      return "The login item \(item.value) is not on this Mac any more, so nothing was changed."
+    case .changeFailed(let reason):
+      return reason
+    }
   }
 
   // MARK: - Routing

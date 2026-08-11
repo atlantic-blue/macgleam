@@ -31,6 +31,11 @@ public enum FindingCategory: Codable, Sendable, Equatable, Hashable {
   case diskMapSelection
   // Performance
   case maintenanceTask(task: MaintenanceTask)
+  /// The scope looks redundant beside the identifier and is not: the
+  /// identifier is opaque and nothing takes it apart, so anything that needs
+  /// to know which side of the privileged boundary an item sits on reads the
+  /// scope from here or from the item itself (C24).
+  case launchItem(item: LaunchItemID, scope: LaunchItem.Scope)
 }
 
 /// One path a finding covers, with the allocated bytes its removal reclaims:
@@ -53,10 +58,15 @@ public struct PathEntry: Codable, Sendable, Equatable, Hashable {
 /// entries at scan, review and plan time alike, with no stored copies and no
 /// process wide cache to drift.
 ///
-/// `entries` is empty exactly for the categories that name no file, today
-/// `maintenanceTask` alone: the task names work the machine performs, not
-/// files it removes. With no path to expand, a plan builder has nothing to
-/// turn into a removal, which is what makes "no Performance plan removes a
+/// `entries` is empty exactly for the categories that name no file. The rule
+/// is stated over the module rather than over a list of cases: no Performance
+/// finding names a path, so every Performance category is pathless and one
+/// added later inherits the exception. A maintenance task names work the
+/// machine performs; a launch item names a registration to disable. A launch
+/// item does have a path, and it stays on the item so the row can be revealed
+/// in Finder: a `PathEntry` is a removal target and a byte source, and a
+/// registration is neither. With no path to expand, a plan builder has nothing
+/// to turn into a removal, which is what makes "no Performance plan removes a
 /// file" a property of the data rather than a rule somebody has to keep
 /// obeying.
 public struct Finding: Identifiable, Codable, Sendable, Equatable {

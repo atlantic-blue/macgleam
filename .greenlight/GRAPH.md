@@ -458,13 +458,50 @@ they were done alongside.
 ### s3d. login items
 - Contracts: C24, C23 (login item portion). LaunchItemID and LaunchItemChange
   already exist as value types (s1a, s3a); this slice gives them behaviour.
+  C24 also declares the four boundaries it had only referred to (the
+  inventory source, the two changing sides, the store of prior state) and its
+  error type. Amends C5 (the `launchItem` category, and the pathless rule
+  stated over the Performance module rather than a list of cases), C30
+  (attribution on setLaunchItemEnabled, correlationID on every reply,
+  contract version 2) and C17 (launch item operations go to C24 rather than
+  being routed by path ownership).
 - Depends on: s3c.
 - Verification: inventory attributes items to owning apps; disable then re
   enable round trips through the recorded prior state and survives relaunch;
   user scope changes stay in process, system scope routes through the
-  helper; disable never deletes.
+  helper; disable never deletes; every privileged change is attributable and
+  none can be made without an attribution, which is structural rather than
+  asserted (ChangeAttribution has no empty case, the manager's parameter has
+  no default, and C30's request cannot be built without one, so the
+  unattributed call does not compile); a planned change carries the plan and
+  the operation the executor is running; a switch flipped in the interface
+  carries a change identifier that appears in no plan and in no
+  ExecutionReport, asserted by minting one and searching both for it, so a
+  direct toggle is attributable to itself rather than to a plan that never
+  existed; the helper echoes whichever it was as the reply's correlationID,
+  so a refusal reconciles one to one for both kinds.
 - Tier: verify. Human check: disable a known login item, log out and in,
   confirm it did not launch, re enable with one click.
+
+### s3f. the helper contract at version two
+- Contracts: C30 (the message set moves to version 2), C24, C31.
+- Depends on: s3d.
+- Why it exists: C24 decided that every privileged launch item change carries
+  a `ChangeAttribution`, and the manager and the executor honour that today.
+  The wire does not. Putting the attribution on C30's request and renaming
+  every reply's `operationID` to `correlationID` breaks seven helper test
+  files at compile time, so the helper suites move to version 2 first and the
+  migration lands as its own change rather than riding inside a login item
+  slice. Until it does, no privileged launch item change has a production
+  path, so nothing is unattributed in practice; the gap opens the moment one
+  is wired, which is what makes this a prerequisite rather than a tidy up.
+- Verification: `HelperContract.version` is 2 and both processes compile
+  against the one declaration; a `setLaunchItemEnabled` request cannot be
+  constructed without an attribution; a direct change's identifier appears in
+  no plan and in no `ExecutionReport`; every reply echoes the correlation
+  identifier of the request that caused it, for a planned operation and for a
+  direct change alike; a version 1 client is refused with both numbers named.
+- Tier: auto.
 
 ### s3e. process monitor
 - Contracts: C25.
