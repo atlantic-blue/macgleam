@@ -303,6 +303,31 @@ s7a can start in parallel the moment the workspace exists.
 
 ## M3. Performance and the privileged helper
 
+### s2f. Lumina tokens and the navigation rail
+- Contracts: rewrites C1 (the Lumina Utility palette, eight text roles, three
+  nested radii, elevation with real values, the 4 point half step) and C37
+  (HubDestination, the rail resolver, ModulePane and its resolver). Renames
+  C36's HubCard to HubModuleSummary and cardFigures to moduleFigures.
+- Depends on: s2e.
+- Verification: every specified colour resolves to its hex; every text role
+  carries its size, tracking and line height; the rail reaches every
+  destination with up and down alone and clamps at both ends; left and right
+  no longer move the selection and no transition carries a zoom; a pane
+  carries an action exactly when its module is built and a not ready note
+  exactly when it is not; the module's live figure lands on its first job and
+  nowhere else.
+- Tier: verify. Human check: the rail and the pane read as one app, and every
+  module opens on the same shape.
+
+### s2g. the disk map as a treemap
+- Contracts: adds TreemapLayout to C39's module surface.
+- Depends on: s2f.
+- Verification: tile area matches weight share; tiles never overlap, stay
+  inside the canvas and tile it exactly; a small entry beside a dominant one
+  keeps both a width and a height; equal weights come out close to square.
+- Tier: verify. Human check: a folder holding almost everything no longer
+  hides the rest, and drilling in from a tile feels the same as from the list.
+
 ### s3a. helper contract
 - Contracts: C30, C31 (types, policy, contract tests against a test double
   transport).

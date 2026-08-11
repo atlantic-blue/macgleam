@@ -15,6 +15,20 @@ swift run GleamBundler
 open dist/MacGleam.app
 ```
 
+## Drawing a screen without running it
+
+```
+.build/debug/MacGleam --render shot.png --size 1280x900 \
+  --selection "Space Lens" --appearance dark --map /opt/homebrew
+```
+
+This draws the composed interface to a PNG and exits, which is how a screen
+gets checked without the Screen Recording permission a window capture needs.
+It draws the view rather than the window, so there is no window chrome, and
+scroll views, text fields and materials do not appear in the picture even
+though they are there in the app. `--map` runs a real scan of that folder and
+waits for it before drawing.
+
 The bundle step is not optional. macOS identifies an app for permissions by
 its bundle identifier and code signature, so a bare executable from the build
 directory can never appear in the Full Disk Access list, and any access it
