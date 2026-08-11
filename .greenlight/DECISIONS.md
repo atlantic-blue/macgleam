@@ -102,3 +102,14 @@ gets its own entry pointing at the one it supersedes.
   native app can. Control level padding sits on a 4 point half step because
   the specification pads cards at 20; layout spacing stays on the 8 point
   grid. Status: locked.
+- 2026-08-11. Light is a specified appearance, not a derivation. The Clinical
+  Precision specification (`.desings/lumina_utility/DESIGN-light.md`) supplies
+  the light palette hex for hex, replacing values that had been derived by
+  hand to hold contrast. Elevation becomes appearance aware with it, because
+  the two specifications genuinely disagree: dark separates layers by tone, so
+  a resting card casts nothing and only a floating one casts, sharply; light
+  has no tone left above white, so every card casts a soft ambient shadow in
+  the text navy and an overlay casts a much wider one. Where a specification's
+  palette and its prose disagree, the prose wins, because it is the part that
+  says what a colour is for. Status: locked.
+

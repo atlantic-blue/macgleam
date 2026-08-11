@@ -128,7 +128,7 @@ struct DiskMapTile: View {
             .strokeBorder(
               isSelected
                 ? GleamColorToken.accent.color(for: colorScheme)
-                : Color.white.opacity(GleamElevation.low.borderOpacity),
+                : GleamElevation.low.edge(for: colorScheme),
               lineWidth: isSelected ? 2 : 1
             )
         )

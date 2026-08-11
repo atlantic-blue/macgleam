@@ -328,6 +328,18 @@ s7a can start in parallel the moment the workspace exists.
 - Tier: verify. Human check: a folder holding almost everything no longer
   hides the rest, and drilling in from a tile feels the same as from the list.
 
+### s2h. the specified light appearance
+- Contracts: amends C1 (light values come from the Clinical Precision
+  specification; GleamElevation becomes appearance aware and returns an edge
+  colour and a shadow rather than bare numbers).
+- Depends on: s2f.
+- Verification: every specified light token resolves to its hex; no token is
+  the same colour in both appearances; a resting card casts nothing in dark
+  and something in light; each appearance's named shadows match; a light
+  shadow is cast in the text navy and a dark one in black.
+- Tier: verify. Human check: the light appearance reads as deliberate rather
+  than as the dark one with the lights turned up.
+
 ### s3a. helper contract
 - Contracts: C30, C31 (types, policy, contract tests against a test double
   transport).

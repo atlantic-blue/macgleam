@@ -38,7 +38,7 @@ struct SidebarView: View {
     .background(railFill)
     .overlay(alignment: .trailing) {
       Rectangle()
-        .fill(Color.white.opacity(GleamElevation.low.borderOpacity))
+        .fill(GleamElevation.low.edge(for: colorScheme))
         .frame(width: 1)
     }
   }

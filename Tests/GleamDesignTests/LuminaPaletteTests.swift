@@ -4,9 +4,9 @@ import GleamDesign
 import SwiftUI
 import Testing
 
-/// The dark appearance is the specified one, so its values are checked against
-/// the Lumina Utility specification hex for hex. A drive by tweak to any of
-/// them fails here.
+/// Each appearance has a specification, so each is checked hex for hex:
+/// Lumina Utility for dark, Clinical Precision for light. A drive by tweak to
+/// any of them fails here.
 @Suite("Lumina palette")
 struct LuminaPaletteTests {
 
@@ -191,32 +191,76 @@ struct TypeScaleTests {
 @Suite("Elevation")
 struct ElevationTests {
 
-  @Test("a resting card casts no shadow")
-  func aRestingCardCastsNoShadow() {
-    #expect(GleamElevation.low.shadowOpacity == 0)
-    #expect(GleamElevation.low.shadowRadius == 0)
+  @Test("a resting card casts nothing in dark, where tone does the separating")
+  func aRestingCardCastsNothingInDark() {
+    #expect(GleamElevation.low.shadow(for: .dark) == .none)
   }
 
-  @Test("shadow strength climbs with the level")
-  func shadowStrengthClimbsWithTheLevel() {
-    #expect(GleamElevation.low.shadowOpacity < GleamElevation.medium.shadowOpacity)
-    #expect(GleamElevation.medium.shadowOpacity <= GleamElevation.high.shadowOpacity)
-    #expect(GleamElevation.medium.shadowRadius <= GleamElevation.high.shadowRadius)
-  }
-
-  @Test("every level draws a hairline faint enough to read as an edge, not a border")
-  func everyLevelDrawsAFaintHairline() {
+  @Test("every level casts something in light, where there is no tone left above white")
+  func everyLevelCastsSomethingInLight() {
     for level in GleamElevation.allCases {
-      #expect(level.borderOpacity > 0)
-      #expect(level.borderOpacity <= 0.2)
+      #expect(level.shadow(for: .light).opacity > 0)
+      #expect(level.shadow(for: .light).radius > 0)
     }
   }
 
-  @Test("the floating level matches the specified shadow")
-  func theFloatingLevelMatchesTheSpecifiedShadow() {
-    #expect(GleamElevation.high.shadowRadius == 12)
-    #expect(GleamElevation.high.shadowOffsetY == 4)
-    #expect(GleamElevation.high.shadowOpacity == 0.5)
+  @Test("shadow strength climbs with the level in both appearances")
+  func shadowStrengthClimbsWithTheLevel() {
+    for appearance in [ColorScheme.dark, .light] {
+      let low = GleamElevation.low.shadow(for: appearance)
+      let medium = GleamElevation.medium.shadow(for: appearance)
+      let high = GleamElevation.high.shadow(for: appearance)
+      #expect(low.opacity <= medium.opacity)
+      #expect(medium.opacity <= high.opacity)
+      #expect(low.radius <= medium.radius)
+      #expect(medium.radius <= high.radius)
+    }
+  }
+
+  @Test("the dark floating shadow is the one its specification names")
+  func theDarkFloatingShadowIsTheOneItsSpecificationNames() {
+    let shadow = GleamElevation.high.shadow(for: .dark)
+    #expect(shadow.opacity == 0.5)
+    #expect(shadow.radius == 12)
+    #expect(shadow.offsetY == 4)
+  }
+
+  @Test("the light card and overlay shadows are the ones their specification names")
+  func theLightShadowsAreTheOnesTheirSpecificationNames() {
+    let card = GleamElevation.low.shadow(for: .light)
+    #expect(card.opacity == 0.05)
+    #expect(card.radius == 12)
+    #expect(card.offsetY == 4)
+    let overlay = GleamElevation.high.shadow(for: .light)
+    #expect(overlay.opacity == 0.12)
+    #expect(overlay.radius == 32)
+    #expect(overlay.offsetY == 12)
+  }
+
+  @Test("a light shadow is cast in the text navy, never in black")
+  func aLightShadowIsCastInTheTextNavy() throws {
+    #expect(try hexString(of: GleamElevation.low.shadow(for: .light).color) == "16213A")
+    #expect(try hexString(of: GleamElevation.high.shadow(for: .dark).color) == "000000")
+  }
+
+  @Test("a resting surface draws an edge and a lifted one does not need to")
+  func aRestingSurfaceDrawsAnEdge() throws {
+    for appearance in [ColorScheme.dark, .light] {
+      #expect(try opacity(of: GleamElevation.low.edge(for: appearance)) > 0)
+    }
+  }
+
+  @Test("the dark edge is white and the light edge is the specified separator")
+  func theEdgeColourMatchesItsAppearance() throws {
+    #expect(try hexString(of: GleamElevation.low.edge(for: .dark)) == "FFFFFF")
+    #expect(try hexString(of: GleamElevation.low.edge(for: .light)) == "E1E5ED")
+  }
+
+  @Test("a dark edge stays faint enough to read as an edge, not a border")
+  func aDarkEdgeStaysFaint() throws {
+    for level in GleamElevation.allCases {
+      #expect(try opacity(of: level.edge(for: .dark)) <= 0.2)
+    }
   }
 }
 
@@ -253,6 +297,12 @@ func composite(_ top: Color, atOpacity opacity: Double, over bottom: Color) thro
     blue: over.blue * opacity + under.blue * (1 - opacity),
     opacity: 1
   )
+}
+
+func opacity(of color: Color) throws -> Double {
+  let resolved = try #require(
+    NSColor(color).usingColorSpace(.sRGB), "colour must resolve into the sRGB space")
+  return Double(resolved.alphaComponent)
 }
 
 func hexString(of color: Color) throws -> String {

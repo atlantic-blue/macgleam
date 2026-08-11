@@ -27,7 +27,7 @@ struct StatusBarView: View {
     .background(GleamColorToken.baseBackground.color(for: colorScheme))
     .overlay(alignment: .top) {
       Rectangle()
-        .fill(Color.white.opacity(GleamElevation.low.borderOpacity))
+        .fill(GleamElevation.low.edge(for: colorScheme))
         .frame(height: 1)
     }
   }

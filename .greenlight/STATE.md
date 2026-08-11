@@ -2,7 +2,7 @@
 stage:    implement
 updated:  2026-08-11
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     open the pull request for s2f and s2g, carry it to green, merge
+next:     M3, the helper contract and daemon
 blocked:  the live window cannot be captured; the terminal has no Screen
           Recording permission, so checks run off offscreen renders
 prs:      atlantic-blue/macgleam#1
@@ -23,8 +23,9 @@ steps:
   - [x] s2c similar photos (atlantic-blue/macgleam#13)
   - [x] s2d disk map (atlantic-blue/macgleam#14)
   - [x] s2e performance gates (atlantic-blue/macgleam#16)
-  - [x] s2f Lumina tokens and the navigation rail (this branch)
-  - [x] s2g the disk map as a treemap (this branch)
+  - [x] s2f Lumina tokens and the navigation rail (atlantic-blue/macgleam#19)
+  - [x] s2g the disk map as a treemap (atlantic-blue/macgleam#19)
+  - [x] s2h the specified light appearance (this branch)
 
   - [ ] M2 to M7 per .greenlight/GRAPH.md
 ```
