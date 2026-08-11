@@ -2,8 +2,11 @@ import GleamDesign
 import GleamHub
 import SwiftUI
 
-/// The window: a top bar, the navigation rail down the left, the selected
-/// destination's pane filling the rest, and a status bar along the bottom.
+/// The window: the navigation rail down the left, the selected destination's
+/// pane filling the rest, and a status bar along the bottom of that pane.
+///
+/// There is no top bar. The app's name and its settings both live in the
+/// rail, so a bar carrying them again said everything twice.
 ///
 /// Up and down move the rail selection through HubNavigationResolver. Return
 /// and escape do not move it; they carry an intent the open pane interprets.
@@ -12,7 +15,6 @@ struct AppShellView: View {
   let cleanup: CleanupDependencies
   let spaceLens: SpaceLensDependencies
   @State private var navigation: HubNavigationState
-  @State private var searchText = ""
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @FocusState private var railHasKeyFocus: Bool
@@ -31,22 +33,16 @@ struct AppShellView: View {
   }
 
   var body: some View {
-    VStack(spacing: 0) {
-      TopBarView(
-        searchText: $searchText,
-        onOpenSettings: { select(.settings) }
+    HStack(spacing: 0) {
+      SidebarView(
+        selection: navigation.selection,
+        orbMood: model.orbMood,
+        onSelect: { select($0) }
       )
-      HStack(spacing: 0) {
-        SidebarView(
-          selection: navigation.selection,
-          orbMood: model.orbMood,
-          onSelect: { select($0) }
-        )
-        VStack(spacing: 0) {
-          paneSurface
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-          StatusBarView(statusLine: model.statusLine, mood: model.orbMood)
-        }
+      VStack(spacing: 0) {
+        paneSurface
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+        StatusBarView(statusLine: model.statusLine, mood: model.orbMood)
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)

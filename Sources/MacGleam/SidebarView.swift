@@ -17,6 +17,9 @@ struct SidebarView: View {
       brand
         .padding(.horizontal, GleamSpacing.half(1))
         .padding(.bottom, GleamSpacing.points(4))
+        // The title bar is hidden, so the close, minimise and zoom buttons
+        // float over this corner. The inset is the room they need.
+        .padding(.top, GleamSpacing.points(4))
       ForEach(Array(HubDestination.allCases.enumerated()), id: \.element) { row, destination in
         if startsANewGroup(at: row) {
           Spacer(minLength: GleamSpacing.points(2))
