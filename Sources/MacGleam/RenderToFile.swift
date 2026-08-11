@@ -1,5 +1,7 @@
 import AppKit
+import GleamCore
 import GleamHub
+import SpaceLensModule
 import SwiftUI
 
 /// Renders the shell to a PNG and exits, without ever showing a window.
@@ -20,6 +22,10 @@ enum RenderToFile {
     let size: CGSize
     let appearance: ColorScheme
     let selection: HubDestination
+    /// When present, the render maps this folder for real and waits for the
+    /// map before drawing, so the picture is of an actual scan rather than a
+    /// fixture.
+    let mapFolder: String?
   }
 
   /// Parses the request out of the process arguments, or nil for a normal
@@ -32,7 +38,8 @@ enum RenderToFile {
       destination: URL(fileURLWithPath: arguments[renderIndex + 1]),
       size: parseSize(value(of: "--size", in: arguments)) ?? CGSize(width: 1280, height: 1024),
       appearance: value(of: "--appearance", in: arguments) == "light" ? .light : .dark,
-      selection: parseSelection(value(of: "--selection", in: arguments))
+      selection: parseSelection(value(of: "--selection", in: arguments)),
+      mapFolder: value(of: "--map", in: arguments)
     )
   }
 
@@ -62,6 +69,24 @@ enum RenderToFile {
 
   enum RenderFailure: Error {
     case couldNotProduceAnImage
+  }
+
+  /// Runs a real map of the folder and waits for it to settle, so a render of
+  /// the map is a render of an actual scan. Gives up after the deadline and
+  /// draws whatever has streamed in by then, which is itself a picture worth
+  /// having.
+  @MainActor
+  static func mapAndSettle(
+    _ model: SpaceLensModuleModel,
+    folder: String,
+    deadline: Duration = .seconds(20)
+  ) async {
+    model.startMapping(volume: AbsolutePath(normalising: folder))
+    let started = ContinuousClock.now
+    while ContinuousClock.now - started < deadline {
+      if case .browsing = model.state { return }
+      try? await Task.sleep(for: .milliseconds(100))
+    }
   }
 
   private static func value(of flag: String, in arguments: [String]) -> String? {

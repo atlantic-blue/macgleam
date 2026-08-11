@@ -18,23 +18,29 @@ final class MacGleamAppDelegate: NSObject, NSApplicationDelegate {
     NSApplication.shared.activate(ignoringOtherApps: true)
   }
 
-  /// A render run never shows a window and never reaches the file system
-  /// beyond the image it writes.
+  /// A render run never shows a window. It reads the file system only when
+  /// asked to map a folder, and writes only the image.
   @MainActor
   private func renderAndExit(_ request: RenderToFile.Request) {
     let onboarding = DiskAccessOnboardingModel(monitor: RealFullDiskAccessMonitor())
-    do {
-      try RenderToFile.render(
-        request,
-        hub: HubModel(state: .firstRun(now: Date())),
-        cleanup: CleanupComposition.make(onboarding: onboarding),
-        spaceLens: SpaceLensComposition.make()
-      )
-      FileHandle.standardOutput.write(Data("rendered \(request.destination.path)\n".utf8))
-      exit(0)
-    } catch {
-      FileHandle.standardError.write(Data("render failed: \(error)\n".utf8))
-      exit(1)
+    let spaceLens = SpaceLensComposition.make()
+    Task { @MainActor in
+      if let folder = request.mapFolder {
+        await RenderToFile.mapAndSettle(spaceLens.model, folder: folder)
+      }
+      do {
+        try RenderToFile.render(
+          request,
+          hub: HubModel(state: .firstRun(now: Date())),
+          cleanup: CleanupComposition.make(onboarding: onboarding),
+          spaceLens: spaceLens
+        )
+        FileHandle.standardOutput.write(Data("rendered \(request.destination.path)\n".utf8))
+        exit(0)
+      } catch {
+        FileHandle.standardError.write(Data("render failed: \(error)\n".utf8))
+        exit(1)
+      }
     }
   }
 
