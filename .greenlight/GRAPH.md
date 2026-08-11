@@ -504,14 +504,68 @@ they were done alongside.
 - Tier: auto.
 
 ### s3e. process monitor
-- Contracts: C25.
+- Contracts: C25, amended in this slice on five points, each a contract change
+  rather than an implementation choice: `quit` takes a `QuitConfirmation`
+  value rather than an identifier, a name and a `force` flag; the name lookup
+  moves onto the signalling boundary beside the terminate rather than sitting
+  with the listing; the sampling cadence becomes an injected boundary; the
+  heaviest first ordering breaks ties by the lower process identifier; and a
+  snapshot the machine refuses is skipped rather than repeated. C25 also
+  declares the three boundaries it had only described (`ProcessListing`,
+  `ProcessTerminating`, `ProcessSampleCadence`) and writes the recycled
+  identifier guarantee out in full, including the part it does not promise.
+  Nothing implemented C25 before this slice, so none of it migrates.
 - Depends on: s3c.
-- Verification: samples stream sorted heaviest first without blocking the
-  main actor; quit demands the confirmation path and force is a second
-  separate confirmation; a recycled process identifier is caught by the name
-  check and nothing is killed.
-- Tier: verify. Human check: the live view updates smoothly and quitting a
-  test process names it in the confirmation.
+- Verification: nothing is read before the first tick and one snapshot is
+  taken per tick, so the view reads the machine when a sample is due and never
+  speculatively; the stream finishes when the cadence does and a cancelled
+  consumer ends the sampling loop, with ticks after it reading the machine no
+  further times. Every snapshot arrives heaviest first with ties broken by the
+  lower process identifier, asserted over generated machines drawn from a
+  handful of footprint buckets so most rows are ties, and the same processes
+  reported in any order produce one order on screen; sorting drops nothing,
+  invents nothing and edits no field. Monitoring signals nothing and reads no
+  name for a whole run, which is structural rather than asserted alone: the
+  sampling loop holds `ProcessListing`, which declares one method and it
+  reads, so a sampler that could end a process does not compile. The machine
+  is never read on the main actor and the sampler makes progress while the
+  main actor is held in a loop, which is the assertion that fails against a
+  monitor isolated to the main actor and passes against one that samples off
+  it; quitting from the main actor reaches the machine off it too. A snapshot
+  the machine refuses is skipped and the view carries on, with the failed tick
+  attempted rather than passed over, and a machine with nothing running yields
+  an empty snapshot rather than no snapshot. `quit` accepts only a
+  `QuitConfirmation`, and a force quit needs its own: no sequence of quit
+  confirmations, over every process on the fixture machine in any order,
+  produces a force signal, and repeating a quit against a process that ignores
+  the polite signal repeats that answer rather than escalating; the escalation
+  is unwritable rather than untested, since the kind has no setter and the
+  memberwise initialiser is not public. A confirmation cannot be decoded from
+  bytes, so none can be stored or replayed. The live name is read from the
+  signalling boundary immediately before the signal and the two land in that
+  order on one journal, so the check is asserted as an ordering; a recycled
+  identifier is refused naming both the confirmed process and the one holding
+  the number now, nothing is signalled, no retry follows, and the process that
+  inherited the identifier is still running afterwards. The check reads the
+  machine rather than the snapshot the row was drawn from, proved by taking a
+  real sample, recycling the identifier under it and confirming exactly what
+  the row said. Comparison is exact over a matrix of every confirmed name
+  against every live name for both kinds of confirmation, near misses
+  included, so case, surrounding whitespace, a prefix and an empty name are
+  all mismatches and a signal goes out exactly when the two names are equal; a
+  vacant identifier is refused for every name, so a missing name is never read
+  as no objection. Both failure paths fail closed: a name the machine will not
+  give up refuses the quit and signals nothing, and a signal the machine
+  refuses surfaces as `notPermitted` in a plain sentence naming the process,
+  with that process still running. Two processes sharing a name are two
+  processes: quitting one leaves the other running. The monitor is not a
+  `GleamEngine` and not a `PlanExecuting`, so nothing routes the live view
+  into a plan, and a `ProcessSample` carries no path, so C5's pathless rule
+  holds here by the shape of the data.
+- Tier: verify. Human check: the live view updates smoothly and reads in a
+  stable order rather than shuffling equal rows between ticks; quitting a test
+  process names it in the confirmation; and a process that ignores the polite
+  signal asks a second, separate question before it is forced.
 
 ## M4. Applications
 
