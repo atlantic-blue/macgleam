@@ -96,4 +96,25 @@ struct LeftoversPlanAndExecutionTests {
     #expect(targets == [allowed])
     #expect(!targets.contains(blocked))
   }
+
+  /// C15 fixes the payload: the identifier is the offending finding's, never
+  /// the session's, because a caller reconciling a refusal needs to know
+  /// which finding to drop and a session identifier cannot tell them. The
+  /// finding's identifier, its session and the context's session are three
+  /// distinct fixture values, so this equality discriminates between them.
+  @Test("the refusal names the offending finding, never the session it came from")
+  func findingFromDifferentSessionNamesTheFinding() throws {
+    let context = makePlanContext(
+      rules: try LeftoversTree.catalog(),
+      sessionID: LeftoversFixture.sessionID
+    )
+    let foreign = makeLeftoversFinding(
+      id: LeftoversFixture.uuid(0xD4),
+      sessionID: LeftoversFixture.foreignSessionID
+    )
+
+    #expect(throws: PlanningError.findingFromDifferentSession(foreign.id)) {
+      _ = try makeLeftoversEngine().plan(selection: [foreign], context: context)
+    }
+  }
 }

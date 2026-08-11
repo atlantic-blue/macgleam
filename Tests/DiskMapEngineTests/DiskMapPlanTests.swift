@@ -142,6 +142,30 @@ struct DiskMapPlanTests {
       return true
     }
   }
+
+  /// C15 fixes the payload: the identifier is the offending finding's, never
+  /// the session's, because a caller reconciling a refusal needs to know
+  /// which finding to drop and a session identifier cannot tell them. The
+  /// finding's identifier, its session and the context's session are three
+  /// distinct fixture values, so this equality discriminates between them.
+  @Test("the refusal names the offending finding, never the session it came from")
+  func findingFromDifferentSessionNamesTheFinding() throws {
+    let context = makePlanContext(
+      rules: try LensTree.catalog(),
+      sessionID: DiskMapFixture.sessionID
+    )
+    let foreign = makeDiskMapSelection(
+      id: DiskMapFixture.uuid(0xF4),
+      sessionID: DiskMapFixture.foreignSessionID,
+      entries: [
+        PathEntry(path: DiskMapFixture.path(LensTree.photo), allocatedBytes: 8_000)
+      ]
+    )
+
+    #expect(throws: PlanningError.findingFromDifferentSession(foreign.id)) {
+      _ = try DiskMapEngine().plan(selection: [foreign], context: context)
+    }
+  }
 }
 
 @Suite("Disk map end to end: map, select, plan, execute")

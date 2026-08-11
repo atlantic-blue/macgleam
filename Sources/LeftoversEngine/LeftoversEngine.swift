@@ -71,7 +71,7 @@ extension LeftoversEngine {
     yield(.phase(.determinate(estimatedTotalFiles: counters.filesSeen)))
     for finding in try await buildFindings(files: files, context: context) {
       try Task.checkCancellation()
-      counters.itemCount += UInt32(finding.entries.count)
+      counters.itemCount += finding.itemCount
       counters.bytesReclaimable += finding.byteSize
       yield(.finding(finding))
       yield(.progress(counters))

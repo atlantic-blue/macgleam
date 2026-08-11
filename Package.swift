@@ -93,6 +93,16 @@ let package = Package(
             path: "Tests/DiskMapEngineTests"
         ),
         .target(
+            name: "PerformanceEngine",
+            dependencies: ["GleamCore"],
+            path: "Sources/PerformanceEngine"
+        ),
+        .testTarget(
+            name: "PerformanceEngineTests",
+            dependencies: ["PerformanceEngine", "GleamCore"],
+            path: "Tests/PerformanceEngineTests"
+        ),
+        .target(
             name: "DiskMapModule",
             dependencies: ["GleamCore", "DiskMapEngine", "GleamHub"],
             path: "Sources/DiskMapModule"

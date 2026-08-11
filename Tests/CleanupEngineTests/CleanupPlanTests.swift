@@ -180,6 +180,27 @@ struct CleanupPlanSafetyTests {
       return true
     }
   }
+
+  /// C15 fixes the payload: the identifier is the offending finding's, never
+  /// the session's, because a caller reconciling a refusal needs to know
+  /// which finding to drop and a session identifier cannot tell them. The
+  /// finding's identifier, its session and the context's session are three
+  /// distinct fixture values, so this equality discriminates between them.
+  @Test("the refusal names the offending finding, never the session it came from")
+  func findingFromDifferentSessionNamesTheFinding() throws {
+    let context = makePlanContext(
+      rules: try JunkTree.catalog(),
+      sessionID: CleanupFixture.sessionID
+    )
+    let foreign = makeCleanupFinding(
+      id: CleanupFixture.uuid(0xB4),
+      sessionID: CleanupFixture.foreignSessionID
+    )
+
+    #expect(throws: PlanningError.findingFromDifferentSession(foreign.id)) {
+      _ = try CleanupEngine().plan(selection: [foreign], context: context)
+    }
+  }
 }
 
 @Suite("Cleanup plan: privilege routing")

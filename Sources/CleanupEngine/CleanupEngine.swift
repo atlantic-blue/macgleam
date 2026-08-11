@@ -297,7 +297,7 @@ private struct FindingBatches {
         rule: rules[batches[slot].ruleIndex],
         category: batches[slot].category,
         records: records.sorted { $0.path < $1.path }))
-    counters.itemCount += UInt32(finding.entries.count)
+    counters.itemCount += finding.itemCount
     counters.bytesReclaimable += finding.byteSize
     yield(.finding(finding))
     yield(.progress(counters))

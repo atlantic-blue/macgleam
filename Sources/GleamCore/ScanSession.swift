@@ -12,7 +12,9 @@ public struct ScanCounters: Codable, Sendable, Equatable {
   public var filesSeen: UInt64
   public var bytesReclaimable: UInt64
   /// Path entries across the findings emitted so far. Rises by a finding's
-  /// entry count in the same step that emits that finding.
+  /// `Finding.itemCount` in the same step that emits that finding: its entry
+  /// count, or one for a finding that carries no entries, where the finding
+  /// is itself the item.
   public var itemCount: UInt32
 
   public static let zero = ScanCounters(filesSeen: 0, bytesReclaimable: 0, itemCount: 0)
