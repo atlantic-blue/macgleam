@@ -1,3 +1,5 @@
+import CleanupModule
+import DiskMapModule
 import GleamDesign
 import GleamHub
 import SwiftUI
@@ -8,8 +10,11 @@ import SwiftUI
 /// There is no top bar. The app's name and its settings both live in the
 /// rail, so a bar carrying them again said everything twice.
 ///
-/// Up and down move the rail selection through HubNavigationResolver. Return
-/// and escape do not move it; they carry an intent the open pane interprets.
+/// Every key press resolves through HubKeyResolver. Up and down move the
+/// rail. Return runs the primary control of the pane on screen, and escape
+/// backs out of a drilled in level of the map. Anything the shell cannot
+/// act on it leaves alone, so the press reaches the machine and the user
+/// gets the answer a key with nothing behind it should get.
 struct AppShellView: View {
   let model: HubModel
   let cleanup: CleanupDependencies
@@ -74,7 +79,7 @@ struct AppShellView: View {
         DiskMapView(
           model: diskMap.model, executor: diskMap.executor, idlePane: content)
       default:
-        ModulePaneView(pane: content, onActivate: {})
+        ModulePaneView(pane: content, onActivate: { primaryAction?() })
       }
     }
     .transition(paneTransition)
@@ -103,12 +108,77 @@ struct AppShellView: View {
   }
 
   private func handle(_ key: HubKeyEvent) -> KeyPress.Result {
-    let transition = HubNavigationResolver.transition(navigation, applying: key)
-    if transition.next != navigation {
+    switch HubKeyResolver.outcome(navigation, applying: key, pane: paneCapabilities) {
+    case .moved(let next):
       withAnimation(GleamSpring.snappy.animation(reduceMotion: reduceMotion)) {
-        navigation = transition.next
+        navigation = next
       }
+      return .handled
+    case .acted(let intent):
+      run(intent)
+      return .handled
+    case .ignored:
+      return .ignored
     }
-    return .handled
+  }
+
+  /// What the pane on screen can be asked to do. Both facts come from the
+  /// same properties that carry out the work, so the shell cannot claim a
+  /// key it has nothing to run.
+  private var paneCapabilities: HubPaneCapabilities {
+    HubPaneCapabilities(
+      hasPrimaryAction: primaryAction != nil,
+      hasDismissal: dismissAction != nil
+    )
+  }
+
+  private func run(_ intent: HubIntent) {
+    switch intent {
+    case .activatePrimaryAction:
+      primaryAction?()
+    case .dismiss:
+      dismissAction?()
+    }
+  }
+
+  /// What the pane's primary control does right now, and nil when it draws
+  /// none. This mirrors `paneSurface`: a module that is not built shows a
+  /// note rather than a control, and once a module is working it has put up
+  /// its own screens, which own their own keys. So the shell offers the
+  /// entry action and nothing else.
+  private var primaryAction: (() -> Void)? {
+    switch navigation.selection {
+    case .module(.cleanup) where pane.action != nil:
+      guard case .idle = cleanup.model.state else { return nil }
+      return { cleanup.model.startScan() }
+    case .diskMap:
+      guard case .idle = diskMap.model.state else { return nil }
+      return { diskMap.model.startMapping(volume: DiskMapView.defaultVolume) }
+    default:
+      return nil
+    }
+  }
+
+  /// Escape backs out one level of the map, which is exactly what the
+  /// breadcrumb's own chevron does and destroys nothing. It is the only
+  /// dismissal in the shell: stopping a running scan throws the work away,
+  /// and a key pressed by accident is no place for that.
+  private var dismissAction: (() -> Void)? {
+    guard navigation.selection == .diskMap else { return nil }
+    let map: DiskMapState
+    switch diskMap.model.state {
+    case .mapping(let state), .browsing(let state):
+      map = state
+    default:
+      return nil
+    }
+    guard map.focusPath != map.volume else { return nil }
+    return { drillOutOfMap() }
+  }
+
+  private func drillOutOfMap() {
+    withAnimation(DiskMapZoom.animation(for: .zoomOut, reduceMotion: reduceMotion)) {
+      _ = diskMap.model.drillOut()
+    }
   }
 }

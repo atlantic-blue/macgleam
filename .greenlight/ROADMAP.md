@@ -46,14 +46,15 @@ flowchart TB
 
 ## Milestones
 
-**M0. Foundation and the hub shell**
+**M0. Foundation and the shell**
 - Repo cut from the ideas folder, Swift package workspace, continuous
   integration on a GitHub Actions macOS runner with test and lint gates.
 - GleamDesign package: colour, type, spacing and motion tokens; the spring set.
-- Hub window with the status scene in its idle states and six placeholder
-  cards; matched geometry zoom in and out working end to end with keyboard
-  navigation and Reduce Motion fallback.
-- Slices here prove the signature interaction before any cleaning exists.
+- The window with the status scene in its idle states, every destination
+  reachable, keyboard navigation and the Reduce Motion fallback.
+- Slices here prove the interaction before any cleaning exists. What shipped
+  was the hexagonal hub and its matched geometry zoom; the rail replaced that
+  surface in M2 (DECISIONS.md, 2026-08-10) and the models underneath survived.
 
 **M1. The first clean**
 - Full Disk Access onboarding flow with live grant detection and the degraded
@@ -70,9 +71,11 @@ flowchart TB
 **M2. Leftovers and Disk Map**
 - Leftovers: large and old files, downloads triage, duplicates by content
   hash (keep one copy invariant), similar photos.
-- Disk Map: streaming disk map with the shared zoom grammar.
+- Disk Map: a streaming treemap, drilled into with the shared zoom grammar.
 - Scan performance targets from DESIGN.md are measured and enforced in tests
   here, since these are the heaviest scans.
+- The interface work that landed alongside: the navigation rail replacing the
+  hub, the treemap, and the specified light appearance.
 
 **M3. Performance and the privileged helper**
 - GleamHelper: SMAppService daemon registration flow, XPC contract in

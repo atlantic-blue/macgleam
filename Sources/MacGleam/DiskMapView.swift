@@ -21,7 +21,10 @@ struct DiskMapView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var confirmingScope: PermanentDeletionScope?
 
-  private static let defaultVolume = AbsolutePath(normalising: "/")
+  /// The volume a map opens on. The shell starts a map from the same value
+  /// when the return key asks for one, so the key and the button map the
+  /// same disk.
+  static let defaultVolume = AbsolutePath(normalising: "/")
 
   var body: some View {
     Group {
@@ -169,33 +172,16 @@ struct DiskMapView: View {
 
   private func performDrillIn(to path: AbsolutePath) {
     var drill: DiskMapDrill?
-    withAnimation(zoomAnimation(for: .zoomIn)) {
+    withAnimation(DiskMapZoom.animation(for: .zoomIn, reduceMotion: reduceMotion)) {
       drill = model.drillIn(to: path)
     }
     _ = drill
   }
 
   private func performDrillOut() {
-    withAnimation(zoomAnimation(for: .zoomOut)) {
+    withAnimation(DiskMapZoom.animation(for: .zoomOut, reduceMotion: reduceMotion)) {
       _ = model.drillOut()
     }
-  }
-
-  /// The same zoom language as the hub: the drill direction resolves
-  /// through HubZoomResolver, so full motion is the snappy matched geometry
-  /// spring and Reduce Motion is a crossfade, never a spring.
-  private func zoomAnimation(for direction: HubZoomDirection) -> Animation {
-    switch HubZoomResolver.appearance(for: direction, reduceMotion: reduceMotion) {
-    case .matchedGeometry(let spring):
-      return spring.animation(reduceMotion: false)
-    case .crossfade(let fade):
-      return .easeInOut(duration: seconds(of: fade.duration))
-    }
-  }
-
-  private func seconds(of duration: Duration) -> Double {
-    Double(duration.components.seconds)
-      + Double(duration.components.attoseconds) / 1e18
   }
 
   private var isConfirmingPermanent: Binding<Bool> {
