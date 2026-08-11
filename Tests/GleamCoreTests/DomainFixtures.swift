@@ -110,14 +110,12 @@ func makeOperationPlan(
 
 func makeMetadataSnapshot(
   posixPermissions: UInt16 = 0o644,
-  ownerAccountName: String? = "test",
   extendedAttributes: [String: Data] = ["com.apple.quarantine": Fixture.attributeBytes],
   created: Date? = Fixture.referenceDate,
   modified: Date? = Fixture.laterDate
 ) -> FileMetadataSnapshot {
   FileMetadataSnapshot(
     posixPermissions: posixPermissions,
-    ownerAccountName: ownerAccountName,
     extendedAttributes: extendedAttributes,
     created: created,
     modified: modified

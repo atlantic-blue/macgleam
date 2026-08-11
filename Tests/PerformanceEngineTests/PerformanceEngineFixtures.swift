@@ -101,6 +101,10 @@ struct ReadingOnlyFileSystem: FileSystemReading {
     try await backing.metadata(at: path)
   }
 
+  func posixPermissions(at path: AbsolutePath) async throws -> UInt16 {
+    try await backing.posixPermissions(at: path)
+  }
+
   func readData(at path: AbsolutePath, maxBytes: UInt64) async throws -> Data {
     try await backing.readData(at: path, maxBytes: maxBytes)
   }
@@ -176,6 +180,10 @@ final class TrappingFileSystem: FileSystemReading, FileSystemMutating, Sendable 
     throw FileSystemUseError.readsAreNotPartOfMaintenance
   }
 
+  func posixPermissions(at path: AbsolutePath) async throws -> UInt16 {
+    throw FileSystemUseError.readsAreNotPartOfMaintenance
+  }
+
   func readData(at path: AbsolutePath, maxBytes: UInt64) async throws -> Data {
     throw FileSystemUseError.readsAreNotPartOfMaintenance
   }
@@ -209,6 +217,11 @@ final class TrappingFileSystem: FileSystemReading, FileSystemMutating, Sendable 
 
   func createDirectory(at path: AbsolutePath) async throws {
     record("createDirectory(\(path.value))")
+    throw FileSystemUseError.mutationsAreNotPartOfMaintenance
+  }
+
+  func writeData(_ data: Data, to path: AbsolutePath) async throws {
+    record("writeData(\(path.value))")
     throw FileSystemUseError.mutationsAreNotPartOfMaintenance
   }
 

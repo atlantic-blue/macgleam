@@ -14,7 +14,6 @@ struct FileMetadataSnapshotTests {
   func sparseSnapshotRoundTrips() throws {
     let snapshot = makeMetadataSnapshot(
       posixPermissions: 0,
-      ownerAccountName: nil,
       extendedAttributes: [:],
       created: nil,
       modified: nil

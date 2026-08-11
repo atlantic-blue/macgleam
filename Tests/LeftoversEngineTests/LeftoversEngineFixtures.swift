@@ -218,6 +218,10 @@ struct ReadingOnlyFileSystem: FileSystemReading {
     try await backing.metadata(at: path)
   }
 
+  func posixPermissions(at path: AbsolutePath) async throws -> UInt16 {
+    try await backing.posixPermissions(at: path)
+  }
+
   func readData(at path: AbsolutePath, maxBytes: UInt64) async throws -> Data {
     try await backing.readData(at: path, maxBytes: maxBytes)
   }
@@ -283,6 +287,10 @@ struct AllocationPinningFileSystem: FileSystemReading {
 
   func metadata(at path: AbsolutePath) async throws -> FileRecord {
     repinned(try await backing.metadata(at: path))
+  }
+
+  func posixPermissions(at path: AbsolutePath) async throws -> UInt16 {
+    try await backing.posixPermissions(at: path)
   }
 
   func readData(at path: AbsolutePath, maxBytes: UInt64) async throws -> Data {

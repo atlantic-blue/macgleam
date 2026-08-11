@@ -158,6 +158,10 @@ struct ExecutorTrippingFileSystem: FileSystemReading, FileSystemMutating {
     try await base.metadata(at: path)
   }
 
+  func posixPermissions(at path: AbsolutePath) async throws -> UInt16 {
+    try await base.posixPermissions(at: path)
+  }
+
   func readData(at path: AbsolutePath, maxBytes: UInt64) async throws -> Data {
     try await base.readData(at: path, maxBytes: maxBytes)
   }
@@ -198,6 +202,12 @@ struct ExecutorTrippingFileSystem: FileSystemReading, FileSystemMutating {
 
   func createDirectory(at path: AbsolutePath) async throws {
     try await base.createDirectory(at: path)
+  }
+
+  /// Forwarded without tripping: the trigger models cancelling between two
+  /// executor operations, and the executor never writes bytes.
+  func writeData(_ data: Data, to path: AbsolutePath) async throws {
+    try await base.writeData(data, to: path)
   }
 
   func setPosixPermissions(_ mode: UInt16, at path: AbsolutePath) async throws {

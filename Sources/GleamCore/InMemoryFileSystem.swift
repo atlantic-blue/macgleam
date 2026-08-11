@@ -122,6 +122,10 @@ extension InMemoryFileSystem: FileSystemReading {
     record(at: path, node: try existingNode(at: path))
   }
 
+  public func posixPermissions(at path: AbsolutePath) async throws -> UInt16 {
+    try existingNode(at: path).posixPermissions & 0o7777
+  }
+
   public func readData(at path: AbsolutePath, maxBytes: UInt64) async throws -> Data {
     let node = try existingNode(at: path)
     guard !node.isDirectory else {
@@ -184,6 +188,23 @@ extension InMemoryFileSystem: FileSystemMutating {
       return
     }
     seedDirectory(at: path)
+  }
+
+  /// Replaces the node's contents whole, creating the node when absent. A
+  /// missing parent directory throws rather than being created, so the fake
+  /// refuses the mistyped path the real file system refuses.
+  public func writeData(_ data: Data, to path: AbsolutePath) async throws {
+    guard let parent = path.parent else { throw FileSystemError.destinationOccupied(path) }
+    guard nodes[parent]?.isDirectory == true else { throw FileSystemError.notFound(parent) }
+    if let existing = nodes[path] {
+      guard !existing.isDirectory else { throw FileSystemError.destinationOccupied(path) }
+      nodes[path]?.contents = data
+      return
+    }
+    nodes[path] = Node(
+      isDirectory: false, contents: data, isExecutable: false, created: nil, modified: nil,
+      lastOpened: nil, extendedAttributes: [:], posixPermissions: 0o644,
+      fileID: allocateFileID())
   }
 
   public func setPosixPermissions(_ mode: UInt16, at path: AbsolutePath) async throws {

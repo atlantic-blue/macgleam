@@ -132,6 +132,90 @@ struct FileSystemMetadataConformanceTests {
   }
 }
 
+/// Modes chosen so no constant can satisfy the round trip and so
+/// `FileRecord.isExecutable` cannot stand in for any of it: 0o600 and 0o644
+/// differ only in bits that boolean never sees, 0o700 and 0o755 are identical
+/// through it, and 0o751 gives the owner, group and other triples three
+/// different values.
+private let exactModes: [UInt16] = [0o600, 0o644, 0o700, 0o751, 0o755]
+
+/// The three bits above the permission triples. A restore reinstates the
+/// mode bit for bit, so a setuid binary that comes back without its setuid
+/// bit is a broken restore and a sticky directory that loses its sticky bit
+/// is another.
+private let specialBitModes: [UInt16] = [0o4755, 0o2711, 0o1755]
+
+@Suite("File system conformance: permission modes")
+struct FileSystemPermissionModeConformanceTests {
+
+  @Test(
+    "posixPermissions returns the exact mode a file carries",
+    arguments: FileSystemKind.allCases, exactModes)
+  func exactModeIsReportedForAFile(kind: FileSystemKind, mode: UInt16) async throws {
+    try await withHarness(kind, tree: readingTree) { harness in
+      let path = harness.root.appending("notes.txt")
+      try await harness.fileSystem.setPosixPermissions(mode, at: path)
+      #expect(try await harness.fileSystem.posixPermissions(at: path) == mode)
+    }
+  }
+
+  @Test(
+    "posixPermissions reports the setuid, setgid and sticky bits",
+    arguments: FileSystemKind.allCases, specialBitModes)
+  func specialBitsAreReported(kind: FileSystemKind, mode: UInt16) async throws {
+    try await withHarness(kind, tree: readingTree) { harness in
+      let path = harness.root.appending("tools/runme")
+      try await harness.fileSystem.setPosixPermissions(mode, at: path)
+      #expect(try await harness.fileSystem.posixPermissions(at: path) == mode)
+    }
+  }
+
+  @Test(
+    "posixPermissions tells apart two files the executable bit cannot",
+    arguments: FileSystemKind.allCases)
+  func modesAgreeingOnTheExecutableBitAreStillDistinct(kind: FileSystemKind) async throws {
+    try await withHarness(kind, tree: readingTree) { harness in
+      let shared = harness.root.appending("tools/runme")
+      let restricted = harness.root.appending("payload.bin")
+      try await harness.fileSystem.setPosixPermissions(0o755, at: shared)
+      try await harness.fileSystem.setPosixPermissions(0o700, at: restricted)
+      let sharedRecord = try await harness.fileSystem.metadata(at: shared)
+      let privateRecord = try await harness.fileSystem.metadata(at: restricted)
+      // The lossy derivation agrees, which is exactly why the exact read exists.
+      #expect(sharedRecord.isExecutable == privateRecord.isExecutable)
+      #expect(try await harness.fileSystem.posixPermissions(at: shared) == 0o755)
+      #expect(try await harness.fileSystem.posixPermissions(at: restricted) == 0o700)
+    }
+  }
+
+  @Test(
+    "a directory's mode comes back exactly and carries no file type bits",
+    arguments: FileSystemKind.allCases)
+  func directoryModeCarriesNoFileTypeBits(kind: FileSystemKind) async throws {
+    try await withHarness(kind, tree: readingTree) { harness in
+      let directory = harness.root.appending("tools")
+      try await harness.fileSystem.setPosixPermissions(0o750, at: directory)
+      let mode = try await harness.fileSystem.posixPermissions(at: directory)
+      #expect(mode == 0o750)
+      #expect(mode & ~0o7777 == 0)
+      // The harness tears down through this directory.
+      try await harness.fileSystem.setPosixPermissions(0o755, at: directory)
+    }
+  }
+
+  @Test(
+    "posixPermissions for a missing path throws notFound rather than defaulting",
+    arguments: FileSystemKind.allCases)
+  func posixPermissionsThrowsNotFoundForMissingPath(kind: FileSystemKind) async throws {
+    try await withHarness(kind, tree: readingTree) { harness in
+      let missing = harness.root.appending("never-created.txt")
+      await #expect(throws: FileSystemError.notFound(missing)) {
+        _ = try await harness.fileSystem.posixPermissions(at: missing)
+      }
+    }
+  }
+}
+
 @Suite("File system conformance: reading data")
 struct FileSystemReadDataConformanceTests {
 

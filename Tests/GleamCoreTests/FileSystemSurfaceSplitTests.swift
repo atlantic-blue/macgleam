@@ -22,6 +22,10 @@ private struct ReadingOnlyFileSystem: FileSystemReading {
     throw FileSystemError.notFound(path)
   }
 
+  func posixPermissions(at path: AbsolutePath) async throws -> UInt16 {
+    throw FileSystemError.notFound(path)
+  }
+
   func readData(at path: AbsolutePath, maxBytes: UInt64) async throws -> Data {
     throw FileSystemError.notFound(path)
   }
@@ -39,6 +43,41 @@ private struct ReadingOnlyFileSystem: FileSystemReading {
   }
 }
 
+/// The mirror image, and the compile time proof for the other side: this
+/// builds only if `writeData` is a member of the mutating protocol. An
+/// implementation that put a byte writing method on the reading side would
+/// fail to compile here and in the type above at once.
+private struct WritingOnlyFileSystem: FileSystemMutating {
+
+  func moveToTrash(_ path: AbsolutePath) async throws -> AbsolutePath {
+    throw FileSystemError.notFound(path)
+  }
+
+  func move(_ source: AbsolutePath, to destination: AbsolutePath) async throws {
+    throw FileSystemError.notFound(source)
+  }
+
+  func delete(_ path: AbsolutePath) async throws {
+    throw FileSystemError.notFound(path)
+  }
+
+  func createDirectory(at path: AbsolutePath) async throws {
+    throw FileSystemError.permissionDenied(path)
+  }
+
+  func writeData(_ data: Data, to path: AbsolutePath) async throws {
+    throw FileSystemError.permissionDenied(path)
+  }
+
+  func setPosixPermissions(_ mode: UInt16, at path: AbsolutePath) async throws {
+    throw FileSystemError.notFound(path)
+  }
+
+  func setExtendedAttributes(_ attributes: [String: Data], at path: AbsolutePath) async throws {
+    throw FileSystemError.notFound(path)
+  }
+}
+
 @Suite("Reading and mutating split")
 struct FileSystemSurfaceSplitTests {
 
@@ -46,6 +85,12 @@ struct FileSystemSurfaceSplitTests {
   func readingOnlyConformanceIsNotMutating() {
     let readingOnly: Any = ReadingOnlyFileSystem()
     #expect(!(readingOnly is any FileSystemMutating))
+  }
+
+  @Test("a mutating only conformance is possible and is not a reading file system")
+  func mutatingOnlyConformanceIsNotReading() {
+    let writingOnly: Any = WritingOnlyFileSystem()
+    #expect(!(writingOnly is any FileSystemReading))
   }
 
   @Test("the combined FileSystem alias carries both the reading and the mutating side")
