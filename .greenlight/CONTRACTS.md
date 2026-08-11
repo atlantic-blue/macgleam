@@ -1436,7 +1436,22 @@ public struct PerformanceEngine: GleamEngine { /* module == .performance */ }
 ///   the helper (C30). The caller does not choose; the implementation
 ///   routes by scope.
 /// - Changing an item that no longer exists throws `itemNotFound` and
-///   changes nothing.
+///   changes nothing. For a system scope item that is the helper refusing
+///   `malformedRequest` because it cannot resolve the item (C31); this
+///   contract maps that refusal onto `itemNotFound`, so the caller is told
+///   the item is gone rather than shown a protocol error.
+///
+/// Types landing ahead of this slice: `LaunchItemID` and `LaunchItemChange`
+/// are plain value types carrying no behaviour, and both ship into GleamCore
+/// before this contract is implemented, because contracts built earlier name
+/// them. `LaunchItemID` landed with the domain model, which needed it for
+/// C7's `Operation.Kind`. `LaunchItemChange` lands with s3a, which needs it
+/// for C30's `launchItemChanged` reply: it arrives exactly as declared below,
+/// Codable, Sendable and Equatable, carrying `item`, `previousEnabled`,
+/// `newEnabled` and `changedAt` and nothing else. Every guarantee about how a
+/// change is produced, recorded, persisted or replayed belongs to this
+/// contract's slice; s3a adds none of it and asserts none of it beyond the
+/// round trip through the wire encoding.
 public protocol LaunchItemManaging: Sendable {
     func list() async throws -> [LaunchItem]
     func setEnabled(_ enabled: Bool, item: LaunchItemID) async throws -> LaunchItemChange
@@ -1676,10 +1691,19 @@ public struct FullSweepJobOutcome: Codable, Sendable, Equatable {
 ///   the helper's log and the app's report reconcile one to one.
 /// - `remove` carries an explicit destination; the helper never chooses
 ///   where a file goes.
-/// - Version handshake: the app sends `handshake` first; a helper whose
-///   contract version differs refuses all further requests with
-///   `versionMismatch` and the app prompts for helper update. Neither
-///   process assumes the other is current.
+/// - Version handshake: the app sends `handshake` first, naming the version
+///   it compiles against, and the helper answers naming the version it
+///   compiles against, whether the two agree or not. A helper whose contract
+///   version differs refuses every further request on that connection with
+///   `versionMismatch`. Neither process assumes the other is current.
+/// - The handshake exchange carries both versions by construction, so a
+///   disagreement is never reported to the app as a bare mismatch. The app
+///   compares the two numbers, says which side is behind, and prompts to
+///   update that side. Nothing else in the message set carries a version,
+///   and nothing else needs to.
+/// - `HelperContract.version` is the single declaration of the version both
+///   processes compile against. Any change to this message set bumps it in
+///   the same commit as the change.
 public enum HelperRequest: Codable, Sendable, Equatable {
     case handshake(contractVersion: UInt16)
     case remove(target: AbsolutePath, destination: HelperRemovalDestination,
@@ -1687,6 +1711,13 @@ public enum HelperRequest: Codable, Sendable, Equatable {
     case setLaunchItemEnabled(item: LaunchItemID, enabled: Bool,
                               planID: UUID, operationID: UUID)
     case runMaintenance(task: MaintenanceTask, planID: UUID, operationID: UUID)
+}
+
+/// Not a message: the one place the contract version is declared, in the
+/// package both processes link, so app and helper cannot disagree about what
+/// the current contract is without one of them being an older build.
+public enum HelperContract {
+    public static let version: UInt16 = 1
 }
 
 public enum HelperRemovalDestination: Codable, Sendable, Equatable {
@@ -1700,9 +1731,24 @@ public enum HelperRemovalDestination: Codable, Sendable, Equatable {
 }
 
 public enum HelperResponse: Codable, Sendable, Equatable {
+    /// The versions agreed. The value is the version now in force, which is
+    /// the helper's own and, by that agreement, the app's too.
     case handshakeAccepted(contractVersion: UInt16)
+    /// The versions disagreed. Sent for that reason and no other, and it
+    /// names both by construction, so the app never has to infer which side
+    /// is behind: a helper version below the client's means the helper is
+    /// the old one and the update prompt is for the helper, above it means
+    /// the app is the old one and the prompt is for the app. The two are
+    /// never equal in this reply.
+    case handshakeRefused(helperContractVersion: UInt16,
+                          clientContractVersion: UInt16)
     case success(operationID: UUID, bytesReclaimed: UInt64)
     case launchItemChanged(operationID: UUID, change: LaunchItemChange)
+    /// Every refusal that is not a version disagreement, including a
+    /// handshake refused on identity. It names the operation it refused
+    /// where there is one, so the app's report reconciles, and it names no
+    /// version: a client the helper could not verify is told nothing about
+    /// the helper.
     case refused(operationID: UUID?, reason: HelperRefusal)
     case failed(operationID: UUID, reason: String)
 }
@@ -1710,6 +1756,7 @@ public enum HelperResponse: Codable, Sendable, Equatable {
 public enum HelperRefusal: String, Codable, Sendable, Equatable {
     case denylisted              // target blocked by the helper's own denylist
     case notSystemDomain         // target is user domain; least privilege cuts both ways
+    /// No version agreed on this connection, or the agreed versions differ.
     case versionMismatch
     case identityRejected        // connecting client failed code signing verification
     case malformedRequest
@@ -1722,17 +1769,47 @@ public enum HelperRefusal: String, Codable, Sendable, Equatable {
 /// The helper's own gate. Runs inside GleamHelper before any request is
 /// acted on. This is the security model made executable.
 ///
+/// One policy instance guards one connection. The agreed version is
+/// connection state: it is created with the connection and dies with it, so
+/// nothing another client did can change what this connection may do.
+///
 /// Guarantees, in evaluation order:
 /// - Identity: the connection's audit token must satisfy the code signing
-///   requirement (exact team identifier and bundle identifier of
-///   MacGleam.app). Anything else is dropped before message decoding, and
-///   a decoded message on a rejected connection is impossible by
-///   construction.
-/// - Handshake: contract versions must match (C30).
+///   requirement (the exact team identifier and bundle identifier of
+///   MacGleam.app, `ExpectedClientIdentity.macGleamApp`). Anything else is
+///   dropped before message decoding, and a decoded message on a rejected
+///   connection is impossible by construction.
+/// - Handshake: the first request on a connection must be `handshake`, and
+///   the version it names must equal the helper's own (C30). Two cases the
+///   evaluation order alone does not settle:
+///   - A request of any other kind arriving before any handshake is refused
+///     `versionMismatch`. No version has been agreed, so the helper cannot
+///     know the app speaks its contract, and it treats no agreement exactly
+///     as it treats disagreement. The app can always tell the two apart
+///     locally, because it knows whether it sent a handshake on this
+///     connection, and it prompts the user to update only on a
+///     `handshakeRefused` that named the versions.
+///   - A connection that has once been refused stays refused. Every later
+///     request is refused `versionMismatch`, including a second handshake
+///     naming the correct version, so a stale app cannot retry its way in.
+/// - The app learns the numbers from the exchange, never from the helper's
+///   own records: a version disagreement is answered with C30's
+///   `handshakeRefused`, which names the helper's version and the version
+///   the client claimed. The policy also exposes the mismatch it recorded
+///   for the connection; that record is helper side diagnostics and never
+///   crosses the process boundary.
 /// - Domain: `remove` and `setLaunchItemEnabled` targets must be
 ///   systemDomain under the shared PathOwnershipPolicy (C16). User domain
 ///   targets are refused `notSystemDomain`; the helper never does work the
 ///   user process could do itself.
+/// - Resolution, inside the domain stage: a `setLaunchItemEnabled` names an
+///   item, never a path, so the helper resolves the item to the file it
+///   would mutate through its own `HelperLaunchItemLocating` before it can
+///   place that file in a domain. An item the helper cannot resolve is
+///   refused `malformedRequest`, before the denylist is consulted: the
+///   helper cannot verify least privilege for something it cannot find, and
+///   it refuses rather than guessing. C24 maps that refusal onto its
+///   `itemNotFound` so the user is told the item is gone.
 /// - Denylist: the target is checked against the helper's own effective
 ///   denylist (embedded baseline united with any catalogue the helper has
 ///   itself verified per C10 and C19). The app's opinion is not trusted; a
@@ -1745,6 +1822,29 @@ public enum HelperRefusal: String, Codable, Sendable, Equatable {
 ///   real daemon on a real machine before release.
 public protocol HelperPolicy: Sendable {
     func admit(_ request: HelperRequest, from client: ClientIdentity) -> HelperAdmission
+}
+
+/// The one client identity the helper serves. Compiled into the helper
+/// rather than read from a file, so nothing on disk can widen it.
+///
+/// The team identifier is a launch milestone dependency. It is the team
+/// identifier of the Developer ID certificate the app and the helper are
+/// signed with, and that certificate does not exist yet (ROADMAP M7, s7b in
+/// GRAPH.md). Until it does, `macGleamApp` carries the real bundle
+/// identifier and a stand in team identifier, and the tests assert only that
+/// the team identifier is not empty.
+///
+/// This is the one value in the codebase that fails silently when it is
+/// wrong. A placeholder team identifier compiles, passes every identity test
+/// and still admits any signed client that copies the bundle identifier,
+/// which turns the whole client verification into a formality while the
+/// suite stays green. So the release pipeline fails the build when this
+/// value is not the Developer ID team (s7b): it cannot ship by being
+/// forgotten, only by being overruled.
+public struct ExpectedClientIdentity: Sendable, Equatable {
+    public let teamIdentifier: String
+    public let bundleIdentifier: String
+    public static let macGleamApp: ExpectedClientIdentity
 }
 
 public struct ClientIdentity: Sendable, Equatable {
@@ -2902,6 +3002,12 @@ These span boundaries and get their own always true tests:
   channel (C19) and licence activation (C34). A test walks the dependency
   graph for network capable types and asserts they exist only in those three
   places.
+- The helper serves exactly one client identity, and that identity is real
+  before release. `ExpectedClientIdentity.macGleamApp` (C31) carries a stand
+  in team identifier until the Developer ID exists, and the release pipeline
+  fails a signed build whose expected team identifier is not the Developer ID
+  team (s7b). Every other guarantee in the helper assumes this check bites,
+  so a placeholder left here removes all of them at once and breaks no test.
 - The denylist is enforced at three independent points: engine plan time
   (C15), executor run time (C17), helper admission (C31). Removing any one
   enforcement still leaves a blocked path unremovable.
