@@ -10,7 +10,8 @@ let package = Package(
         .library(name: "GleamCore", targets: ["GleamCore"]),
         .library(name: "GleamDesign", targets: ["GleamDesign"]),
         .library(name: "GleamHub", targets: ["GleamHub"]),
-        .executable(name: "MacGleam", targets: ["MacGleam"])
+        .executable(name: "MacGleam", targets: ["MacGleam"]),
+        .executable(name: "GleamHelper", targets: ["GleamHelper"])
     ],
     targets: [
         .target(
@@ -40,6 +41,16 @@ let package = Package(
             name: "GleamHelperCoreTests",
             dependencies: ["GleamHelperCore", "GleamCore"],
             path: "Tests/GleamHelperCoreTests"
+        ),
+        .target(
+            name: "GleamHelperClient",
+            dependencies: ["GleamCore", "GleamHelperCore"],
+            path: "Sources/GleamHelperClient"
+        ),
+        .testTarget(
+            name: "GleamHelperClientTests",
+            dependencies: ["GleamHelperClient", "GleamHelperCore", "GleamCore"],
+            path: "Tests/GleamHelperClientTests"
         ),
         .target(
             name: "CleanupEngine",
@@ -107,6 +118,11 @@ let package = Package(
             path: "Tests/GleamHubTests"
         ),
         .executableTarget(
+            name: "GleamHelper",
+            dependencies: ["GleamCore", "GleamHelperCore"],
+            path: "Sources/GleamHelper"
+        ),
+        .executableTarget(
             name: "GleamBaselineGenerator",
             dependencies: ["GleamCore"],
             path: "Sources/GleamBaselineGenerator"
@@ -118,8 +134,8 @@ let package = Package(
         .executableTarget(
             name: "MacGleam",
             dependencies: [
-        "GleamHub", "GleamDesign", "GleamCore", "CleanupEngine", "CleanupModule",
-        "DiskMapEngine", "DiskMapModule",
+        "GleamHub", "GleamDesign", "GleamCore", "GleamHelperCore", "GleamHelperClient",
+        "CleanupEngine", "CleanupModule", "DiskMapEngine", "DiskMapModule",
       ],
             path: "Sources/MacGleam"
         )

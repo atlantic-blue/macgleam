@@ -18,6 +18,13 @@ struct Bundler {
   static let executableName = "MacGleam"
   static let minimumSystemVersion = "14.0"
 
+  /// The privileged daemon travels inside the app. `SMAppService` registers a
+  /// daemon by the file name of a property list in the app's own
+  /// `Contents/Library/LaunchDaemons`, and launchd refuses a property list
+  /// whose `Label` and file name disagree, so both are this one string.
+  static let helperExecutableName = "GleamHelper"
+  static let helperLabel = "com.atlanticblue.macgleam.helper"
+
   let configuration: String
   let packageRoot: URL
 
@@ -31,13 +38,18 @@ struct Bundler {
 
   func run() throws {
     let binary = buildDirectory.appending(path: Self.executableName)
-    guard FileManager.default.fileExists(atPath: binary.path) else {
-      throw BundlerError.missingBinary(binary.path, configuration: configuration)
+    let helperBinary = buildDirectory.appending(path: Self.helperExecutableName)
+    for built in [binary, helperBinary] {
+      guard FileManager.default.fileExists(atPath: built.path) else {
+        throw BundlerError.missingBinary(built.path, configuration: configuration)
+      }
     }
 
     try replaceBundle()
-    try installBinary(from: binary)
+    try installBinary(from: binary, named: Self.executableName)
+    try installBinary(from: helperBinary, named: Self.helperExecutableName)
     try writeInformationPropertyList()
+    try writeLaunchDaemonPropertyList()
     try sign()
 
     print("Bundled \(bundleURL.path)")
@@ -49,21 +61,39 @@ struct Bundler {
     if manager.fileExists(atPath: bundleURL.path) {
       try manager.removeItem(at: bundleURL)
     }
-    try manager.createDirectory(
-      at: bundleURL.appending(path: "Contents/MacOS"),
-      withIntermediateDirectories: true
-    )
-    try manager.createDirectory(
-      at: bundleURL.appending(path: "Contents/Resources"),
-      withIntermediateDirectories: true
+    for directory in ["Contents/MacOS", "Contents/Resources", "Contents/Library/LaunchDaemons"] {
+      try manager.createDirectory(
+        at: bundleURL.appending(path: directory),
+        withIntermediateDirectories: true
+      )
+    }
+  }
+
+  private func installBinary(from binary: URL, named name: String) throws {
+    try FileManager.default.copyItem(
+      at: binary,
+      to: bundleURL.appending(path: "Contents/MacOS/\(name)")
     )
   }
 
-  private func installBinary(from binary: URL) throws {
-    try FileManager.default.copyItem(
-      at: binary,
-      to: bundleURL.appending(path: "Contents/MacOS/\(Self.executableName)")
+  /// The daemon's launchd job. `BundleProgram` is relative to the app bundle,
+  /// so the daemon that runs is always the one inside the app that registered
+  /// it, and `AssociatedBundleIdentifiers` is what puts a line reading MacGleam
+  /// rather than a bare label in Login Items and Extensions.
+  private func writeLaunchDaemonPropertyList() throws {
+    let job: [String: Any] = [
+      "Label": Self.helperLabel,
+      "BundleProgram": "Contents/MacOS/\(Self.helperExecutableName)",
+      "MachServices": [Self.helperLabel: true],
+      "AssociatedBundleIdentifiers": [Self.bundleIdentifier],
+    ]
+    let data = try PropertyListSerialization.data(
+      fromPropertyList: job,
+      format: .xml,
+      options: 0
     )
+    try data.write(
+      to: bundleURL.appending(path: "Contents/Library/LaunchDaemons/\(Self.helperLabel).plist"))
   }
 
   private func writeInformationPropertyList() throws {
@@ -88,10 +118,18 @@ struct Bundler {
     try data.write(to: bundleURL.appending(path: "Contents/Info.plist"))
   }
 
+  /// Inside out, which is the only order that works: signing the app seals the
+  /// hashes of everything inside it, so a nested executable signed afterwards
+  /// invalidates the enclosing signature it is sealed into.
   private func sign() throws {
+    try codesign(bundleURL.appending(path: "Contents/MacOS/\(Self.helperExecutableName)"))
+    try codesign(bundleURL)
+  }
+
+  private func codesign(_ target: URL) throws {
     let process = Process()
     process.executableURL = URL(filePath: "/usr/bin/codesign")
-    process.arguments = ["--force", "--sign", "-", "--timestamp=none", bundleURL.path]
+    process.arguments = ["--force", "--sign", "-", "--timestamp=none", target.path]
     try process.run()
     process.waitUntilExit()
     guard process.terminationStatus == 0 else {
@@ -109,7 +147,8 @@ enum BundlerError: Error, CustomStringConvertible {
     case .missingBinary(let path, let configuration):
       return """
         No built executable at \(path).
-        Build it first: swift build -c \(configuration) --product MacGleam
+        Build both first: swift build -c \(configuration) --product MacGleam
+        and swift build -c \(configuration) --product GleamHelper
         """
     case .signingFailed(let status):
       return "codesign exited with status \(status)."
