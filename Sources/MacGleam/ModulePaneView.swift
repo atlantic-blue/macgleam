@@ -63,7 +63,7 @@ struct ModulePaneView: View {
         )
         .overlay(
           Capsule()
-            .strokeBorder(Color.white.opacity(GleamElevation.low.borderOpacity), lineWidth: 1)
+            .strokeBorder(GleamElevation.low.edge(for: colorScheme), lineWidth: 1)
         )
     }
   }

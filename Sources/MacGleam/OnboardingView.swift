@@ -48,16 +48,12 @@ struct OnboardingView: View {
     .background(
       RoundedRectangle(cornerRadius: GleamRadius.card.value)
         .fill(GleamColorToken.surface.color(for: colorScheme))
-        .shadow(
-          color: .black.opacity(GleamElevation.high.shadowOpacity),
-          radius: GleamElevation.high.shadowRadius,
-          y: GleamElevation.high.shadowOffsetY
-        )
+        .gleamShadow(.high, for: colorScheme)
     )
     .overlay(
       RoundedRectangle(cornerRadius: GleamRadius.card.value)
         .strokeBorder(
-          Color.white.opacity(GleamElevation.high.borderOpacity), lineWidth: 1)
+          GleamElevation.high.edge(for: colorScheme), lineWidth: 1)
     )
   }
 }
