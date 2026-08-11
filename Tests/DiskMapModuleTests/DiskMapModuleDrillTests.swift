@@ -6,7 +6,7 @@ import GleamHub
 import Testing
 
 @MainActor
-@Suite("Space lens module drill")
+@Suite("Disk map module drill")
 struct DiskMapModuleDrillTests {
 
   @Test("drilling into a directory child of the focus moves the focus and zooms in")

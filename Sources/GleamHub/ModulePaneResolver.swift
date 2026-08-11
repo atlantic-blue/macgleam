@@ -57,7 +57,7 @@ public enum ModulePaneResolver {
     case .fullSweep:
       named = [
         ("Deep clean", "wand.and.sparkles"),
-        ("Storage deleftovers", "internaldrive"),
+        ("Storage declutter", "internaldrive"),
         ("Performance boost", "bolt"),
       ]
     case .cleanup:

@@ -20,7 +20,7 @@ the design session of 2026-08-09.
   Interaction and Motion section).
 
 **Full Sweep (v1 ships three of five jobs)**
-- One scan runs deep clean (Cleanup), storage deleftovers (Leftovers large and old
+- One scan runs deep clean (Cleanup), storage declutter (Leftovers large and old
   files) and performance boost (Performance maintenance) concurrently and presents
   one combined result with per job detail.
 - Threat scan and software updates join Full Sweep in later milestones once the
@@ -101,7 +101,7 @@ the design session of 2026-08-09.
 ### Non Functional
 
 - Scan performance: a full Cleanup scan of a typical 512 GB system disk completes
-  in under 60 seconds; Disk Map maps a full volume in under 30 seconds on Apple
+  in under 60 seconds; Disk Maps a full volume in under 30 seconds on Apple
   silicon. Directory enumeration uses getattrlistbulk with 4 to 8 concurrent
   readers per volume (APFS serialises directory reads past that).
 - Animation: no dropped frames during the hub zoom and scan progress on a 60 Hz

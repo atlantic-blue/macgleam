@@ -13,7 +13,7 @@ also keeps us clear of MacPaw's trademarks.
 CleanMyMac 5 is organised as six primary modules plus standalone tools:
 
 - Full Sweep: one scan that runs five jobs (deep clean, threat scan, performance
-  boost, software updates, storage deleftovers) and presents one combined result
+  boost, software updates, storage declutter) and presents one combined result
 - Cleanup: system junk (caches, logs, broken downloads), mail attachments, trash bins
 - Protection: malware scan and removal, privacy cleanup (browser data, recent lists)
 - Performance: maintenance scripts, login items, background items and launch agents,

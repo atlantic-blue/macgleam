@@ -289,7 +289,7 @@ s7a can start in parallel the moment the workspace exists.
   enforces the performance and streaming clauses of C20 and C22.
 - Depends on: s2a, s2d.
 - Verification: on a generated fixture of typical shape, the full Cleanup
-  scan finishes under 60 seconds and the Disk Map map under 30 on Apple
+  scan finishes under 60 seconds and the Disk Map under 30 on Apple
   silicon; peak resident memory during the largest scan stays under 500
   megabytes; the first finding and the first map node each arrive within two
   seconds of their run starting and within the first half of it; no finding

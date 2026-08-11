@@ -51,7 +51,7 @@ private func sendChildrenAndRevisions(_ feed: MapFeed) {
 }
 
 @MainActor
-@Suite("Space lens module intentions while mapping")
+@Suite("Disk map module intentions while mapping")
 struct DiskMapModuleIntentionTests {
 
   @Test(

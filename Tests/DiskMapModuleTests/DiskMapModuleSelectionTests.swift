@@ -4,7 +4,7 @@ import GleamCore
 import Testing
 
 @MainActor
-@Suite("Space lens module selection")
+@Suite("Disk map module selection")
 struct DiskMapModuleSelectionTests {
 
   @Test("toggling a selectable node selects it and the byte total is the exact sum")

@@ -95,7 +95,7 @@ flowchart TB
 - Signed rules channel live: Ed25519 manifest, independent publish workflow.
 
 **M6. Full Sweep and the menu bar**
-- FullSweepOrchestrator composing deep clean, storage deleftovers and
+- FullSweepOrchestrator composing deep clean, storage declutter and
   performance boost into one scan, one combined result, per job detail.
 - Menu bar scene: storage, memory, processor, one quick clean action.
 - The status scene now reflects live Full Sweep state across all its moods.

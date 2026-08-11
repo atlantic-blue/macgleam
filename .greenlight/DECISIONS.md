@@ -29,7 +29,7 @@ gets its own entry pointing at the one it supersedes.
 - 2026-08-09. Sparkle 2 for updates, EdDSA signed appcast, beta and stable
   channels. Rejected a custom updater as undifferentiated risk. Status: locked.
 - 2026-08-09. Full Sweep ships three of five jobs (deep clean, storage
-  deleftovers, performance boost). Threat scan and software updates join when
+  declutter, performance boost). Threat scan and software updates join when
   Protection and Applications exist; no stub jobs ever. Status: locked.
 - 2026-08-09. Privileged operations via an SMAppService root daemon with a
   typed XPC contract, closed operation set, denylist enforced in both

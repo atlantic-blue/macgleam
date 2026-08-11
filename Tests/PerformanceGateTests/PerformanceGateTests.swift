@@ -23,7 +23,7 @@ private let cleanupScanBudgetSeconds = 30.0
 
 /// C22 gives a full volume map 30 seconds, and the same scaling argument
 /// applies: half the contract budget over a fraction of the volume.
-private let diskMapMapBudgetSeconds = 15.0
+private let diskMapBudgetSeconds = 15.0
 
 /// The DESIGN.md ceiling itself, not scaled down. Holding the full disk
 /// figure on a smaller fixture is the least a streaming design must manage,
@@ -114,10 +114,10 @@ struct PerformanceGateTests {
     #expect(elapsed < cleanupScanBudgetSeconds)
   }
 
-  // MARK: Disk Map map
+  // MARK: Disk Map
 
-  @Test("the full disk map map of the typical fixture converges inside its budget")
-  func diskMapMapConvergesInsideItsBudget() async throws {
+  @Test("the full disk map of the typical fixture converges inside its budget")
+  func diskMapConvergesInsideItsBudget() async throws {
     let fixture = try SharedPerformanceFixture.get()
     let context = try makeRealDiskScanContext(for: fixture)
     let clock = ContinuousClock()
@@ -142,15 +142,15 @@ struct PerformanceGateTests {
     let elapsed = durationSeconds(start.duration(to: clock.now))
 
     print(
-      "PERFORMANCE GATE disk map map seconds: " + String(format: "%.2f", elapsed)
-        + " (budget \(diskMapMapBudgetSeconds)) over \(fixture.fileCount) fixture files, "
+      "PERFORMANCE GATE disk map seconds: " + String(format: "%.2f", elapsed)
+        + " (budget \(diskMapBudgetSeconds)) over \(fixture.fileCount) fixture files, "
         + "\(nodeCount) nodes, \(revisionCount) size revisions, root total \(rootTotalBytes) bytes"
     )
 
     #expect(nodeCount >= PerformanceFixture.intendedFileCount)
     #expect(rootTotalBytes > 0)
     #expect(completions == 1)
-    #expect(elapsed < diskMapMapBudgetSeconds)
+    #expect(elapsed < diskMapBudgetSeconds)
   }
 
   // MARK: Memory
@@ -192,7 +192,7 @@ struct PerformanceGateTests {
         + ") over \(entryCount) entries"
     )
     print(
-      "PERFORMANCE GATE peak resident megabytes, disk map map: "
+      "PERFORMANCE GATE peak resident megabytes, disk map: "
         + String(format: "%.0f", FootprintMeasurement.megabytes(mapFootprint.peakBytes))
         + " (ceiling 500, baseline "
         + String(format: "%.0f", FootprintMeasurement.megabytes(mapFootprint.baselineBytes))

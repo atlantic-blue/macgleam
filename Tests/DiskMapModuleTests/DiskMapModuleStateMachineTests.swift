@@ -4,7 +4,7 @@ import GleamCore
 import Testing
 
 @MainActor
-@Suite("Space lens module state machine")
+@Suite("Disk map module state machine")
 struct DiskMapModuleStateMachineTests {
 
   @Test("startMapping moves idle to mapping with a fresh session focused on the volume root")
@@ -249,7 +249,7 @@ func expectCommandsAreIdentity(
 }
 
 @MainActor
-@Suite("Space lens module command totality")
+@Suite("Disk map module command totality")
 struct DiskMapModuleCommandTotalityTests {
 
   @Test("in idle every command except startMapping is the identity")

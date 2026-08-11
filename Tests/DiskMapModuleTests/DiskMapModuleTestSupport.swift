@@ -180,7 +180,7 @@ struct MapFeed: Sendable {
   func fail(_ error: any Error) { continuation.finish(throwing: error) }
 }
 
-final class FakeDiskMapMapProvider: DiskMapMapProviding, @unchecked Sendable {
+final class FakeDiskMapProvider: DiskMapProviding, @unchecked Sendable {
   let module: GleamModule
 
   private let lock = NSLock()
@@ -479,7 +479,7 @@ final class FakeFullDiskAccessMonitor: FullDiskAccessMonitoring, @unchecked Send
 
 @MainActor
 struct DiskMapHarness {
-  let engine: FakeDiskMapMapProvider
+  let engine: FakeDiskMapProvider
   let executor: FakePlanExecutor
   let store: FakeSettingsStore
   let sessions: FakeDiskMapSessionProvider
@@ -495,7 +495,7 @@ func makeDiskMapHarness(
     LensModuleFixture.sessionA, LensModuleFixture.sessionB, LensModuleFixture.sessionC,
   ]
 ) -> DiskMapHarness {
-  let engine = FakeDiskMapMapProvider()
+  let engine = FakeDiskMapProvider()
   let executor = FakePlanExecutor()
   let store = FakeSettingsStore(initial: LensModuleFixture.settings(mode: deletionMode))
   let sessions = FakeDiskMapSessionProvider(sessionIDs: sessionIDs)
@@ -516,19 +516,19 @@ func makeDiskMapHarness(
 // MARK: - State extraction
 
 @MainActor
-func mappingState(_ model: DiskMapModuleModel) -> DiskMapMapState? {
+func mappingState(_ model: DiskMapModuleModel) -> DiskMapState? {
   if case .mapping(let map) = model.state { return map }
   return nil
 }
 
 @MainActor
-func browsingState(_ model: DiskMapModuleModel) -> DiskMapMapState? {
+func browsingState(_ model: DiskMapModuleModel) -> DiskMapState? {
   if case .browsing(let map) = model.state { return map }
   return nil
 }
 
 @MainActor
-func currentMapState(_ model: DiskMapModuleModel) -> DiskMapMapState? {
+func currentMapState(_ model: DiskMapModuleModel) -> DiskMapState? {
   mappingState(model) ?? browsingState(model)
 }
 
@@ -644,7 +644,7 @@ func sendStandardTree(_ feed: MapFeed) {
 }
 
 @MainActor
-func reachBrowsing(_ harness: DiskMapHarness) async -> DiskMapMapState? {
+func reachBrowsing(_ harness: DiskMapHarness) async -> DiskMapState? {
   let feed = await beginMapping(harness)
   sendStandardTree(feed)
   feed.send(.completed)

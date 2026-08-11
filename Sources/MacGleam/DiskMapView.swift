@@ -109,7 +109,7 @@ struct DiskMapView: View {
     }
   }
 
-  private func mapScene(_ map: DiskMapMapState, isStreaming: Bool) -> some View {
+  private func mapScene(_ map: DiskMapState, isStreaming: Bool) -> some View {
     VStack(spacing: GleamSpacing.points(2)) {
       DiskMapBreadcrumb(
         map: map,
@@ -117,7 +117,7 @@ struct DiskMapView: View {
         onDrillOut: { performDrillOut() },
         onCancel: { model.cancelMapping() }
       )
-      DiskMapMapCanvas(
+      DiskMapCanvas(
         map: map,
         onToggle: { model.toggleSelection($0) },
         onDrillIn: { performDrillIn(to: $0) }
@@ -127,7 +127,7 @@ struct DiskMapView: View {
     }
   }
 
-  private func footer(_ map: DiskMapMapState, isStreaming: Bool) -> some View {
+  private func footer(_ map: DiskMapState, isStreaming: Bool) -> some View {
     HStack {
       Text(selectionLine(map))
         .gleamType(.body)
@@ -152,7 +152,7 @@ struct DiskMapView: View {
     }
   }
 
-  private func selectionLine(_ map: DiskMapMapState) -> String {
+  private func selectionLine(_ map: DiskMapState) -> String {
     let count = map.selectedPaths.count
     guard count > 0 else { return "Nothing selected" }
     return
@@ -254,7 +254,7 @@ struct DiskMapIdleInvitation: View {
 
 /// Where the user is in the tree, with the way back and the live caption.
 struct DiskMapBreadcrumb: View {
-  let map: DiskMapMapState
+  let map: DiskMapState
   let isStreaming: Bool
   let onDrillOut: () -> Void
   let onCancel: () -> Void

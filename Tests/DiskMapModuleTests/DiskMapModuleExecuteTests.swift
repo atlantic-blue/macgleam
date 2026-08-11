@@ -4,7 +4,7 @@ import GleamCore
 import Testing
 
 @MainActor
-@Suite("Space lens module execute: minting findings and the plan path")
+@Suite("Disk map module execute: minting findings and the plan path")
 struct DiskMapModuleExecuteTests {
 
   @Test("an empty selection while browsing is refused and nothing is touched")
@@ -123,7 +123,7 @@ struct DiskMapModuleExecuteTests {
 }
 
 @MainActor
-@Suite("Space lens module permanent deletion confirmation")
+@Suite("Disk map module permanent deletion confirmation")
 struct DiskMapModulePermanentConfirmationTests {
 
   @Test("in trash mode the permanent scope is nil while browsing")

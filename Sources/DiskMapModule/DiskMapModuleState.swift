@@ -7,7 +7,7 @@ import GleamHub
 /// streaming map and the plan without the real engine. DiskMapEngine is
 /// the one production conformance; this protocol adds nothing to C22 and
 /// takes nothing from it: `map` and `plan` carry C22's guarantees verbatim.
-public protocol DiskMapMapProviding: Sendable {
+public protocol DiskMapProviding: Sendable {
   var module: GleamModule { get }
   func map(
     volume: AbsolutePath,
@@ -16,7 +16,7 @@ public protocol DiskMapMapProviding: Sendable {
   func plan(selection: [Finding], context: PlanContext) throws -> OperationPlan
 }
 
-extension DiskMapEngine: DiskMapMapProviding {}
+extension DiskMapEngine: DiskMapProviding {}
 
 /// Mints the per session contexts of C15 for Disk Map. Every
 /// makeScanContext call mints a fresh session identifier, and plan contexts
@@ -73,7 +73,7 @@ public struct DiskMapTreeNode: Sendable, Equatable, Identifiable {
 /// node present in the tree. `selectedPaths` contains only selectable nodes
 /// and is an antichain under `isDescendant(of:)`: it never contains a path
 /// and a descendant of that path, so no byte is ever counted twice.
-public struct DiskMapMapState: Sendable, Equatable {
+public struct DiskMapState: Sendable, Equatable {
   public let sessionID: UUID
   public let volume: AbsolutePath
   public let root: DiskMapTreeNode?
@@ -123,11 +123,11 @@ public enum DiskMapModuleState: Sendable, Equatable {
   case idle
   /// The stream is running. The map grows, drill and selection work,
   /// execution is refused until completion.
-  case mapping(DiskMapMapState)
+  case mapping(DiskMapState)
   /// The stream completed: every total converged and true. The only state
   /// that admits executeSelection, so every byte figure a confirmation
   /// names is a true allocated total, never an estimate.
-  case browsing(DiskMapMapState)
+  case browsing(DiskMapState)
   case executing(DiskMapExecutionProgress)
   case result(DiskMapResultSummary)
 }

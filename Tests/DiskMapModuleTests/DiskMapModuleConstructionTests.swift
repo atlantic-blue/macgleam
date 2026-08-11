@@ -3,7 +3,7 @@ import Foundation
 import GleamCore
 import Testing
 
-@Suite("Space lens module construction")
+@Suite("Disk map module construction")
 struct DiskMapModuleConstructionTests {
 
   @Test("construction traps unless the engine is the disk map engine")
@@ -11,7 +11,7 @@ struct DiskMapModuleConstructionTests {
     await #expect(processExitsWith: .failure) {
       await MainActor.run {
         _ = DiskMapModuleModel(
-          engine: FakeDiskMapMapProvider(module: .cleanup),
+          engine: FakeDiskMapProvider(module: .cleanup),
           executor: FakePlanExecutor(),
           settings: FakeSettingsStore(initial: LensModuleFixture.settings()),
           sessions: FakeDiskMapSessionProvider(sessionIDs: [LensModuleFixture.sessionA]),

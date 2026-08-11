@@ -3,7 +3,7 @@ import Foundation
 import GleamCore
 import Testing
 
-@Suite("Space lens plan: the Trash default and exact entry totals")
+@Suite("Disk map plan: the Trash default and exact entry totals")
 struct DiskMapPlanTests {
 
   private let documentsSelection = makeDiskMapSelection(
@@ -144,7 +144,7 @@ struct DiskMapPlanTests {
   }
 }
 
-@Suite("Space lens end to end: map, select, plan, execute")
+@Suite("Disk map end to end: map, select, plan, execute")
 struct DiskMapEndToEndTests {
 
   @Test(

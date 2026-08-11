@@ -1604,7 +1604,7 @@ public enum YaraError: Error, Sendable, Equatable {
 ### C29. FullSweepOrchestrating
 
 ```swift
-/// One scan composing deep clean (Cleanup), storage deleftovers (Leftovers large
+/// One scan composing deep clean (Cleanup), storage declutter (Leftovers large
 /// and old files plus downloads triage) and performance boost (Performance
 /// maintenance) concurrently, with one combined result and per job detail.
 ///
@@ -1629,7 +1629,7 @@ public protocol FullSweepOrchestrating: Sendable {
 
 public enum FullSweepJob: String, Codable, Sendable, CaseIterable, Equatable {
     case deepClean
-    case storageDeleftovers
+    case storageDeclutter
     case performanceBoost
 }
 
@@ -2586,7 +2586,7 @@ import GleamHub   // HubZoomDirection, HubZoomResolver, HubZoomAppearance (C37)
 /// (C22) is the one production conformance; this protocol adds nothing to
 /// C22 and takes nothing from it: `map` and `plan` carry C22's guarantees
 /// verbatim.
-public protocol DiskMapMapProviding: Sendable {
+public protocol DiskMapProviding: Sendable {
     var module: GleamModule { get }
     func map(
         volume: AbsolutePath,
@@ -2653,7 +2653,7 @@ public struct DiskMapTreeNode: Sendable, Equatable, Identifiable {
 ///   the selected paths whose nodes are present in the tree; an
 ///   unresolved intention contributes nothing until it resolves. A pure
 ///   derivation, no stored copy to drift.
-public struct DiskMapMapState: Sendable, Equatable {
+public struct DiskMapState: Sendable, Equatable {
     public let sessionID: UUID
     public let volume: AbsolutePath
     public let root: DiskMapTreeNode?
@@ -2675,11 +2675,11 @@ public enum DiskMapModuleState: Sendable, Equatable {
     case idle
     /// The stream is running. The map grows, drill and selection work,
     /// execution is refused until completion.
-    case mapping(DiskMapMapState)
+    case mapping(DiskMapState)
     /// The stream completed: every total converged and true (C22). The
     /// only state that admits executeSelection, so every byte figure a
     /// confirmation names is a true allocated total, never an estimate.
-    case browsing(DiskMapMapState)
+    case browsing(DiskMapState)
     case executing(DiskMapExecutionProgress)
     case result(DiskMapResultSummary)
 }
@@ -2867,7 +2867,7 @@ public final class DiskMapModuleModel {
     public private(set) var failureNotice: String?
 
     public init(
-        engine: any DiskMapMapProviding,
+        engine: any DiskMapProviding,
         executor: any PlanExecuting,
         settings: any SettingsStoring,
         sessions: any DiskMapSessionProviding,

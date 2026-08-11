@@ -21,7 +21,7 @@ public final class DiskMapModuleModel {
   public private(set) var state: DiskMapModuleState = .idle
   public private(set) var failureNotice: String?
 
-  @ObservationIgnored private let engine: any DiskMapMapProviding
+  @ObservationIgnored private let engine: any DiskMapProviding
   @ObservationIgnored private let executor: any PlanExecuting
   @ObservationIgnored private let settings: any SettingsStoring
   @ObservationIgnored private let sessions: any DiskMapSessionProviding
@@ -47,7 +47,7 @@ public final class DiskMapModuleModel {
   @ObservationIgnored private var selectedPaths: Set<AbsolutePath> = []
 
   public init(
-    engine: any DiskMapMapProviding,
+    engine: any DiskMapProviding,
     executor: any PlanExecuting,
     settings: any SettingsStoring,
     sessions: any DiskMapSessionProviding,
@@ -171,7 +171,7 @@ public final class DiskMapModuleModel {
   public func executeSelection(
     permanentConfirmation: PermanentDeletionConfirmation?
   ) -> DiskMapCommandRefusal? {
-    let map: DiskMapMapState
+    let map: DiskMapState
     switch state {
     case .mapping:
       return .mappingStillRunning
@@ -386,9 +386,9 @@ public final class DiskMapModuleModel {
     return AbsolutePath(normalising: "/" + components.joined(separator: "/"))
   }
 
-  private func currentMap() -> DiskMapMapState? {
+  private func currentMap() -> DiskMapState? {
     guard let tree, let focus = focusPath else { return nil }
-    return DiskMapMapState(
+    return DiskMapState(
       sessionID: tree.sessionID,
       volume: tree.volume,
       root: tree.buildRoot(),
@@ -432,7 +432,7 @@ public final class DiskMapModuleModel {
   /// one entry carrying the node's path and its converged allocated total.
   /// Byte totals therefore derive from the finding's own entries; no cache,
   /// no second source of truth.
-  private func mintFindings(from map: DiskMapMapState) -> [Finding] {
+  private func mintFindings(from map: DiskMapState) -> [Finding] {
     var bytesByPath: [AbsolutePath: UInt64] = [:]
     if let root = map.root {
       var stack = [root]
@@ -464,7 +464,7 @@ public final class DiskMapModuleModel {
   }
 
   private func runExecution(
-    map: DiskMapMapState,
+    map: DiskMapState,
     confirmation: PermanentDeletionConfirmation?,
     epoch: UInt64
   ) async {

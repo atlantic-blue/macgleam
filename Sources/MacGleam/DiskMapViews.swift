@@ -10,8 +10,8 @@ import SwiftUI
 /// what each entry is called and exactly how much it holds, which a tile too
 /// small to carry a label cannot. Selection and drilling work the same way in
 /// both, so neither is the second class one.
-struct DiskMapMapCanvas: View {
-  let map: DiskMapMapState
+struct DiskMapCanvas: View {
+  let map: DiskMapState
   let onToggle: (AbsolutePath) -> Void
   let onDrillIn: (AbsolutePath) -> Void
   @Environment(\.colorScheme) private var colorScheme

@@ -5,7 +5,7 @@ import GleamCore
 import Testing
 
 @MainActor
-@Suite("Space lens module tree")
+@Suite("Disk map module tree")
 struct DiskMapModuleTreeTests {
 
   @Test("node updates grow the published tree under the streamed structure")

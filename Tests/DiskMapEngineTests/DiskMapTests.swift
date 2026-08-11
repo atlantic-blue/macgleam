@@ -3,8 +3,8 @@ import Foundation
 import GleamCore
 import Testing
 
-@Suite("Space lens map: streaming and structure")
-struct DiskMapMapStreamingTests {
+@Suite("Disk map: streaming and structure")
+struct DiskMapStreamingTests {
 
   @Test("the engine names the disk map module")
   func engineNamesTheDiskMapModule() {
@@ -74,8 +74,8 @@ struct DiskMapMapStreamingTests {
   }
 }
 
-@Suite("Space lens map: totals only grow and converge")
-struct DiskMapMapTotalTests {
+@Suite("Disk map: totals only grow and converge")
+struct DiskMapTotalTests {
 
   @Test("a node's reported subtree total never decreases across the stream")
   func subtreeTotalsNeverDecrease() async throws {
@@ -138,8 +138,8 @@ struct DiskMapMapTotalTests {
   }
 }
 
-@Suite("Space lens map: denylisted nodes render but are not selectable")
-struct DiskMapMapSelectabilityTests {
+@Suite("Disk map: denylisted nodes render but are not selectable")
+struct DiskMapSelectabilityTests {
 
   @Test("a denylisted directory arrives as a node with isSelectable false")
   func denylistedDirectoryRendersUnselectable() async throws {
@@ -173,8 +173,8 @@ struct DiskMapMapSelectabilityTests {
   }
 }
 
-@Suite("Space lens map: cancellation")
-struct DiskMapMapCancellationTests {
+@Suite("Disk map: cancellation")
+struct DiskMapCancellationTests {
 
   @Test("cancelling the consuming task ends the stream promptly")
   func cancellingTheConsumerEndsTheStreamPromptly() async throws {

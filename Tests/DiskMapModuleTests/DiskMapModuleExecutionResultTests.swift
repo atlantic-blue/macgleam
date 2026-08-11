@@ -4,7 +4,7 @@ import GleamCore
 import Testing
 
 @MainActor
-@Suite("Space lens module execution progress")
+@Suite("Disk map module execution progress")
 struct DiskMapModuleExecutionProgressTests {
 
   private func threeNodeRun(
@@ -80,7 +80,7 @@ struct DiskMapModuleExecutionProgressTests {
 }
 
 @MainActor
-@Suite("Space lens module result")
+@Suite("Disk map module result")
 struct DiskMapModuleResultTests {
 
   @Test("the summary is consistent with the one report: totals, counts, sentences and skips")

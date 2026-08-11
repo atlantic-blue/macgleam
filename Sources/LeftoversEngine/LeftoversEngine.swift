@@ -2,7 +2,7 @@ import CryptoKit
 import Foundation
 import GleamCore
 
-/// Storage deleftovers: large files, old files, downloads triage, duplicate
+/// Storage declutter: large files, old files, downloads triage, duplicate
 /// sets and similar photo sets.
 ///
 /// Large files are files at or above the Settings threshold, strictly inside
