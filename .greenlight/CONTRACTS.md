@@ -663,6 +663,15 @@ exactly what restore reinstates. The reversal is cheap on the day privileged
 restore exists (GRAPH.md open question 11). The migration note after this
 contract lists the source level costs.
 
+Amended 2026-08-11 in s4e: `SafetyNetItem` gains `allocatedBytes`, the size the
+payload occupied at the moment it was stored. C18 strips execute from every
+payload it holds so a quarantined bundle cannot run, and on a real volume that
+also removes traversal of a directory payload, so the store cannot read inside
+its own payload afterwards. A size the store can never read again is a fact to
+record once and not a value to recompute, so it is recorded here and the purge
+total is the sum of these (C18). The migration note after this contract answers
+the data question: nothing persisted, so nothing migrates.
+
 ```swift
 /// One quarantined or archived file in the SafetyNet store.
 ///
@@ -686,6 +695,22 @@ contract lists the source level costs.
 ///   reader, a setter and an optional field added in one change; old manifest
 ///   entries would decode as nil, so that is an added property rather than a
 ///   data migration.
+/// - `allocatedBytes` is the allocated size the payload occupied at the moment
+///   it was stored: the allocated size of a file, the whole subtree allocated
+///   total of a directory. Allocated and never logical, C5's and C6's basis,
+///   so one number means one thing across the app.
+/// - It is a fact recorded once and never a value to recompute. Nothing may
+///   re-derive it by reading the store, because the store deliberately makes
+///   its own payloads unreadable: it strips execute from what it holds, and on
+///   a real volume a directory without execute cannot be traversed (C13), so a
+///   later reading of a directory payload returns an absence rather than the
+///   truth. The measurement therefore happens at the origin path, before the
+///   payload moves and before the strip, in the same pass that snapshots the
+///   metadata above.
+/// - There is no absent, partial or zero case to interpret. An item exists
+///   only if its size was measured exactly; a payload the walk could not read
+///   whole is refused rather than stored against a short figure, and C18 says
+///   what `store` does when the measurement fails.
 /// - `groupID` links the items of one uninstall so they restore as one unit.
 /// - `isRestored` items remain listed (history), are excluded from restore,
 ///   and their stored payload has been moved back, not copied.
@@ -700,6 +725,10 @@ public struct SafetyNetItem: Identifiable, Codable, Sendable, Equatable {
     public let source: Source
     public let groupID: UUID?
     public let metadata: FileMetadataSnapshot
+    /// The allocated bytes the payload occupied when it was stored, measured
+    /// before the move and before the execute strip. Recorded, never
+    /// recomputed: see the guarantees above and C18's purge total.
+    public let allocatedBytes: UInt64
     public let storedAt: Date
     public let expiresAt: Date
     public var isRestored: Bool
@@ -726,6 +755,32 @@ tree as it stands:
 - The domain fixture drops its `ownerAccountName` default and the one snapshot
   built by hand in the C8 suite drops the argument. Neither asserts the field,
   so no assertion changes.
+
+Migration note for the C8 amendment (s4e). This one is a genuine data question
+rather than a formality, because SafetyNet items are meant to outlive a launch:
+findings are session scoped and these are not. Checked on 2026-08-11 rather
+than assumed, and the answer is that nothing migrates:
+
+- No build has been distributed. The repository carries no tag and no release,
+  so no copy of MacGleam exists anywhere that could have written a manifest.
+- No `SafetyNetStore` is constructed outside the tests. The app hands the store
+  directory to the helper as a removal destination and builds no store, so the
+  only manifests that have ever existed were written by in memory file systems
+  that lived for the length of a test.
+- There is no store directory on the one machine that runs this app. Nothing
+  sits under Application Support to read, convert or discard.
+
+So `allocatedBytes` is not optional and carries no absent case. There is no old
+entry that could decode as nil, and an optional that could only ever be nil in
+a struct claiming to carry a fact is the exact shape the s4a amendment removed
+from this same type. The source level costs:
+
+- `SafetyNetItem` gains a stored property and an initialiser parameter, so
+  every construction site moves: the store and the test fixtures today.
+- The store measures the payload before it moves it, in the pass that already
+  reads the mode, the extended attributes and the record.
+- Nothing that reads an item has to handle a missing size, which is the point
+  of not making it optional.
 
 ### C9. AppInventoryEntry
 
@@ -914,6 +969,18 @@ through it and setuid is invisible. Read only, so C13 stays a read only
 protocol and the surface split holds. The migration note after this contract
 lists the source level costs.
 
+Amended 2026-08-11 in s4e: says what clearing a directory's execute bits does
+to reading it, because the fake and the real disk disagreed about it and a
+defect lived in the gap. C18 strips execute from every payload it stores so a
+quarantined bundle cannot run; on a real volume that removes traversal, so
+nothing inside the directory can be reached through it. The in memory file
+system traversed such a directory happily, which is a fake looser than the disk
+it stands in for, so the SafetyNet store sized its own directory payloads to
+nothing on a real machine while every test stayed green. The behaviour is
+stated here and the shared conformance suite gains the case; a fake looser than
+reality is the failure mode that suite exists to prevent. The migration note
+after this contract lists the source level costs.
+
 ```swift
 /// The read side of the file system. The only view of the disk any engine
 /// ever gets, which is what makes every engine testable against an in memory
@@ -947,6 +1014,24 @@ lists the source level costs.
 ///   it never substitutes a default. A mode nobody could read is an error and
 ///   not 0o644, because a guessed mode written back onto somebody's file is a
 ///   silent permission change.
+/// - A directory whose execute bits are all clear cannot be traversed, and
+///   every implementation of this protocol answers that way. The directory
+///   itself still reads: `metadata` and `posixPermissions` for the directory
+///   answer as before, because reaching it needs permission on its parent and
+///   not on itself. Nothing inside it reads: `metadata` and `posixPermissions`
+///   for a path inside it throw `permissionDenied`, and `enumerate` rooted at
+///   it yields no record for anything inside it, reporting it through
+///   `inaccessible` per the clause above.
+/// - A byte total summed over such an enumeration is an absence and never a
+///   measurement. A caller that adds up `record` events and ignores
+///   `inaccessible` reads an unreadable subtree as zero bytes, and zero bytes
+///   looks exactly like a true small number. Anything computing a total over
+///   an enumeration treats an `inaccessible` event as a failed measurement,
+///   which is why C18 measures a payload before it strips it and never after.
+/// - Both behaviours are carried by the shared conformance suite, anchored on
+///   the disk: an in memory implementation that traverses a stripped directory
+///   is wrong, however convenient it is to seed. This is the case that hid the
+///   SafetyNet sizing defect of 2026-08-11 (GRAPH.md s4e).
 /// - Order is not guaranteed and tests must not depend on it.
 public protocol FileSystemReading: Sendable {
     func enumerate(
@@ -1011,6 +1096,22 @@ changes.
   of the addition.
 - The shared conformance suite (s1b) gains the method, and the surface split
   test gains it on the reading side.
+
+Migration note for the C13 amendment (s4e). The protocol gains no method,
+nothing is persisted and no format changes. The costs are behavioural and they
+all land on the fake:
+
+- The in memory file system decides readability from the owner read bit alone,
+  so a directory stripped of execute stays readable in it and its children come
+  back regardless. Search permission has to join that decision for the fake to
+  refuse what the disk refuses.
+- The shared conformance suite (s1b) gains the case: clear execute from a
+  directory holding a file, then assert the directory itself still reads, that
+  a path inside it throws `permissionDenied`, and that an enumeration rooted at
+  it yields no record from inside. The disk is the reference; the fake is the
+  side that moves.
+- Any seeding helper that sets a directory mode has to be able to express a
+  directory without execute, or the case above cannot be written.
 
 ### C14. FileSystemMutating
 
@@ -1440,6 +1541,18 @@ construction is stated with it, because every one of those clauses is about
 the file system and the directory the store was handed. The migration note
 after this contract lists the costs.
 
+Amended 2026-08-11 in s4e: the purge total changes basis. It was the allocated
+bytes of the stored payloads read through C13 when the confirmation is built,
+which cannot be done, because this store strips execute from what it holds and
+a directory without execute cannot be traversed on a real volume (C13). The
+store could not read inside its own payload, so every uninstall archive, which
+is every directory, hit the clause that says an unreadable payload fails the
+purge. The total is now the sum of the sizes the items recorded when they were
+stored (C8), measured before the strip, and purge reads no payload at all. The
+strip stays: it is the containment, and the clause below says so plainly so
+nobody reconciles the two by dropping it. The migration note after this
+contract carries the data question and what the tree still owes.
+
 ```swift
 /// The quarantine and archive store. Reversibility is the trust feature;
 /// this contract is where it lives.
@@ -1451,12 +1564,38 @@ after this contract lists the costs.
 ///
 /// Guarantees:
 /// - `store` moves the file into the store (never copies and deletes as two
-///   visible steps), snapshots metadata per C8, strips execute permissions
-///   on the stored payload so quarantined malware cannot run, and preserves
-///   extended attributes for restore fidelity. The snapshotted mode is what
-///   C13's `posixPermissions` returns for the origin path before the move,
-///   read exactly. Stripping execute changes the stored payload and never the
-///   snapshot, so the mode restore puts back is the mode the file had.
+///   visible steps), snapshots metadata per C8, records the payload's
+///   allocated size per C8, strips execute permissions on the stored payload
+///   so quarantined malware cannot run, and preserves extended attributes for
+///   restore fidelity. The snapshotted mode is what C13's `posixPermissions`
+///   returns for the origin path before the move, read exactly. Stripping
+///   execute changes the stored payload and never the snapshot, so the mode
+///   restore puts back is the mode the file had.
+/// - The size is measured before anything moves, and it is exact or nothing is
+///   stored. `store` reads the payload's allocated size at the origin path, in
+///   the same pass that snapshots its metadata and before the move and the
+///   strip, and records it on the item (C8). If any part of the payload cannot
+///   be read while measuring, `store` throws and moves nothing, so the file
+///   stays where it was and the store never holds a payload whose size it had
+///   to guess. A directory the walk could not enter is a failed measurement
+///   and never a zero contribution: a subtree total that quietly skipped what
+///   it could not read is a smaller number that looks exactly like a true one
+///   (C13).
+/// - The strip and the sizing pull against each other, and the strip wins.
+///   Stripping execute from a directory removes traversal on a real volume
+///   (C13), so the store cannot read inside a directory payload it holds, and
+///   that is the containment rather than a side effect: the binary inside a
+///   quarantined bundle cannot be reached through the directory that holds it.
+///   The sizing moved to store time for that reason, and not the other way
+///   round. Restoring execute to a payload, or skipping the strip for
+///   directories, would make the purge arithmetic easy again and would put a
+///   runnable quarantined bundle back on the disk, which is the one thing this
+///   store exists to prevent, so nobody may reconcile the two that way.
+///   Restore never noticed any of it, because a rename needs permission on the
+///   parent directory and not on the directory being moved, which is why this
+///   cost a defect: the in memory file system traversed a stripped directory
+///   happily until C13's amendment, and the shared conformance suite now
+///   carries the case that hid it.
 /// - `restore` reinstates the payload at its origin path with its original
 ///   permission mode, extended attributes and dates. The mode is the
 ///   snapshotted value bit for bit, never one inferred from
@@ -1483,24 +1622,35 @@ after this contract lists the costs.
 ///   field name a lie. Eligibility is not removal: the confirmation still
 ///   gates the purge, so the inclusive edge costs nobody a file.
 /// - `PurgeConfirmation.byteTotal` is the sum, over the items named in the
-///   purge, of the allocated bytes their stored payloads occupy, read through
-///   C13 when the confirmation is built: the allocated size of a file, the
-///   subtree allocated total of a directory. The same basis as C6's
-///   `totalBytes` and C5's entries, allocated never logical, so one number
-///   means one thing across the app and the figure in the confirmation is the
-///   figure the volume gets back. `itemCount` is the number of identifiers in
-///   the purge. Nothing is apportioned or estimated, and a payload whose size
-///   cannot be read fails the purge rather than counting as zero.
-///   KNOWN DEFECT as of 2026-08-11, carried by slice s4e. On a real disk,
-///   stripping execute from a DIRECTORY payload removes traversal, so the
-///   store cannot size its own payload and every directory archive hits the
-///   clause above. The in memory file system traverses a stripped directory
-///   happily, which is why no test caught it. Every uninstall archives
-///   directories, so this is the common case rather than an edge. The fix is
-///   to record the allocated size at store time, measured before the strip,
-///   and to sum recorded sizes at purge rather than re-reading the store.
-///   Restore is unaffected: a rename needs permission on the parent, not on
-///   the directory being moved.
+///   purge, of the sizes those items recorded when they were stored (C8).
+///   Purge sizes nothing and reads no payload: the store measured what each
+///   payload occupied as it took it in, and that recorded figure is what the
+///   confirmation carries and what the purge reclaims. `itemCount` is the
+///   number of identifiers in the purge. The basis is C6's `totalBytes` and
+///   C5's entries, allocated never logical, so one number means one thing
+///   across the app. Nothing is apportioned or estimated.
+/// - A payload whose size is unknown still fails the purge and never counts as
+///   zero, and the way a size can be unknown has changed. It cannot be missing
+///   from a stored item: the size is recorded at store time, `allocatedBytes`
+///   has no absent case, a payload that could not be measured exactly was
+///   never stored, and no manifest predating the field exists anywhere,
+///   because no build has been distributed and the type has never been
+///   persisted outside a test (the migration note carries the evidence). What
+///   remains is a manifest entry carrying no size at all, which fails to
+///   decode, and an unreadable manifest is already an error: the store reports
+///   it and purges nothing rather than confirming a total it invented. Zero is
+///   only ever an exact promise here, never a measurement that did not happen.
+/// - Both sides of the arithmetic read the same recorded facts. Whatever
+///   builds the confirmation sums the `allocatedBytes` of the items `items`
+///   listed it, and the store checks that sum against the same values, so the
+///   confirmation is an agreement about a recorded fact rather than two
+///   readings of a disk that may have changed between them.
+/// - The recorded figure is the payload's allocation on the volume it came
+///   from. Origin and store share the user's home volume on every path this
+///   store is used on today, so the figure is the space the volume gets back.
+///   Where one ever does not, the figure is still what the rest of the app
+///   showed for that path, which is the consistency worth keeping over a
+///   rounding difference nobody can observe.
 /// - A restored item is outside the purge story entirely. Its payload has
 ///   already moved back to its origin, so the store holds nothing to reclaim
 ///   for it: `purgeEligibleItems` never returns one whatever its dates say,
@@ -1557,8 +1707,10 @@ public protocol SafetyNetStoring: Sendable {
 public struct PurgeConfirmation: Codable, Sendable, Equatable {
     /// The number of identifiers in the purge.
     public let itemCount: UInt32
-    /// The allocated bytes the purge reclaims, on C5's and C6's basis. See
-    /// the guarantee above for how it is computed and when it is read.
+    /// The allocated bytes the purge reclaims, on C5's and C6's basis: the
+    /// sum of the `allocatedBytes` the purged items recorded when they were
+    /// stored (C8). Nothing re-reads the store to size a payload. See the
+    /// guarantees above.
     public let byteTotal: UInt64
     public let confirmedAt: Date
 }
@@ -1590,6 +1742,31 @@ migrates. The costs land in the slice being written now:
 - The suite's expiry cases sit one second either side of `expiresAt`, so they
   assert neither boundary. The inclusive instant needs a case of its own
   (GRAPH.md s4a).
+
+Migration note for the C18 amendment (s4e). Nothing migrates, and that was
+checked rather than assumed: no build has been distributed, no `SafetyNetStore`
+is constructed outside the tests, and no store directory exists under
+Application Support, so no manifest written by an older version can be waiting
+anywhere. C8's migration note carries the evidence in full. The costs land in
+the slice being written now:
+
+- `store` measures before it moves, and a measurement that could not read the
+  whole payload fails the store rather than recording a short figure. The
+  subtree walk that skipped what it could not read has to treat that as a
+  failure (C13).
+- `purge` stops touching the file system to size anything. It sums recorded
+  sizes, so the store's private payload sizing helper goes.
+- Whatever builds a `PurgeConfirmation` sums the recorded sizes of the items it
+  was listed, rather than asking the disk.
+
+What this amendment does and does not close. The KNOWN DEFECT annotation that
+sat on the byte total clause is gone, because the contract no longer asks for a
+reading the disk cannot give. The tree still owes the work: as of this
+amendment the merged store sizes payloads at purge time by reading them,
+`SafetyNetItem` carries no recorded size, and the in memory file system still
+traverses a stripped directory, so a real purge of a real uninstall archive
+would still report nothing reclaimed. Closed in the contract, open in the code
+until slice s4e lands (GRAPH.md s4e).
 
 ### C19. RuleCatalogProviding
 

@@ -49,6 +49,11 @@ enum SafetyNetFixture {
   static func contents(_ seed: UInt8, length: Int = 96) -> Data {
     FileSystemFixture.contents(seed, length: length)
   }
+
+  /// The mode a payload carries once the store has stripped execute from it.
+  /// On a real volume a directory wearing this cannot be traversed (C13),
+  /// which is the containment and the reason sizing happens at store time.
+  static let strippedDirectoryMode: UInt16 = 0o644
 }
 
 // MARK: - The world every suite starts from
@@ -174,6 +179,136 @@ func safetyNetSeedFile(
   return state
 }
 
+// MARK: - Measuring a subtree through the boundary
+
+/// Raised when a walk met a subtree it could not read. An `inaccessible`
+/// event is a failed measurement and never a zero contribution (C13), so the
+/// tests' own arithmetic obeys the rule the store is held to: no helper here
+/// can quietly hand back a short figure.
+struct SafetyNetMeasurementRefused: Error, Equatable {
+  let path: AbsolutePath
+}
+
+/// Everything, so no measurement here depends on an unspecified default and
+/// a payload that happens to be a bundle is counted whole.
+func safetyNetWholeSubtreeOptions() -> EnumerationOptions {
+  makeEnumerationOptions(includesHiddenFiles: true, descendsIntoPackages: true)
+}
+
+/// The allocated total of a whole subtree, the path itself included, on the
+/// project's usual basis: every record counts toward itself and each of its
+/// ancestors. Throws rather than returning a total it could not read whole.
+func safetyNetSubtreeBytes(
+  of root: AbsolutePath,
+  in fileSystem: any FileSystem
+) async throws -> UInt64 {
+  var total = try await fileSystem.metadata(at: root).allocatedBytes
+  for try await event in fileSystem.enumerate(root: root, options: safetyNetWholeSubtreeOptions()) {
+    switch event {
+    case .record(let record):
+      total += record.allocatedBytes
+    case .inaccessible(let path, _):
+      throw SafetyNetMeasurementRefused(path: path)
+    }
+  }
+  return total
+}
+
+/// What a walk that added up what it could read and ignored what it could not
+/// would come back with. Never a measurement: the tests use it to show the
+/// figure a stripped payload offers anybody who tries to re-derive its size.
+func safetyNetNaiveSubtreeBytes(
+  of root: AbsolutePath,
+  in fileSystem: any FileSystem
+) async throws -> UInt64 {
+  var total = try await fileSystem.metadata(at: root).allocatedBytes
+  for try await event in fileSystem.enumerate(root: root, options: safetyNetWholeSubtreeOptions()) {
+    if case .record(let record) = event {
+      total += record.allocatedBytes
+    }
+  }
+  return total
+}
+
+// MARK: - Directory payloads
+
+/// A directory payload at an origin path, with the figures measured through
+/// the boundary before anything moved or stripped it.
+struct SafetyNetDirectoryPayload: Sendable {
+  let root: AbsolutePath
+  /// One file inside the payload, near the top.
+  let shallowFile: AbsolutePath
+  /// One file further down, so a walk that stopped at the first level is
+  /// caught.
+  let deepFile: AbsolutePath
+  /// A directory inside the payload, the one a test strips to make part of
+  /// the payload unreadable.
+  let innerDirectory: AbsolutePath
+  /// The allocated total of the whole subtree, the payload directory itself
+  /// included. What C8 says the item records.
+  let subtreeBytes: UInt64
+  /// What the payload directory's own record reports. A store that entered
+  /// nothing comes back with this, and it is the figure the defect produced.
+  let ownBytes: UInt64
+}
+
+/// Seeds a directory payload shaped like the thing an uninstall archives:
+/// a directory with files at two depths, one of them executable.
+///
+/// Every uninstall archives directories, so this is the common case rather
+/// than an exotic one.
+@discardableResult
+func safetyNetSeedDirectory(
+  in fileSystem: InMemoryFileSystem,
+  at root: AbsolutePath,
+  seed: UInt8,
+  sourceLocation: SourceLocation = #_sourceLocation
+) async throws -> SafetyNetDirectoryPayload {
+  let contents = root.appending("Contents")
+  let macOS = contents.appending("MacOS")
+  for directory in [root, contents, macOS] {
+    await fileSystem.seedDirectory(at: directory)
+  }
+  let shallow = root.appending("notes.txt")
+  let deep = macOS.appending("tool")
+  await fileSystem.seedFile(
+    at: shallow,
+    contents: FileSystemFixture.contents(seed, length: 512),
+    isExecutable: false,
+    created: SafetyNetFixture.createdDate,
+    modified: SafetyNetFixture.modifiedDate,
+    lastOpened: nil,
+    extendedAttributes: SafetyNetFixture.attributes(seed)
+  )
+  await fileSystem.seedFile(
+    at: deep,
+    contents: FileSystemFixture.contents(seed &+ 1, length: 4096),
+    isExecutable: true,
+    created: SafetyNetFixture.createdDate,
+    modified: SafetyNetFixture.modifiedDate,
+    lastOpened: nil,
+    extendedAttributes: SafetyNetFixture.attributes(seed &+ 1)
+  )
+
+  let ownBytes = try await fileSystem.metadata(at: root).allocatedBytes
+  let subtreeBytes = try await safetyNetSubtreeBytes(of: root, in: fileSystem)
+  // Without this the recorded size could equal the directory's own record and
+  // every assertion about a subtree total would prove nothing.
+  #expect(
+    subtreeBytes > ownBytes,
+    "a payload whose contents weigh nothing cannot prove a subtree total",
+    sourceLocation: sourceLocation
+  )
+  return SafetyNetDirectoryPayload(
+    root: root,
+    shallowFile: shallow,
+    deepFile: deep,
+    innerDirectory: contents,
+    subtreeBytes: subtreeBytes,
+    ownBytes: ownBytes
+  )
+}
+
 /// Asserts restore fidelity one attribute at a time. A copy passes "the file
 /// exists"; only this catches a lost attribute, and it names which one.
 func expectSameFile(
@@ -208,29 +343,140 @@ func safetyNetIdentifiers(_ items: [SafetyNetItem]) -> Set<UUID> {
 
 // MARK: - Purge confirmation
 
-/// The bytes a purge accounts for: the allocated bytes of the payloads it
-/// removes, the same basis every other byte figure in MacGleam uses (C6).
-func safetyNetStoredBytes(
-  of items: [SafetyNetItem],
-  in fileSystem: any FileSystem
-) async throws -> UInt64 {
-  var total: UInt64 = 0
-  for item in items {
-    total += try await fileSystem.metadata(at: item.storedPath).allocatedBytes
-  }
-  return total
+/// The bytes a purge accounts for: the sum, over the items named in it, of
+/// the sizes those items recorded when they were stored (C18). Nothing here
+/// touches the file system, because the store's own payloads cannot be read
+/// once execute has been stripped from them and a confirmation is an
+/// agreement about a recorded fact rather than a second reading of a disk.
+func safetyNetStoredBytes(of items: [SafetyNetItem]) -> UInt64 {
+  items.reduce(UInt64(0)) { $0 + $1.allocatedBytes }
 }
 
 /// A confirmation that matches the items exactly. Tests that expect a refusal
 /// build this and then break one field, so the two mismatch cases differ from
 /// the accepted case in exactly one number.
-func safetyNetConfirmation(
-  for items: [SafetyNetItem],
-  in fileSystem: any FileSystem
-) async throws -> PurgeConfirmation {
+func safetyNetConfirmation(for items: [SafetyNetItem]) -> PurgeConfirmation {
   PurgeConfirmation(
     itemCount: UInt32(items.count),
-    byteTotal: try await safetyNetStoredBytes(of: items, in: fileSystem),
+    byteTotal: safetyNetStoredBytes(of: items),
     confirmedAt: SafetyNetFixture.confirmationInstant
   )
+}
+
+// MARK: - Watching what the store reads
+
+/// Every read side call made through the boundary, in request order.
+///
+/// `exists` and `volumeInfo` are deliberately not recorded. Asking whether a
+/// path is there, or what volume it sits on, is not reading what is inside
+/// it, and a purge about to remove a payload may reasonably ask. Reading the
+/// payload is what C18 forbids at purge time, so that is what this records.
+final class FileSystemReadLog: @unchecked Sendable {
+
+  struct Call: Sendable, Equatable, CustomStringConvertible {
+    let method: String
+    let path: AbsolutePath
+
+    var description: String { "\(method)(\(path.value))" }
+  }
+
+  private let lock = NSLock()
+  private var storage: [Call] = []
+
+  func note(_ method: String, _ path: AbsolutePath) {
+    lock.lock()
+    defer { lock.unlock() }
+    storage.append(Call(method: method, path: path))
+  }
+
+  var calls: [Call] {
+    lock.lock()
+    defer { lock.unlock() }
+    return storage
+  }
+
+  /// Forgets everything recorded so far, so a test can watch one operation
+  /// rather than the whole session.
+  func reset() {
+    lock.lock()
+    defer { lock.unlock() }
+    storage.removeAll()
+  }
+
+  /// Every call that read the given path or something under it.
+  func callsReading(_ path: AbsolutePath) -> [Call] {
+    calls.filter { $0.path == path || $0.path.isDescendant(of: path) }
+  }
+}
+
+/// A file system that records what was read through it and otherwise behaves
+/// exactly like the one it wraps. Nothing is faked; only the calls are
+/// counted.
+struct ReadRecordingFileSystem: FileSystem {
+  let backing: InMemoryFileSystem
+  let log: FileSystemReadLog
+
+  func enumerate(
+    root: AbsolutePath,
+    options: EnumerationOptions
+  ) -> AsyncThrowingStream<EnumerationEvent, Error> {
+    log.note("enumerate", root)
+    return backing.enumerate(root: root, options: options)
+  }
+
+  func metadata(at path: AbsolutePath) async throws -> FileRecord {
+    log.note("metadata", path)
+    return try await backing.metadata(at: path)
+  }
+
+  func posixPermissions(at path: AbsolutePath) async throws -> UInt16 {
+    log.note("posixPermissions", path)
+    return try await backing.posixPermissions(at: path)
+  }
+
+  func readData(at path: AbsolutePath, maxBytes: UInt64) async throws -> Data {
+    log.note("readData", path)
+    return try await backing.readData(at: path, maxBytes: maxBytes)
+  }
+
+  func extendedAttributes(at path: AbsolutePath) async throws -> [String: Data] {
+    log.note("extendedAttributes", path)
+    return try await backing.extendedAttributes(at: path)
+  }
+
+  func exists(_ path: AbsolutePath) async -> Bool {
+    await backing.exists(path)
+  }
+
+  func volumeInfo(at path: AbsolutePath) async throws -> VolumeInfo {
+    try await backing.volumeInfo(at: path)
+  }
+
+  func moveToTrash(_ path: AbsolutePath) async throws -> AbsolutePath {
+    try await backing.moveToTrash(path)
+  }
+
+  func move(_ source: AbsolutePath, to destination: AbsolutePath) async throws {
+    try await backing.move(source, to: destination)
+  }
+
+  func delete(_ path: AbsolutePath) async throws {
+    try await backing.delete(path)
+  }
+
+  func createDirectory(at path: AbsolutePath) async throws {
+    try await backing.createDirectory(at: path)
+  }
+
+  func writeData(_ data: Data, to path: AbsolutePath) async throws {
+    try await backing.writeData(data, to: path)
+  }
+
+  func setPosixPermissions(_ mode: UInt16, at path: AbsolutePath) async throws {
+    try await backing.setPosixPermissions(mode, at: path)
+  }
+
+  func setExtendedAttributes(_ attributes: [String: Data], at path: AbsolutePath) async throws {
+    try await backing.setExtendedAttributes(attributes, at: path)
+  }
 }

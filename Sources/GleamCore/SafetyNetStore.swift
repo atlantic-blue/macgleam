@@ -53,6 +53,7 @@ public actor SafetyNetStore: SafetyNetStoring {
     try await withExclusiveAccess {
       guard !denylist.blocks(path) else { throw SafetyNetError.denylistedPath(path) }
       let snapshot = try await snapshot(of: path)
+      let allocatedBytes = try await allocatedBytes(ofPayloadAt: path)
       let identifier = UUID()
       let storedPath = try await movePayloadIntoStore(
         path, identifier: identifier, snapshot: snapshot)
@@ -64,6 +65,7 @@ public actor SafetyNetStore: SafetyNetStoring {
         source: source,
         groupID: groupID,
         metadata: snapshot,
+        allocatedBytes: allocatedBytes,
         storedAt: storedAt,
         expiresAt: storedAt.addingTimeInterval(SafetyNetItem.retentionInterval),
         isRestored: false)
@@ -84,6 +86,27 @@ public actor SafetyNetStore: SafetyNetStoring {
       extendedAttributes: attributes,
       created: record.created,
       modified: record.modified)
+  }
+
+  /// The payload's allocated size at its origin, read before the move and
+  /// before the strip: a file's own allocation, a directory's whole subtree
+  /// total. Exact or nothing. An entry the walk could not read fails the
+  /// measurement rather than contributing zero, because a total that quietly
+  /// skipped what it could not read is a smaller number that looks exactly
+  /// like a true one.
+  private func allocatedBytes(ofPayloadAt path: AbsolutePath) async throws -> UInt64 {
+    let record = try await fileSystem.metadata(at: path)
+    guard record.isDirectory else { return record.allocatedBytes }
+    var total: UInt64 = 0
+    for try await event in fileSystem.enumerate(root: path, options: Self.subtreeOptions) {
+      switch event {
+      case .record(let child):
+        total += child.allocatedBytes
+      case .inaccessible(let unreadable, let reason):
+        throw FileSystemError.ioFailure(unreadable, description: reason)
+      }
+    }
+    return total
   }
 
   /// Moves the file in and strips every execute bit from the payload, leaving
@@ -178,7 +201,7 @@ public actor SafetyNetStore: SafetyNetStoring {
     try await withExclusiveAccess {
       var items = try await loadedManifest()
       let targets = try purgeTargets(for: itemIDs, in: items)
-      try await verify(confirmation, against: targets)
+      try verify(confirmation, against: targets)
       for target in targets {
         try await fileSystem.delete(target.storedPath)
       }
@@ -207,32 +230,20 @@ public actor SafetyNetStore: SafetyNetStoring {
     return targets
   }
 
+  /// The confirmation is an agreement about a recorded fact rather than two
+  /// readings of a disk that may have changed between them: both sides sum the
+  /// sizes the items recorded when they were stored. Nothing here reads a
+  /// payload, which is what makes a purge of a contained directory possible at
+  /// all.
   private func verify(
     _ confirmation: PurgeConfirmation,
     against targets: [SafetyNetItem]
-  ) async throws {
+  ) throws {
     guard confirmation.itemCount == UInt32(targets.count) else {
       throw SafetyNetError.confirmationMismatch
     }
-    var total: UInt64 = 0
-    for target in targets {
-      total += try await allocatedBytes(of: target.storedPath)
-    }
+    let total = targets.reduce(UInt64(0)) { $0 + $1.allocatedBytes }
     guard confirmation.byteTotal == total else { throw SafetyNetError.confirmationMismatch }
-  }
-
-  /// Allocated bytes, the basis every reclaimable figure in MacGleam uses: the
-  /// allocated size of a file, the subtree total of a directory. A size that
-  /// cannot be read throws rather than counting as zero.
-  private func allocatedBytes(of path: AbsolutePath) async throws -> UInt64 {
-    let record = try await fileSystem.metadata(at: path)
-    guard record.isDirectory else { return record.allocatedBytes }
-    var total: UInt64 = 0
-    for try await event in fileSystem.enumerate(root: path, options: Self.subtreeOptions) {
-      guard case .record(let child) = event else { continue }
-      total += child.allocatedBytes
-    }
-    return total
   }
 
   // MARK: - Manifest
