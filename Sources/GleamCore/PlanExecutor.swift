@@ -1,14 +1,20 @@
 import Foundation
 
 /// Executes an operation plan in the user process. Before every item, in
-/// order: cancellation probe, denylist check, ownership routing. Operations
-/// whose target the ownership policy places in the system domain would route
-/// to the privileged helper; no helper exists in this build, so such an
-/// operation stops the run with `helperUnavailable` and everything from that
-/// item onward reports `notStarted`.
+/// order: cancellation probe, denylist check, ownership routing. The denylist
+/// runs before routing, so a blocked target is skipped in this process and
+/// never crosses to the helper.
+///
+/// Operations whose target the ownership policy places in the system domain
+/// route to the privileged helper. With a helper wired, each one is that
+/// helper's to answer and a refusal costs one operation; the plan carries on
+/// either way. With no helper, such an operation stops the run with
+/// `helperUnavailable` and everything from that item onward reports
+/// `notStarted`.
 public struct PlanExecutor: PlanExecuting {
   private let fileSystem: any FileSystem
   private let denylist: Denylist
+  private let helper: (any PrivilegedOperationPerforming)?
   private let ownershipPolicy: any PathOwnershipPolicy
   private let environment: OwnershipEnvironment
   private let now: @Sendable () -> Date
@@ -17,6 +23,7 @@ public struct PlanExecutor: PlanExecuting {
   public init(
     fileSystem: any FileSystem,
     denylist: Denylist,
+    helper: (any PrivilegedOperationPerforming)? = nil,
     ownershipPolicy: any PathOwnershipPolicy,
     environment: OwnershipEnvironment,
     now: @escaping @Sendable () -> Date,
@@ -24,6 +31,7 @@ public struct PlanExecutor: PlanExecuting {
   ) {
     self.fileSystem = fileSystem
     self.denylist = denylist
+    self.helper = helper
     self.ownershipPolicy = ownershipPolicy
     self.environment = environment
     self.now = now
@@ -54,7 +62,7 @@ public struct PlanExecutor: PlanExecuting {
     var results: [(operationID: UUID, result: OperationResult)] = []
     var halted = false
     for operation in plan.operations {
-      let result = await executeItem(operation, halted: &halted, yield: yield)
+      let result = await executeItem(operation, planID: plan.id, halted: &halted, yield: yield)
       results.append((operationID: operation.id, result: result))
     }
     yield(.planCompleted(report(for: plan, results: results, startedAt: startedAt)))
@@ -62,6 +70,7 @@ public struct PlanExecutor: PlanExecuting {
 
   private func executeItem(
     _ operation: Operation,
+    planID: UUID,
     halted: inout Bool,
     yield: (ExecutionEvent) -> Void
   ) async -> OperationResult {
@@ -74,7 +83,8 @@ public struct PlanExecutor: PlanExecuting {
       yield(.operationFinished(operationID: operation.id, result: .skippedDenylisted))
       return .skippedDenylisted
     }
-    guard routedPrivilege(of: operation) == .user else {
+    let needsPrivilege = routedPrivilege(of: operation) == .root
+    if needsPrivilege, helper == nil {
       halted = true
       let reason =
         "The privileged helper is not installed, so this system item was left untouched."
@@ -82,9 +92,21 @@ public struct PlanExecutor: PlanExecuting {
       return .notStarted
     }
     yield(.operationStarted(operationID: operation.id))
-    let result = await perform(operation)
+    let result = await outcome(of: operation, planID: planID, needsPrivilege: needsPrivilege)
     yield(.operationFinished(operationID: operation.id, result: result))
     return result
+  }
+
+  /// One operation's outcome, from whichever process owns it. A privileged
+  /// operation is the helper's to answer, and the helper answers every one:
+  /// its refusals and failures are this operation's result, never the run's.
+  private func outcome(
+    of operation: Operation,
+    planID: UUID,
+    needsPrivilege: Bool
+  ) async -> OperationResult {
+    guard needsPrivilege, let helper else { return await perform(operation) }
+    return await helper.perform(operation, planID: planID)
   }
 
   // MARK: - Routing

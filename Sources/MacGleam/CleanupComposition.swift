@@ -16,7 +16,8 @@ enum CleanupComposition {
     let executor = CancellableCleanupExecutor(
       fileSystem: DiskFileSystem(),
       denylist: rules.denylist,
-      ownershipPolicy: ownershipPolicy
+      ownershipPolicy: ownershipPolicy,
+      helpers: HelperSupply()
     )
     let model = CleanupModuleModel(
       engine: CleanupEngine(),
@@ -109,48 +110,55 @@ struct OnboardingDegradedStateProvider: CleanupDegradedStateProviding {
   }
 }
 
-/// The user domain policy for this build: the user's home is user domain,
-/// everything else routes to the (not yet shipped) helper and is refused
-/// honestly by the executor.
-struct HomeDirectoryOwnershipPolicy: PathOwnershipPolicy {
-  func ownership(of path: AbsolutePath, environment: OwnershipEnvironment) -> PathOwnership {
-    let home = environment.currentUserHome
-    guard path == home || path.isDescendant(of: home) else { return .systemDomain }
-    return .userDomain
-  }
-}
-
-/// Wraps the user domain PlanExecutor with the cancellation flag it polls
+/// Wraps the PlanExecutor with the cancellation flag it polls
 /// between operations. The view's cancel control raises the flag alongside
 /// the model's `cancelExecution`, so cancellation lands between items and
 /// the terminal report still arrives.
+///
+/// The executor is built per plan rather than once, because the helper it
+/// routes privileged work to is one connection with one agreed contract
+/// version, and a connection belongs to a run. Nothing is connected or
+/// registered by building this: the helper supply hands over a client, and the
+/// client reaches the system only when an operation genuinely needs privilege.
 final class CancellableCleanupExecutor: PlanExecuting, Sendable {
   private let isCancellationRequested: OSAllocatedUnfairLock<Bool>
-  private let inner: PlanExecutor
+  private let fileSystem: DiskFileSystem
+  private let denylist: Denylist
+  private let ownershipPolicy: any PathOwnershipPolicy
+  private let helpers: HelperSupply
 
   init(
     fileSystem: DiskFileSystem,
     denylist: Denylist,
-    ownershipPolicy: any PathOwnershipPolicy
+    ownershipPolicy: any PathOwnershipPolicy,
+    helpers: HelperSupply
   ) {
-    let flag = OSAllocatedUnfairLock(initialState: false)
-    self.isCancellationRequested = flag
-    self.inner = PlanExecutor(
+    self.isCancellationRequested = OSAllocatedUnfairLock(initialState: false)
+    self.fileSystem = fileSystem
+    self.denylist = denylist
+    self.ownershipPolicy = ownershipPolicy
+    self.helpers = helpers
+  }
+
+  func execute(_ plan: OperationPlan) -> AsyncStream<ExecutionEvent> {
+    isCancellationRequested.withLock { $0 = false }
+    return executorForOneRun().execute(plan)
+  }
+
+  func requestCancellation() {
+    isCancellationRequested.withLock { $0 = true }
+  }
+
+  private func executorForOneRun() -> PlanExecutor {
+    let flag = isCancellationRequested
+    return PlanExecutor(
       fileSystem: fileSystem,
       denylist: denylist,
+      helper: helpers.makeHelper(),
       ownershipPolicy: ownershipPolicy,
       environment: .current,
       now: { Date() },
       isCancelled: { flag.withLock { $0 } }
     )
-  }
-
-  func execute(_ plan: OperationPlan) -> AsyncStream<ExecutionEvent> {
-    isCancellationRequested.withLock { $0 = false }
-    return inner.execute(plan)
-  }
-
-  func requestCancellation() {
-    isCancellationRequested.withLock { $0 = true }
   }
 }

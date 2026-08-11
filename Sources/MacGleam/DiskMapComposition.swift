@@ -15,7 +15,8 @@ enum DiskMapComposition {
     let executor = CancellableCleanupExecutor(
       fileSystem: DiskFileSystem(),
       denylist: rules.denylist,
-      ownershipPolicy: ownershipPolicy
+      ownershipPolicy: ownershipPolicy,
+      helpers: HelperSupply()
     )
     let model = DiskMapModuleModel(
       engine: DiskMapEngine(),

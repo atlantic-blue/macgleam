@@ -10,12 +10,26 @@ import SwiftUI
 /// launch makes a plain `swift run MacGleam` behave like a shipped app.
 final class MacGleamAppDelegate: NSObject, NSApplicationDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
+    if let request = HelperDiagnostics.request(from: CommandLine.arguments) {
+      reportHelperAndExit(request)
+      return
+    }
     if let request = RenderToFile.request(from: CommandLine.arguments) {
       renderAndExit(request)
       return
     }
     NSApplication.shared.setActivationPolicy(.regular)
     NSApplication.shared.activate(ignoringOtherApps: true)
+  }
+
+  /// A helper run never shows a window either. It reports where the privileged
+  /// helper stands and exits.
+  private func reportHelperAndExit(_ request: HelperDiagnostics.Request) {
+    Task {
+      let report = await HelperDiagnostics.run(request)
+      FileHandle.standardOutput.write(Data("\(report)\n".utf8))
+      exit(0)
+    }
   }
 
   /// A render run never shows a window. It reads the file system only when
