@@ -51,7 +51,8 @@ final class MacGleamAppDelegate: NSObject, NSApplicationDelegate {
           hub: HubModel(state: .firstRun(now: Date())),
           cleanup: CleanupComposition.make(onboarding: onboarding, supply: supply),
           diskMap: diskMap,
-          protection: ProtectionComposition.make(supply: supply, helpers: HelperSupply())
+          protection: ProtectionComposition.make(supply: supply, helpers: HelperSupply()),
+          fullSweep: FullSweepComposition.make(supply: supply, helpers: HelperSupply())
         )
         FileHandle.standardOutput.write(Data("rendered \(request.destination.path)\n".utf8))
         exit(0)
@@ -75,6 +76,7 @@ struct MacGleamApp: App {
   @State private var cleanup: CleanupDependencies
   @State private var diskMap: DiskMapDependencies
   @State private var protection: ProtectionDependencies
+  @State private var fullSweep: FullSweepDependencies
   @State private var rules: RuleSupply
 
   init() {
@@ -86,6 +88,8 @@ struct MacGleamApp: App {
     _diskMap = State(initialValue: DiskMapComposition.make(supply: supply))
     _protection = State(
       initialValue: ProtectionComposition.make(supply: supply, helpers: HelperSupply()))
+    _fullSweep = State(
+      initialValue: FullSweepComposition.make(supply: supply, helpers: HelperSupply()))
   }
 
   var body: some Scene {
@@ -95,7 +99,8 @@ struct MacGleamApp: App {
         onboardingModel: onboardingModel,
         cleanup: cleanup,
         diskMap: diskMap,
-        protection: protection
+        protection: protection,
+        fullSweep: fullSweep
       )
       .frame(minWidth: 1120, minHeight: 760)
       // Best effort, once per launch. A catalogue that does not arrive
@@ -118,6 +123,7 @@ struct RootView: View {
   let cleanup: CleanupDependencies
   let diskMap: DiskMapDependencies
   let protection: ProtectionDependencies
+  let fullSweep: FullSweepDependencies
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   private static let hubBlurWhileOnboarding: CGFloat = 8
@@ -125,12 +131,16 @@ struct RootView: View {
   /// The modules whose engine and module model have shipped. Everything else
   /// still gets a pane; the pane says the module is not built rather than
   /// offering an action that would do nothing.
-  static let builtModules: Set<HubModule> = [.cleanup, .protection]
+  static let builtModules: Set<HubModule> = [.fullSweep, .cleanup, .protection]
 
   var body: some View {
     ZStack {
       AppShellView(
-        model: hubModel, cleanup: cleanup, diskMap: diskMap, protection: protection
+        model: hubModel,
+        cleanup: cleanup,
+        diskMap: diskMap,
+        protection: protection,
+        fullSweep: fullSweep
       )
       .blur(radius: showsExplanation ? Self.hubBlurWhileOnboarding : 0)
       .allowsHitTesting(!showsExplanation)

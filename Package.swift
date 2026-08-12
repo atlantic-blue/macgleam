@@ -113,6 +113,16 @@ let package = Package(
             path: "Tests/ProtectionEngineTests"
         ),
         .target(
+            name: "FullSweepModule",
+            dependencies: ["GleamCore", "GleamHub"],
+            path: "Sources/FullSweepModule"
+        ),
+        .testTarget(
+            name: "FullSweepModuleTests",
+            dependencies: ["FullSweepModule", "GleamCore", "GleamHub"],
+            path: "Tests/FullSweepModuleTests"
+        ),
+        .target(
             name: "ProtectionModule",
             dependencies: ["GleamCore", "ProtectionEngine"],
             path: "Sources/ProtectionModule"
@@ -181,7 +191,8 @@ let package = Package(
             dependencies: [
         "GleamHub", "GleamDesign", "GleamCore", "GleamHelperCore", "GleamHelperClient",
         "CleanupEngine", "CleanupModule", "DiskMapEngine", "DiskMapModule",
-        "ProtectionEngine", "ProtectionModule",
+        "ProtectionEngine", "ProtectionModule", "FullSweepModule",
+        "LeftoversEngine", "PerformanceEngine",
       ],
             path: "Sources/MacGleam"
         )

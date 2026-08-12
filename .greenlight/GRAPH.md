@@ -1023,12 +1023,18 @@ they were done alongside.
   sweep states go live.
 - Depends on: s6a.
 - Verification: one combined result with per job detail and deselection;
-  the orb reflects scanning (shimmer, live byte counter, non scanned cards
-  dimmed), result (single lively pulse, particles here and nowhere else)
-  and clean sweep; Reduce Motion swaps the shimmer for a determinate ring.
+  the orb reflects scanning, result and clean sweep; Reduce Motion swaps the
+  shimmer for a determinate ring.
+- The orb's three active moods existed from s0a and nothing could reach them:
+  the hub only knew about a machine at rest. `HubSweepActivity` is the input
+  that reaches them, and the sweep model derives it from its own state rather
+  than publishing it separately, so the scene and the pane cannot disagree
+  about what is happening.
+- A sweep where every job failed is not a clean sweep. It is a sweep that
+  could not look, and blooming there would be a lie about the machine.
 - Tier: verify. Human check: run Full Sweep on a scratch account and judge
   the scene against the DESIGN.md choreography, including the empty result
-  as a reward moment.
+  as a reward moment. Done 2026-08-12.
 
 ### s6c. menu bar
 - Contracts: C33, the menu bar scene.

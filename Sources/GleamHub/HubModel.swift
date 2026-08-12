@@ -26,10 +26,20 @@ public final class HubModel {
     summaries = Self.summaries(for: state)
   }
 
-  /// `idleAttention` exactly when an attention reason is present,
-  /// `idleHealthy` otherwise. The other moods become reachable when Smart
-  /// Care wires in.
+  /// A sweep in progress decides the mood while it runs, because that is the
+  /// one thing happening. With no sweep it is `idleAttention` exactly when an
+  /// attention reason is present and `idleHealthy` otherwise.
   public nonisolated static func mood(for state: HubMachineState) -> OrbMood {
+    switch state.sweepActivity {
+    case .scanning:
+      return .scanning
+    case .result:
+      return .result
+    case .cleanSweep:
+      return .cleanSweep
+    case nil:
+      break
+    }
     if state.attentionReason != nil {
       return .idleAttention
     }
@@ -40,6 +50,18 @@ public final class HubModel {
   /// Otherwise it names the last scan recency and the reclaimable estimate;
   /// before any scan exists it invites the first one.
   public nonisolated static func statusLine(for state: HubMachineState) -> String {
+    switch state.sweepActivity {
+    case .scanning(let bytes):
+      guard bytes > 0 else { return "Checking your Mac." }
+      return "Checking your Mac. \(byteFigure(bytes)) so far."
+    case .result(let bytes, let issues):
+      let things = issues == 1 ? "1 thing" : "\(issues) things"
+      return "\(things) to deal with, \(byteFigure(bytes)) reclaimable."
+    case .cleanSweep:
+      return "Nothing to do. Your Mac is in good shape."
+    case nil:
+      break
+    }
     if let attentionReason = state.attentionReason {
       return attentionReason
     }
