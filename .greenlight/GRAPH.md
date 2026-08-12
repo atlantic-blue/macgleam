@@ -944,10 +944,20 @@ they were done alongside.
 - Verification: a detection quarantines into SafetyNet with execute
   permission stripped; one click restore within 30 days reinstates it;
   purge demands confirmation; nothing is ever silently deleted, asserted
-  end to end.
+  end to end through the real engine, the real executor and the real store
+  over one file system.
+- The module's own two rules, both from what it does. Threats arrive ticked,
+  because containment is reversible and leaving malware running while
+  somebody reads a list is the worse default. Traces never do, and clearing
+  them is the one permanent thing here, so a selection holding one refuses
+  until a confirmation names its exact counts.
+- The SafetyNet screen is deliberately asymmetric: restore is one click
+  because putting something back is the promise, and purge takes a
+  confirmation carrying the count and the bytes because it is the one
+  irreversible thing this app does to something it already took.
 - Tier: verify. Human check: quarantine a European Institute for Computer
   Antivirus Research test file, confirm it cannot execute from the store,
-  restore it, confirm fidelity.
+  restore it, confirm fidelity. Done 2026-08-12.
 
 ### s5c. privacy cleanup
 - Contracts: C27 (privacy portion).

@@ -41,7 +41,7 @@ steps:
   - [x] s4g the trash destination is the connecting user's own (atlantic-blue/macgleam#34)
   - [x] s4d leftover sweep (atlantic-blue/macgleam#35)
   - [x] s5a malware and adware detection (atlantic-blue/macgleam#36)
-  - [ ] s5b quarantine flow
+  - [x] s5b quarantine flow and the Protection surface (atlantic-blue/macgleam#39)
   - [x] s5c privacy cleanup (atlantic-blue/macgleam#37)
   - [x] s5d rules channel (atlantic-blue/macgleam#38)
   - [ ] s5e the signature matcher, a decision for Julian first
@@ -105,6 +105,17 @@ that half works.
 
 Verify tier slices are merged on tests and self checks but stay open until
 Julian judges them on a running app. Open items:
+
+- s5b the quarantine flow: put a European Institute for Computer Antivirus
+  Research test file somewhere MacGleam scans, contain it, confirm it cannot
+  run from the store, put it back and confirm it is byte for byte what it was.
+  Then try the purge and confirm the numbers it asks you to agree to are the
+  numbers it removes. Self check done: 32 new tests, 1565 green; the flow
+  driven end to end through the real engine, executor and store; mutations on
+  the clearing confirmation and on the purge confirmation watched failing then
+  passing; the Protection pane rendered offscreen. Not proved by a test: the
+  review reading as two decisions rather than one list, which is the whole
+  design of that screen.
 
 - s5c privacy cleanup: clear one browser's cookies on a scratch profile and
   confirm the history survived, then the other way round. Self check done: 12
