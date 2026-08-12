@@ -37,6 +37,8 @@ struct ApplicationScanMechanicsTests {
         #expect(
           finding.entries.isEmpty == false,
           "the leftover finding for \(bundleID) named no path")
+      case .orphanedLeftover:
+        #expect(finding.entries.isEmpty == false, "a swept orphan named no path")
       default:
         Issue.record("the Applications scan emitted a category from another module")
       }

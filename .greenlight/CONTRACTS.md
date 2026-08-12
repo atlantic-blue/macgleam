@@ -2776,7 +2776,20 @@ public enum ProcessQuitError: Error, Sendable, Equatable {
 ///   uninstall.
 /// - Leftover sweep: `scan` finds orphaned files from apps already deleted
 ///   (category `orphanedLeftover`, risk review, never preselected), using
-///   the same conservative association rule as C9.
+///   the same conservative association rule as C9 read from the other end:
+///   an uninstall asks which installed application owns a candidate, and the
+///   sweep asks whether any of them does.
+/// - The sweep adds two cautions of its own, because it acts on files no
+///   application speaks for. An identity that is not shaped like a bundle
+///   identifier is never swept, and neither is one that is Apple's. The
+///   question it asks is also wider than the inventory: every identifier a
+///   bundle on the disk claims, including the running application's, so
+///   MacGleam never offers to remove its own state.
+/// - A swept orphan is removed rather than archived, and follows the deletion
+///   mode, which means the Trash by default. An uninstall archives because it
+///   restores an application as a unit; an orphan has no application, so
+///   filling the SafetyNet with items nothing can put back would be a
+///   reversibility promise with nothing behind it.
 public struct ApplicationsEngine: GleamEngine {
     public func inventory(context: ScanContext) async throws -> [AppInventoryEntry]
     /// module == .applications

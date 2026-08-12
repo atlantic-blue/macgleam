@@ -39,7 +39,7 @@ steps:
   - [x] s4e the store sizes what it stored (atlantic-blue/macgleam#30)
   - [x] s4f the helper archives into the store (atlantic-blue/macgleam#33)
   - [ ] s4g the trash destination is chosen by the request
-  - [ ] s4d leftover sweep
+  - [x] s4d leftover sweep (atlantic-blue/macgleam#35)
   - [ ] M5 protection: s5a malware, s5b quarantine, s5c privacy, s5d rules
   - [ ] M6 full sweep: s6a orchestrator, s6b smart care, s6c menu bar
   - [ ] M7 launch: s7a sparkle, s7b release pipeline, s7c licensing
@@ -78,6 +78,13 @@ confirmed). Julian is away; product decisions get batched and flagged here.
 
 Verify tier slices are merged on tests and self checks but stay open until
 Julian judges them on a running app. Open items:
+
+- s4d the leftover sweep: sweep a real machine and read the findings before
+  acting on any of them. Self check done: 16 new tests, 1471 green; mutations
+  on the shape rule, on the wider claimed identifiers and on the deletion mode
+  branch watched failing then passing. What a test cannot judge: whether the
+  findings on a real disk read as obviously safe to remove, which is the whole
+  question for a category that acts on files nobody claims.
 
 - s4f the privileged archive: uninstall an application from /Applications on a
   scratch account, confirm the archive is listed with a real size, restore it

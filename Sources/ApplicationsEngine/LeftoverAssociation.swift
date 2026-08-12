@@ -73,6 +73,44 @@ enum LeftoverAssociation {
     return name
   }
 
+  /// Whether a candidate is one the sweep may offer to remove: nobody on this
+  /// Mac claims it, its identity is shaped like a bundle identifier, and it is
+  /// not Apple's.
+  ///
+  /// The shape rule is the sweep's own, and it exists because the sweep acts on
+  /// files nobody speaks for. An uninstall is checked against an application
+  /// the person can see in the list; a sweep has no such second opinion, so
+  /// anything that does not look like an application's own name is left alone.
+  /// A folder called `Vendor` in Caches is somebody's, and the sweep has no way
+  /// to know whose.
+  static func isSweepable(_ candidate: Candidate, claimedBundleIDs: Set<String>) -> Bool {
+    let identity = identity(ofCandidateNamed: candidate.root.lastComponent)
+    guard !claimedBundleIDs.contains(identity) else { return false }
+    guard !isVendorReserved(identity) else { return false }
+    return isBundleIdentifierShaped(identity)
+  }
+
+  /// Apple's own files answer to no application in the inventory, because the
+  /// system's applications are not installed the way a downloaded one is. They
+  /// are not MacGleam's to sweep, and the absence of an owner says nothing
+  /// about them.
+  static func isVendorReserved(_ identity: String) -> Bool {
+    reservedPrefixes.contains { identity == $0 || identity.hasPrefix($0 + ".") }
+  }
+
+  /// Three labels or more, each of them a plain lowercase name: the shape a
+  /// bundle identifier has. `com.ghost.removed` passes; `Vendor` does not, and
+  /// neither does a sentence somebody named a folder with.
+  static func isBundleIdentifierShaped(_ identity: String) -> Bool {
+    let labels = identity.split(separator: ".", omittingEmptySubsequences: false)
+    guard labels.count >= 3 else { return false }
+    return labels.allSatisfy { label in
+      !label.isEmpty && label.allSatisfy { $0.isLowercase || $0.isNumber || $0 == "-" || $0 == "_" }
+    }
+  }
+
+  private static let reservedPrefixes = ["com.apple"]
+
   /// The application a candidate belongs to: the one whose bundle identifier
   /// is exactly the candidate's identity, and nothing otherwise.
   static func owner(of candidate: Candidate, installedBundleIDs: Set<String>) -> String? {
