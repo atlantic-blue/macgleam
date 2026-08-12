@@ -1088,10 +1088,24 @@ they were done alongside.
 - Verification: trial boundaries against a controlled clock (day 14 versus
   day 15); verify is offline and network independent; activation exchanges
   a key for a signed licence and server failure leaves state untouched; no
-  feature gate exists during trial, asserted by walking every module entry
-  point in the trial state.
-- Tier: verify. Human check: the trial and purchase surfaces read honestly,
-  no dark patterns.
+  feature gate exists during trial.
+- The no gate promise is checked as a property of the source rather than at a
+  boundary that could not express it: no engine and no module surface mentions
+  the licence types at all, so none of them can behave differently in one state
+  than another. A module that started importing them would fail that test on
+  the day it was written.
+- Two decisions worth stating. A record that cannot be read starts a fresh
+  trial rather than locking somebody out, because the failure that costs a sale
+  is worse than the one that gives away a fortnight. And the trial start is
+  written once and never rewritten, so quitting or putting the clock back buys
+  nothing.
+- Tier: verify. Human check: the trial and purchase surfaces read honestly, no
+  dark patterns. Done 2026-08-12, with one credential wall: the licence signing
+  key. The embedded key is a development stage one, so a licence signed by
+  anybody else fails to verify, which is the right way round. Minting the
+  production key is the same ceremony as the rules key, and
+  `licence.macgleam.app` does not exist yet, so activation reports the server
+  as unreachable and changes nothing.
 
 Launch also carries non engineering work with no contracts: the trademark
 search resolving the MacGleam name, the branding pass, the website and
