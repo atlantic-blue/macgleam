@@ -1,4 +1,5 @@
 import Foundation
+import GleamCore
 import Observation
 
 /// The hub view model, on the macOS 14 Observation framework. The SwiftUI hub
@@ -104,21 +105,10 @@ public final class HubModel {
     return days == 1 ? "1 day ago" : "\(days) days ago"
   }
 
+  /// The one byte figure style, shared with every other surface (C13's
+  /// ByteFigure), so the status line and the menu bar cannot write the same
+  /// number two ways.
   private nonisolated static func byteFigure(_ bytes: UInt64) -> String {
-    let units = ["KB", "MB", "GB", "TB", "PB"]
-    if bytes < 1000 {
-      return bytes == 1 ? "1 byte" : "\(bytes) bytes"
-    }
-    var value = Double(bytes)
-    var unitIndex = -1
-    while value >= 1000, unitIndex < units.count - 1 {
-      value /= 1000
-      unitIndex += 1
-    }
-    let tenths = (value * 10).rounded() / 10
-    if tenths == tenths.rounded() {
-      return "\(Int(tenths)) \(units[unitIndex])"
-    }
-    return "\(tenths) \(units[unitIndex])"
+    ByteFigure.string(bytes)
   }
 }
