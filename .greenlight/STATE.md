@@ -2,7 +2,7 @@
 stage:    implement
 updated:  2026-08-12
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     M5 protection: s5a malware scan, then s5b, s5c, s5d
+next:     s6b the smart care surface, then s6c the menu bar
 blocked:  none. The live window cannot be captured (the terminal has no
           Screen Recording permission), so visual checks run off offscreen
           renders and the human checks stay queued below.
@@ -45,7 +45,9 @@ steps:
   - [x] s5c privacy cleanup (atlantic-blue/macgleam#37)
   - [x] s5d rules channel (atlantic-blue/macgleam#38)
   - [ ] s5e the signature matcher, a decision for Julian first
-  - [ ] M6 full sweep: s6a orchestrator, s6b smart care, s6c menu bar
+  - [x] s6a full sweep orchestrator (atlantic-blue/macgleam#40)
+  - [ ] s6b smart care surface
+  - [ ] s6c menu bar
   - [ ] M7 launch: s7a sparkle, s7b release pipeline, s7c licensing
 ```
 
