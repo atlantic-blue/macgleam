@@ -2,7 +2,7 @@
 stage:    implement
 updated:  2026-08-12
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     s6b the smart care surface, then s6c the menu bar
+next:     s6c the menu bar, then M7 launch
 blocked:  none. The live window cannot be captured (the terminal has no
           Screen Recording permission), so visual checks run off offscreen
           renders and the human checks stay queued below.
@@ -46,7 +46,7 @@ steps:
   - [x] s5d rules channel (atlantic-blue/macgleam#38)
   - [ ] s5e the signature matcher, a decision for Julian first
   - [x] s6a full sweep orchestrator (atlantic-blue/macgleam#40)
-  - [ ] s6b smart care surface
+  - [x] s6b smart care surface (atlantic-blue/macgleam#41)
   - [ ] s6c menu bar
   - [ ] M7 launch: s7a sparkle, s7b release pipeline, s7c licensing
 ```
@@ -107,6 +107,14 @@ that half works.
 
 Verify tier slices are merged on tests and self checks but stay open until
 Julian judges them on a running app. Open items:
+
+- s6b the smart care surface: run a Full Sweep on a scratch account and judge
+  the scene, especially the empty result as a reward moment rather than a
+  blank screen, and the same run under Reduce Motion. Self check done: 25 new
+  tests, the orb's three active moods reachable for the first time, mutations
+  on the preselection rule and on the clean sweep mood watched failing then
+  passing, the pane rendered offscreen. Not proved by a test: the choreography,
+  which is the whole of this slice.
 
 - s5b the quarantine flow: put a European Institute for Computer Antivirus
   Research test file somewhere MacGleam scans, contain it, confirm it cannot

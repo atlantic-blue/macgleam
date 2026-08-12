@@ -20,6 +20,7 @@ struct AppShellView: View {
   let cleanup: CleanupDependencies
   let diskMap: DiskMapDependencies
   let protection: ProtectionDependencies
+  let fullSweep: FullSweepDependencies
   @State private var navigation: HubNavigationState
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -30,12 +31,14 @@ struct AppShellView: View {
     cleanup: CleanupDependencies,
     diskMap: DiskMapDependencies,
     protection: ProtectionDependencies,
+    fullSweep: FullSweepDependencies,
     initialSelection: HubDestination = HubNavigationState.initial.selection
   ) {
     self.model = model
     self.cleanup = cleanup
     self.diskMap = diskMap
     self.protection = protection
+    self.fullSweep = fullSweep
     _navigation = State(
       initialValue: HubNavigationState(selection: initialSelection, moduleStateSlots: [:]))
   }
@@ -81,6 +84,8 @@ struct AppShellView: View {
           executor: cleanup.executor,
           presentation: cleanup.presentation,
           idlePane: content)
+      case .module(.fullSweep) where content.action != nil:
+        FullSweepModuleView(model: fullSweep.model, idlePane: content)
       case .module(.protection) where content.action != nil:
         ProtectionModuleView(
           model: protection.model, safetyNet: protection.safetyNet, idlePane: content)
@@ -167,6 +172,9 @@ struct AppShellView: View {
     case .module(.cleanup) where pane.action != nil:
       guard case .idle = cleanup.model.state else { return nil }
       return { cleanup.model.startScan() }
+    case .module(.fullSweep) where pane.action != nil:
+      guard case .idle = fullSweep.model.state else { return nil }
+      return { fullSweep.model.startSweep() }
     case .module(.protection) where pane.action != nil:
       guard case .idle = protection.model.state else { return nil }
       return { protection.model.startScan() }
