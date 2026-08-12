@@ -870,7 +870,9 @@ they were done alongside.
   merely shares a string prefix with the real one is refused, since the
   association rule and the store's own path checks have both been caught by
   exactly that trap before.
-- Tier: auto.
+- Tier: auto. Done 2026-08-12. The check is equality with the connecting
+  user's home rather than containment, because there is exactly one home a
+  removal may name and no descendant of it is another one.
 
 ### s4d. leftover sweep
 - Contracts: C26 (orphan sweep).

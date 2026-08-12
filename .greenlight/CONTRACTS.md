@@ -3099,8 +3099,10 @@ public struct HelperReplyRouter: Sendable {
 /// how a payload came to sit in the store with nothing recording it.
 public enum HelperRemovalDestination: Codable, Sendable, Equatable {
     /// Move into the requesting user's trash, transferring ownership so the
-    /// user can restore it. See GRAPH.md open questions for the unresolved
-    /// design point on root owned items and the Trash default.
+    /// user can restore it. The home is checked against the connecting user's
+    /// own at admission (C31), so this names one directory rather than any
+    /// directory. See GRAPH.md open questions for the unresolved design point
+    /// on root owned items and the Trash default.
     case userTrash(userHome: AbsolutePath)
     case permanent
 }
@@ -3253,6 +3255,12 @@ read by a new build. The source level costs against the tree as it stands:
 ///   denylist (embedded baseline united with any catalogue the helper has
 ///   itself verified per C10 and C19). The app's opinion is not trusted; a
 ///   compromised app process cannot make the helper cross the denylist.
+/// - Destination, for a removal into a trash: the home the request names must
+///   be the home of the connecting user, compared as a whole path rather than
+///   as a prefix. Without it a client past the identity check names any home
+///   at all and has root create a trash directory there and move a system file
+///   into it. A permanent deletion names no destination and has nothing to
+///   check here.
 /// - Destination, for the archive family (C30): the helper checks where it is
 ///   being asked to write as carefully as what it is being asked to touch.
 ///   That stage did not exist while the store was a removal destination, and a
