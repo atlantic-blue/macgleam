@@ -150,14 +150,28 @@ public final class HelperConnectionPolicy: HelperPolicy, @unchecked Sendable {
   /// which is what makes the rest of the stage enforceable.
   private func destinationRefusal(for request: HelperRequest) -> HelperRefusal? {
     switch request {
-    case .handshake, .remove, .setLaunchItemEnabled, .runMaintenance:
+    case .handshake, .setLaunchItemEnabled, .runMaintenance:
       return nil
+    case .remove(_, let destination, _, _):
+      return refusal(forRemovalTo: destination)
     case .archiveIntoSafetyNet(_, let storedPath, let itemID),
       .describeArchived(let storedPath, let itemID),
       .restoreArchived(let storedPath, let itemID),
       .discardArchived(let storedPath, let itemID):
       return refusal(forStoredPath: storedPath, itemID: itemID)
     }
+  }
+
+  /// A removal into a trash carries the home directory it is to use, and the
+  /// request is the part an attacker would choose. It is admitted only when it
+  /// is the home of the client on this connection, so the helper cannot be
+  /// asked to create a trash directory somewhere else and move a system file
+  /// into it. A permanent deletion names no destination and has nothing here
+  /// to check.
+  private func refusal(forRemovalTo destination: HelperRemovalDestination) -> HelperRefusal? {
+    guard case .userTrash(let userHome) = destination else { return nil }
+    guard userHome == environment.currentUserHome else { return .destinationRejected }
+    return nil
   }
 
   private func refusal(forStoredPath storedPath: AbsolutePath, itemID: UUID) -> HelperRefusal? {

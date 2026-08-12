@@ -2,11 +2,11 @@
 stage:    implement
 updated:  2026-08-12
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     s4g the trash destination is chosen by the request, then s4d, then M5
+next:     s4d the leftover sweep, then M5 protection
 blocked:  none. The live window cannot be captured (the terminal has no
           Screen Recording permission), so visual checks run off offscreen
           renders and the human checks stay queued below.
-prs:      atlantic-blue/macgleam#1 to #33, merged in order
+prs:      atlantic-blue/macgleam#1 to #34, merged in order
 steps:
   - [x] s0a tokens and workspace (atlantic-blue/macgleam#1)
   - [x] s0b the shell model (atlantic-blue/macgleam#2)
@@ -38,7 +38,7 @@ steps:
   - [x] s4c uninstall (atlantic-blue/macgleam#29)
   - [x] s4e the store sizes what it stored (atlantic-blue/macgleam#30)
   - [x] s4f the helper archives into the store (atlantic-blue/macgleam#33)
-  - [ ] s4g the trash destination is chosen by the request
+  - [x] s4g the trash destination is the connecting user's own (atlantic-blue/macgleam#34)
   - [ ] s4d leftover sweep
   - [ ] M5 protection: s5a malware, s5b quarantine, s5c privacy, s5d rules
   - [ ] M6 full sweep: s6a orchestrator, s6b smart care, s6c menu bar
