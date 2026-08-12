@@ -2,7 +2,7 @@
 stage:    implement
 updated:  2026-08-12
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     s7d the update framework, then the launch credentials
+next:     the launch credentials, all of which are Julian's
 blocked:  none. The live window cannot be captured (the terminal has no
           Screen Recording permission), so visual checks run off offscreen
           renders and the human checks stay queued below.
@@ -49,7 +49,7 @@ steps:
   - [x] s6b smart care surface (atlantic-blue/macgleam#41)
   - [x] s6c menu bar (atlantic-blue/macgleam#42)
   - [x] s7a update channels and the appcast keys (atlantic-blue/macgleam#44)
-  - [ ] s7d the update framework, blocked on fetching its binary artifact
+  - [x] s7d the update framework (atlantic-blue/macgleam#46)
   - [x] s7b release pipeline (atlantic-blue/macgleam#45)
   - [x] s7c licensing (atlantic-blue/macgleam#43)
 ```
@@ -83,14 +83,19 @@ repo only, with the s0a evidence bar (isolated tests, blind implementation,
 own test run, mutation check watched both ways, lint, runner executed count
 confirmed). Julian is away; product decisions get batched and flagged here.
 
-## The update framework is not in the build
+## The launch credentials, all of them yours
 
-Sparkle's package resolves and checks out, and fetching its binary artifact
-hangs here on a keychain lookup for github.com: the same zip downloads in four
-seconds with curl, so it is this environment rather than the network. The
-policy, the two channels, the bundle keys and the endpoint invariant all
-shipped in s7a; the framework and its conformance are s7d, one commit once the
-artifact fetches, and a fresh runner has no keychain to hang on.
+Every M7 slice is built to its credential boundary and none of them can run
+until the credentials exist. The release pipeline needs a Developer ID
+certificate, an App Store Connect key for notarising, the appcast signing key,
+and the Developer ID team identifier written into `ExpectedClientIdentity`.
+The rules channel needs its signing key and `rules.macgleam.app`. Licensing
+needs its signing key and `licence.macgleam.app`.
+
+Everything fails closed while they are missing: the release guard refuses and
+names the placeholder, the publishers refuse without their keys, activation
+reports the server as unreachable, and a rules refresh finds nothing. Nothing
+pretends to work.
 
 ## The launch credentials, all of them yours
 
@@ -133,6 +138,13 @@ that half works.
 
 Verify tier slices are merged on tests and self checks but stay open until
 Julian judges them on a running app. Open items:
+
+- s7d the update framework: run a versioned build against a beta appcast on a
+  real machine and watch it install and relaunch, then try a tampered entry and
+  watch it refused. Both need the appcast signing key, so this waits on the
+  same ceremony as the release pipeline. Note for whoever builds it locally:
+  Sparkle's binary artifact will not download while the login keychain holds
+  two github.com entries, and `HOME=$(mktemp -d) swift build` gets past it.
 
 - s7c licensing: read the trial and purchase surfaces as a stranger would and
   say whether they are honest. Everything works in every state, so the only

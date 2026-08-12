@@ -54,7 +54,8 @@ final class MacGleamAppDelegate: NSObject, NSApplicationDelegate {
           diskMap: diskMap,
           protection: ProtectionComposition.make(supply: supply, helpers: HelperSupply()),
           fullSweep: FullSweepComposition.make(supply: supply, helpers: HelperSupply()),
-          licence: LicenceComposition.make()
+          licence: LicenceComposition.make(),
+          updates: UpdatesModel(updater: UnavailableUpdater())
         )
         FileHandle.standardOutput.write(Data("rendered \(request.destination.path)\n".utf8))
         exit(0)
@@ -81,6 +82,7 @@ struct MacGleamApp: App {
   @State private var fullSweep: FullSweepDependencies
   @State private var menuBar: MenuBarModel
   @State private var licence: LicenceModel
+  @State private var updates: UpdatesModel
   @State private var rules: RuleSupply
 
   init() {
@@ -95,6 +97,7 @@ struct MacGleamApp: App {
     _fullSweep = State(
       initialValue: FullSweepComposition.make(supply: supply, helpers: HelperSupply()))
     _licence = State(initialValue: LicenceComposition.make())
+    _updates = State(initialValue: UpdatesModel(updater: SparkleUpdater()))
     _menuBar = State(
       initialValue: MenuBarModel(
         stats: LiveSystemStats(), preferences: Settings.defaults.menuBar))
@@ -118,7 +121,8 @@ struct MacGleamApp: App {
         diskMap: diskMap,
         protection: protection,
         fullSweep: fullSweep,
-        licence: licence
+        licence: licence,
+        updates: updates
       )
       .frame(minWidth: 1120, minHeight: 760)
       // Best effort, once per launch. A catalogue that does not arrive
@@ -152,6 +156,7 @@ struct RootView: View {
   let protection: ProtectionDependencies
   let fullSweep: FullSweepDependencies
   let licence: LicenceModel
+  let updates: UpdatesModel
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   private static let hubBlurWhileOnboarding: CGFloat = 8
@@ -169,7 +174,8 @@ struct RootView: View {
         diskMap: diskMap,
         protection: protection,
         fullSweep: fullSweep,
-        licence: licence
+        licence: licence,
+        updates: updates
       )
       .blur(radius: showsExplanation ? Self.hubBlurWhileOnboarding : 0)
       .allowsHitTesting(!showsExplanation)
