@@ -207,6 +207,9 @@ enum HelperResponseKind: String, CaseIterable, Sendable {
   case handshakeRefused
   case success
   case launchItemChanged
+  case archived
+  case restoredArchive
+  case discardedArchive
   case refused
   case failed
 }
@@ -218,6 +221,9 @@ extension HelperResponse {
     case .handshakeRefused: return .handshakeRefused
     case .success: return .success
     case .launchItemChanged: return .launchItemChanged
+    case .archived: return .archived
+    case .restoredArchive: return .restoredArchive
+    case .discardedArchive: return .discardedArchive
     case .refused: return .refused
     case .failed: return .failed
     }
@@ -272,7 +278,8 @@ func makeHelperPolicy(
   contractVersion: UInt16 = HelperContract.version,
   ownership: any PathOwnershipPolicy = HelperSystemRootsOwnershipPolicy(),
   environment: OwnershipEnvironment = HelperFixture.environment,
-  launchItems: any HelperLaunchItemLocating = HelperLaunchItemTable()
+  launchItems: any HelperLaunchItemLocating = HelperLaunchItemTable(),
+  paths: any HelperPathInspecting = HelperPathTable.standard
 ) -> HelperConnectionPolicy {
   HelperConnectionPolicy(
     expectedClient: expectedClient,
@@ -280,7 +287,8 @@ func makeHelperPolicy(
     denylist: denylist,
     ownership: ownership,
     environment: environment,
-    launchItems: launchItems
+    launchItems: launchItems,
+    paths: paths
   )
 }
 
@@ -369,6 +377,23 @@ struct LoopbackHelperTransport {
       )
     case .runMaintenance(_, _, let operationID):
       return .success(correlationID: operationID, bytesReclaimed: 0)
+    case .archiveIntoSafetyNet(let target, _, let itemID),
+      .describeArchived(let target, let itemID):
+      return .archived(
+        correlationID: itemID,
+        report: PrivilegedArchiveReport(
+          originPath: target,
+          metadata: FileMetadataSnapshot(
+            posixPermissions: 0o755,
+            extendedAttributes: [:],
+            created: HelperFixture.changeInstant,
+            modified: HelperFixture.changeInstant),
+          allocatedBytes: 4096))
+    case .restoreArchived(_, let itemID):
+      return .restoredArchive(
+        correlationID: itemID, originPath: HelperFixture.systemAllowedTarget)
+    case .discardArchived(_, let itemID):
+      return .discardedArchive(correlationID: itemID)
     }
   }
 }

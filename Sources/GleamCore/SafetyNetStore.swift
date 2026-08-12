@@ -19,6 +19,14 @@ public actor SafetyNetStore: SafetyNetStoring {
   private let directory: AbsolutePath
   private let fileSystem: any FileSystem
   private let denylist: Denylist
+  private let ownership: any PathOwnershipPolicy
+  private let environment: OwnershipEnvironment
+  /// The half of this store that can hold a payload only root can move.
+  /// Optional in exactly the sense the helper is: a build or a test without
+  /// one holds user domain payloads and refuses system domain ones, having
+  /// moved nothing. It is never a store that quietly does the user domain part
+  /// of a system domain job.
+  private let privileged: (any SafetyNetPrivilegedArchiving)?
   private let currentDate: @Sendable () -> Date
 
   private var manifest: [SafetyNetItem]?
@@ -29,11 +37,17 @@ public actor SafetyNetStore: SafetyNetStoring {
     directory: AbsolutePath,
     fileSystem: any FileSystem,
     denylist: Denylist,
+    ownership: any PathOwnershipPolicy,
+    environment: OwnershipEnvironment,
+    privileged: (any SafetyNetPrivilegedArchiving)? = nil,
     now: @escaping @Sendable () -> Date
   ) {
     self.directory = directory
     self.fileSystem = fileSystem
     self.denylist = denylist
+    self.ownership = ownership
+    self.environment = environment
+    self.privileged = privileged
     self.currentDate = now
   }
 
@@ -45,6 +59,12 @@ public actor SafetyNetStore: SafetyNetStoring {
 
   // MARK: - Storing
 
+  /// The store routes, not its caller. It reads the origin's ownership and
+  /// does the whole operation through the privileged half for a system domain
+  /// path. The routing belongs here because this is the only thing that holds
+  /// the manifest: anything that sent an archive to the helper itself would
+  /// move a file into this store without this store knowing, which is the
+  /// defect that made this half exist.
   public func store(
     _ path: AbsolutePath,
     source: SafetyNetItem.Source,
@@ -52,11 +72,15 @@ public actor SafetyNetStore: SafetyNetStoring {
   ) async throws -> SafetyNetItem {
     try await withExclusiveAccess {
       guard !denylist.blocks(path) else { throw SafetyNetError.denylistedPath(path) }
-      let snapshot = try await snapshot(of: path)
-      let allocatedBytes = try await allocatedBytes(ofPayloadAt: path)
       let identifier = UUID()
-      let storedPath = try await movePayloadIntoStore(
-        path, identifier: identifier, snapshot: snapshot)
+      let storedPath = payloadPath(for: identifier)
+      let archived: Archived
+      if needsPrivilege(path) {
+        archived = try await storeThroughPrivilegedHalf(
+          path, identifier: identifier, storedPath: storedPath)
+      } else {
+        archived = try await storeInThisProcess(path, storedPath: storedPath)
+      }
       let storedAt = currentDate()
       let item = SafetyNetItem(
         id: identifier,
@@ -64,8 +88,8 @@ public actor SafetyNetStore: SafetyNetStoring {
         storedPath: storedPath,
         source: source,
         groupID: groupID,
-        metadata: snapshot,
-        allocatedBytes: allocatedBytes,
+        metadata: archived.metadata,
+        allocatedBytes: archived.allocatedBytes,
         storedAt: storedAt,
         expiresAt: storedAt.addingTimeInterval(SafetyNetItem.retentionInterval),
         isRestored: false)
@@ -74,6 +98,55 @@ public actor SafetyNetStore: SafetyNetStoring {
       try await persist(items)
       return item
     }
+  }
+
+  /// What an archive observed at the origin, whichever process performed it.
+  private struct Archived {
+    let metadata: FileMetadataSnapshot
+    let allocatedBytes: UInt64
+  }
+
+  private func needsPrivilege(_ path: AbsolutePath) -> Bool {
+    ownership.ownership(of: path, environment: environment) == .systemDomain
+  }
+
+  private func storeInThisProcess(
+    _ path: AbsolutePath,
+    storedPath: AbsolutePath
+  ) async throws -> Archived {
+    let snapshot = try await snapshot(of: path)
+    let allocatedBytes = try await allocatedBytes(ofPayloadAt: path)
+    try await createStoreDirectories()
+    try await fileSystem.move(path, to: storedPath)
+    try await fileSystem.setPosixPermissions(snapshot.posixPermissions & ~0o111, at: storedPath)
+    return Archived(metadata: snapshot, allocatedBytes: allocatedBytes)
+  }
+
+  /// One request and one recorded fact. The store names the payload path and
+  /// mints the identifier before it asks, so an archive whose reply never
+  /// arrives is settled by looking rather than guessed at: the payload is
+  /// absent, in which case nothing happened, or it is present, in which case
+  /// the store asks what it is and records the stamp root wrote. A payload
+  /// sitting in the store that no manifest entry names is the one outcome this
+  /// contract does not allow, whatever the transport did.
+  private func storeThroughPrivilegedHalf(
+    _ path: AbsolutePath,
+    identifier: UUID,
+    storedPath: AbsolutePath
+  ) async throws -> Archived {
+    guard let privileged else { throw SafetyNetError.privilegeUnavailable(path) }
+    try await createStoreDirectories()
+    let report: PrivilegedArchiveReport
+    do {
+      report = try await privileged.archive(path, to: storedPath, itemID: identifier)
+    } catch {
+      guard await fileSystem.exists(storedPath) else { throw error }
+      report = try await privileged.describeArchived(at: storedPath, itemID: identifier)
+    }
+    guard report.originPath == path else {
+      throw SafetyNetError.privilegedReportDisagreed(identifier)
+    }
+    return Archived(metadata: report.metadata, allocatedBytes: report.allocatedBytes)
   }
 
   /// Everything restore reinstates, read before the file moves.
@@ -109,19 +182,11 @@ public actor SafetyNetStore: SafetyNetStoring {
     return total
   }
 
-  /// Moves the file in and strips every execute bit from the payload, leaving
-  /// the rest of the mode alone. Quarantined malware cannot run from here.
-  private func movePayloadIntoStore(
-    _ path: AbsolutePath,
-    identifier: UUID,
-    snapshot: FileMetadataSnapshot
-  ) async throws -> AbsolutePath {
-    try await createStoreDirectories()
-    let storedPath = AbsolutePath(
-      normalising: payloadDirectory.value + "/" + identifier.uuidString)
-    try await fileSystem.move(path, to: storedPath)
-    try await fileSystem.setPosixPermissions(snapshot.posixPermissions & ~0o111, at: storedPath)
-    return storedPath
+  /// The payload's path, chosen here and never by the privileged half, and
+  /// chosen before the request goes out so a lost reply leaves something to
+  /// look for.
+  private func payloadPath(for identifier: UUID) -> AbsolutePath {
+    AbsolutePath(normalising: payloadDirectory.value + "/" + identifier.uuidString)
   }
 
   // MARK: - Listing
@@ -168,23 +233,42 @@ public actor SafetyNetStore: SafetyNetStoring {
   }
 
   /// An occupied origin refuses before anything moves, which is what makes a
-  /// group restore all or nothing.
+  /// group restore all or nothing. A privileged item is asked about the same
+  /// way: the payload is root owned, but its origin sits where this process
+  /// can see whether something is there.
   private func requireVacantOrigin(of item: SafetyNetItem) async throws {
+    if needsPrivilege(item.originPath), privileged == nil {
+      throw SafetyNetError.privilegeUnavailable(item.originPath)
+    }
     guard await fileSystem.exists(item.originPath) else { return }
     throw SafetyNetError.originOccupied(item.originPath)
   }
 
   /// Moves the payload back and puts the snapshot back on it. The dates ride
   /// along with the move: a copy would restamp them and restore nothing.
+  ///
+  /// A privileged item goes back through the privileged half, which reads
+  /// where it belongs from the payload's own stamp rather than from anything
+  /// this process sends. The two must agree: a restore landing somewhere other
+  /// than the origin this store holds is recorded as a disagreement and
+  /// nothing is marked restored.
   private func reinstate(_ item: SafetyNetItem) async throws {
-    if let parent = item.originPath.parent {
-      try await fileSystem.createDirectory(at: parent)
+    guard needsPrivilege(item.originPath) else {
+      if let parent = item.originPath.parent {
+        try await fileSystem.createDirectory(at: parent)
+      }
+      try await fileSystem.move(item.storedPath, to: item.originPath)
+      try await fileSystem.setExtendedAttributes(
+        item.metadata.extendedAttributes, at: item.originPath)
+      try await fileSystem.setPosixPermissions(
+        item.metadata.posixPermissions, at: item.originPath)
+      return
     }
-    try await fileSystem.move(item.storedPath, to: item.originPath)
-    try await fileSystem.setExtendedAttributes(
-      item.metadata.extendedAttributes, at: item.originPath)
-    try await fileSystem.setPosixPermissions(
-      item.metadata.posixPermissions, at: item.originPath)
+    guard let privileged else { throw SafetyNetError.privilegeUnavailable(item.originPath) }
+    let landed = try await privileged.restoreArchived(at: item.storedPath, itemID: item.id)
+    guard landed == item.originPath else {
+      throw SafetyNetError.privilegedReportDisagreed(item.id)
+    }
   }
 
   // MARK: - Retention
@@ -202,13 +286,28 @@ public actor SafetyNetStore: SafetyNetStoring {
       var items = try await loadedManifest()
       let targets = try purgeTargets(for: itemIDs, in: items)
       try verify(confirmation, against: targets)
+      for target in targets where needsPrivilege(target.originPath) && privileged == nil {
+        throw SafetyNetError.privilegeUnavailable(target.originPath)
+      }
       for target in targets {
-        try await fileSystem.delete(target.storedPath)
+        try await discard(target)
       }
       let purged = Set(targets.map(\.id))
       items.removeAll { purged.contains($0.id) }
       try await persist(items)
     }
+  }
+
+  /// A root owned payload is discarded through the privileged half, because
+  /// removing the children of a root owned directory needs write permission on
+  /// that directory and this process has none.
+  private func discard(_ item: SafetyNetItem) async throws {
+    guard needsPrivilege(item.originPath) else {
+      try await fileSystem.delete(item.storedPath)
+      return
+    }
+    guard let privileged else { throw SafetyNetError.privilegeUnavailable(item.originPath) }
+    try await privileged.discardArchived(at: item.storedPath, itemID: item.id)
   }
 
   /// Identifiers first, counts after: a total computed over a set the store

@@ -204,10 +204,63 @@ extension InMemoryFileSystem: FileSystemMutating {
     moveSubtree(from: source, to: destination)
   }
 
+  /// Deleting descends, and it repairs traversal on the way, because removing
+  /// a directory's children needs search and write permission on the directory
+  /// holding them. The store contains a payload by stripping its execute bits,
+  /// so without this a purge could compute the right total and be unable to
+  /// delete what it counted.
+  ///
+  /// The repair is narrow: owner search and write, added only to directories,
+  /// never to a file, and every bit it added is cleared if it cannot finish.
+  /// This models what the disk does, and it has to, because dropping
+  /// dictionary keys with no permission check is how the fake said yes to what
+  /// a real volume refused.
   public func delete(_ path: AbsolutePath) async throws {
     _ = try existingNode(at: path)
+    var repaired: [AbsolutePath: UInt16] = [:]
+    do {
+      try repairTraversal(of: path, recording: &repaired)
+      try requireDeletable(path)
+    } catch {
+      for (directory, mode) in repaired {
+        nodes[directory]?.posixPermissions = mode
+      }
+      throw error
+    }
     for member in subtreePaths(of: path) {
       nodes.removeValue(forKey: member)
+    }
+  }
+
+  /// What the disk refuses: removing a directory's children needs search and
+  /// write permission on the directory holding them. Asserted after the repair
+  /// rather than instead of it, so a delete that stopped repairing fails here
+  /// instead of quietly dropping keys the disk would have kept.
+  private func requireDeletable(_ path: AbsolutePath) throws {
+    guard let node = nodes[path], node.isDirectory else { return }
+    guard node.posixPermissions & 0o300 == 0o300 else {
+      throw FileSystemError.permissionDenied(path)
+    }
+    for child in childPaths(of: path) {
+      try requireDeletable(child)
+    }
+  }
+
+  /// Adds owner search and write to every directory the delete must enter,
+  /// remembering the mode each one had so an interrupted delete can put it
+  /// back. A directory it cannot repair fails the delete rather than partly
+  /// emptying it.
+  private func repairTraversal(
+    of path: AbsolutePath,
+    recording repaired: inout [AbsolutePath: UInt16]
+  ) throws {
+    guard let node = nodes[path], node.isDirectory else { return }
+    if node.posixPermissions & 0o300 != 0o300 {
+      repaired[path] = node.posixPermissions
+      nodes[path]?.posixPermissions = node.posixPermissions | 0o300
+    }
+    for child in childPaths(of: path) {
+      try repairTraversal(of: child, recording: &repaired)
     }
   }
 
@@ -250,6 +303,13 @@ extension InMemoryFileSystem: FileSystemMutating {
   ) async throws {
     _ = try existingNode(at: path)
     nodes[path]?.extendedAttributes = attributes
+  }
+
+  /// The direct children of a directory, without the permission checks the
+  /// public listing applies: this is the walk a delete performs from inside,
+  /// after it has given itself the traversal it needs.
+  private func childPaths(of directory: AbsolutePath) -> [AbsolutePath] {
+    nodes.keys.filter { $0.parent == directory }
   }
 
   private func subtreePaths(of path: AbsolutePath) -> [AbsolutePath] {

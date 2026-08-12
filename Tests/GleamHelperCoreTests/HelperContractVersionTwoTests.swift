@@ -3,8 +3,13 @@ import GleamCore
 import GleamHelperCore
 import Testing
 
-/// C30 at version two: a privileged launch item change carries who asked for
-/// it, and every reply echoes the identifier of the request that caused it.
+/// C30 from version two onwards: a privileged launch item change carries who
+/// asked for it, and every reply echoes the identifier of the request that
+/// caused it.
+///
+/// The counter has moved on since (the archive family took it to three), so
+/// what these pin is the shape rather than the number: whatever the current
+/// version is, the version before it is refused and both numbers are named.
 ///
 /// Version one carried a plan and an operation on that request, which meant a
 /// change somebody made in the interface had no honest way onto the wire: it
@@ -14,9 +19,9 @@ import Testing
 @Suite("Helper contract version two")
 struct HelperContractVersionTwoTests {
 
-  @Test("the contract is at version two")
-  func theContractIsAtVersionTwo() {
-    #expect(HelperContract.version == 2)
+  @Test("the contract is past version one, where the attribution went onto the wire")
+  func theContractIsPastVersionOne() {
+    #expect(HelperContract.version >= 2)
   }
 
   @Test("the version both processes enforce is the one declaration, not a copy")
@@ -32,21 +37,24 @@ struct HelperContractVersionTwoTests {
         from: HelperFixture.trustedClient) == .refused(.versionMismatch))
   }
 
-  @Test("a version one client is refused, and the refusal names both numbers")
-  func aVersionOneClientIsRefusedNamingBothNumbers() async throws {
+  @Test("a client one version behind is refused, and the refusal names both numbers")
+  func aClientOneVersionBehindIsRefusedNamingBothNumbers() async throws {
     let transport = LoopbackHelperTransport(
       policy: makeHelperPolicy(denylist: try await HelperFixture.verifiedDenylist()))
     let reply = try transport.send(
-      HelperFixture.handshake(version: 1), from: HelperFixture.trustedClient)
+      HelperFixture.handshake(version: HelperContract.version - 1),
+      from: HelperFixture.trustedClient)
     let versions = try #require(reply.refusedVersions)
-    #expect(versions.helperVersion == 2)
-    #expect(versions.clientVersion == 1)
+    #expect(versions.helperVersion == HelperContract.version)
+    #expect(versions.clientVersion == HelperContract.version - 1)
   }
 
-  @Test("a version one client is refused every request after the handshake too")
-  func aVersionOneClientIsRefusedEveryLaterRequest() async throws {
+  @Test("a client one version behind is refused every request after the handshake too")
+  func aClientOneVersionBehindIsRefusedEveryLaterRequest() async throws {
     let policy = makeHelperPolicy(denylist: try await HelperFixture.verifiedDenylist())
-    _ = policy.admit(HelperFixture.handshake(version: 1), from: HelperFixture.trustedClient)
+    _ = policy.admit(
+      HelperFixture.handshake(version: HelperContract.version - 1),
+      from: HelperFixture.trustedClient)
     #expect(
       policy.admit(
         HelperFixture.setLaunchItemEnabled(HelperFixture.systemLaunchItem),
@@ -148,7 +156,8 @@ extension HelperResponse {
     switch self {
     case .handshakeAccepted, .handshakeRefused:
       return nil
-    case .success(let id, _), .launchItemChanged(let id, _), .failed(let id, _):
+    case .success(let id, _), .launchItemChanged(let id, _), .failed(let id, _),
+      .archived(let id, _), .restoredArchive(let id, _), .discardedArchive(let id):
       return id
     case .refused(let id, _):
       return id

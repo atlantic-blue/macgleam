@@ -2,11 +2,11 @@
 stage:    implement
 updated:  2026-08-12
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     s4f the helper archives into the store, then s4d, then M5
+next:     s4g the trash destination is chosen by the request, then s4d, then M5
 blocked:  none. The live window cannot be captured (the terminal has no
           Screen Recording permission), so visual checks run off offscreen
           renders and the human checks stay queued below.
-prs:      atlantic-blue/macgleam#1 to #32, merged in order
+prs:      atlantic-blue/macgleam#1 to #33, merged in order
 steps:
   - [x] s0a tokens and workspace (atlantic-blue/macgleam#1)
   - [x] s0b the shell model (atlantic-blue/macgleam#2)
@@ -37,7 +37,8 @@ steps:
   - [x] s4b app inventory (atlantic-blue/macgleam#28)
   - [x] s4c uninstall (atlantic-blue/macgleam#29)
   - [x] s4e the store sizes what it stored (atlantic-blue/macgleam#30)
-  - [ ] s4f the helper archives into the store
+  - [x] s4f the helper archives into the store (atlantic-blue/macgleam#33)
+  - [ ] s4g the trash destination is chosen by the request
   - [ ] s4d leftover sweep
   - [ ] M5 protection: s5a malware, s5b quarantine, s5c privacy, s5d rules
   - [ ] M6 full sweep: s6a orchestrator, s6b smart care, s6c menu bar
@@ -77,6 +78,17 @@ confirmed). Julian is away; product decisions get batched and flagged here.
 
 Verify tier slices are merged on tests and self checks but stay open until
 Julian judges them on a running app. Open items:
+
+- s4f the privileged archive: uninstall an application from /Applications on a
+  scratch account, confirm the archive is listed with a real size, restore it
+  and launch it; then quarantine something only root can move, confirm it
+  cannot be run from the store, and restore it. Self check done: 1454 tests
+  green, 131 of them new or newly reachable; mutations on the destination
+  stage, on the store's routing, on the executor's routing and on both file
+  systems' delete watched failing then passing. Not proved by a test: the real
+  daemon's archive verbs, because the helper target is an executable nothing
+  links; what is proved is the policy that admits them, the client that sends
+  them and the store that records them.
 
 - s2i module state and the rail's keys: drive the whole app with the keyboard
   alone, start a scan and dismiss a result without touching the pointer, fold

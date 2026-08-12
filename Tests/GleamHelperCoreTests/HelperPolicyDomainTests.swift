@@ -82,7 +82,6 @@ struct HelperPolicyDomainTests {
     let destinations: [HelperRemovalDestination] = [
       .permanent,
       .userTrash(userHome: HelperFixture.userHome),
-      .safetyNetStore(storeDirectory: HelperFixture.safetyNetStore),
     ]
     for destination in destinations {
       #expect(

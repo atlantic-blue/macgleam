@@ -26,6 +26,7 @@ public final class HelperConnectionPolicy: HelperPolicy, @unchecked Sendable {
   private let ownership: any PathOwnershipPolicy
   private let environment: OwnershipEnvironment
   private let launchItems: any HelperLaunchItemLocating
+  private let paths: any HelperPathInspecting
 
   /// Guards the handshake state below, which one connection can reach from
   /// more than one thread.
@@ -39,7 +40,8 @@ public final class HelperConnectionPolicy: HelperPolicy, @unchecked Sendable {
     denylist: Denylist,
     ownership: any PathOwnershipPolicy,
     environment: OwnershipEnvironment,
-    launchItems: any HelperLaunchItemLocating
+    launchItems: any HelperLaunchItemLocating,
+    paths: any HelperPathInspecting
   ) {
     self.expectedClient = expectedClient
     self.contractVersion = contractVersion
@@ -47,6 +49,7 @@ public final class HelperConnectionPolicy: HelperPolicy, @unchecked Sendable {
     self.ownership = ownership
     self.environment = environment
     self.launchItems = launchItems
+    self.paths = paths
   }
 
   /// The version disagreement recorded for this connection, if there was one.
@@ -62,6 +65,7 @@ public final class HelperConnectionPolicy: HelperPolicy, @unchecked Sendable {
     guard isExpected(client) else { return .refused(.identityRejected) }
     if let refusal = versionRefusal(for: request) { return .refused(refusal) }
     if let refusal = targetRefusal(for: request) { return .refused(refusal) }
+    if let refusal = destinationRefusal(for: request) { return .refused(refusal) }
     return .admitted
   }
 
@@ -107,7 +111,21 @@ public final class HelperConnectionPolicy: HelperPolicy, @unchecked Sendable {
     case .setLaunchItemEnabled(let item, _, _):
       guard let location = launchItems.location(of: item) else { return .malformedRequest }
       return refusal(forTarget: location)
+    case .archiveIntoSafetyNet(let target, _, _):
+      return refusal(forTarget: target)
+    case .describeArchived, .restoreArchived, .discardArchived:
+      // These name no target. What they act on is a payload already inside the
+      // store, and where a payload may be is the destination stage below.
+      return nil
     }
+  }
+
+  /// Whether a path read from a payload's own stamp is one this helper may
+  /// write back to: the same two questions any target answers, asked at the
+  /// moment of the restore rather than at admission, because the path is not
+  /// in the request and the helper only learns it from the stamp.
+  public func admitsRestoreOrigin(_ origin: AbsolutePath) -> Bool {
+    refusal(forTarget: origin) == nil
   }
 
   private func refusal(forTarget target: AbsolutePath) -> HelperRefusal? {
@@ -117,4 +135,57 @@ public final class HelperConnectionPolicy: HelperPolicy, @unchecked Sendable {
     guard !denylist.blocks(target) else { return .denylisted }
     return nil
   }
+
+  /// The destination stage: where the helper is being asked to write, checked
+  /// as carefully as what it is being asked to touch.
+  ///
+  /// It exists because the archive used to arrive as a removal into a
+  /// directory the request named, which made the helper a way to create a tree
+  /// anywhere and move a system file into it, whatever the denylist said about
+  /// the target. A stored path is admitted only when it is the exact path the
+  /// store would have named: inside the connecting user's home, not
+  /// denylisted, a file directly inside a directory called payloads, named for
+  /// the item the request names, with a parent that already exists, and with
+  /// no symbolic link anywhere in it. The helper creates no directory for it,
+  /// which is what makes the rest of the stage enforceable.
+  private func destinationRefusal(for request: HelperRequest) -> HelperRefusal? {
+    switch request {
+    case .handshake, .remove, .setLaunchItemEnabled, .runMaintenance:
+      return nil
+    case .archiveIntoSafetyNet(_, let storedPath, let itemID),
+      .describeArchived(let storedPath, let itemID),
+      .restoreArchived(let storedPath, let itemID),
+      .discardArchived(let storedPath, let itemID):
+      return refusal(forStoredPath: storedPath, itemID: itemID)
+    }
+  }
+
+  private func refusal(forStoredPath storedPath: AbsolutePath, itemID: UUID) -> HelperRefusal? {
+    guard storedPath.lastComponent == itemID.uuidString else { return .destinationRejected }
+    guard let payloadsDirectory = parent(of: storedPath),
+      payloadsDirectory.lastComponent == Self.payloadDirectoryName
+    else { return .destinationRejected }
+    guard storedPath.isDescendant(of: environment.currentUserHome) else {
+      return .destinationRejected
+    }
+    guard !denylist.blocks(storedPath) else { return .destinationRejected }
+    guard paths.directoryExists(at: payloadsDirectory) else { return .destinationRejected }
+    guard !containsSymbolicLink(storedPath) else { return .destinationRejected }
+    return nil
+  }
+
+  /// The path itself and every ancestor down to the root. A link at any one of
+  /// them means every check made on the rest of the string describes a path
+  /// the write would not land on.
+  private func containsSymbolicLink(_ path: AbsolutePath) -> Bool {
+    if paths.isSymbolicLink(at: path) { return true }
+    return path.ancestors(downTo: Self.root).contains { paths.isSymbolicLink(at: $0) }
+  }
+
+  private func parent(of path: AbsolutePath) -> AbsolutePath? {
+    path.ancestors(downTo: Self.root).first
+  }
+
+  private static let payloadDirectoryName = "payloads"
+  private static let root = AbsolutePath(normalising: "/")
 }

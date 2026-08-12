@@ -841,6 +841,17 @@ they were done alongside.
   split, the line is archive first, then restore and discard, and the cost of
   splitting is that the store spends the gap holding items it cannot put back,
   which is why it is not the default.
+- Done 2026-08-12, not split. What landed: the message set at version 3 with
+  the archive family, the destination and provenance stages, the daemon's four
+  verbs over a stamp only root can write, the client as the store's privileged
+  half, the store's own routing and its recovery from a lost reply, the
+  descending delete in both file systems and in the shared conformance suite,
+  and the composition finally building a store. One thing the tests cannot
+  reach: the daemon's own archive verbs, because `GleamHelper` is an
+  executable target nothing links, which is the same gap s3f named and closed
+  for the reply routing by moving the decision into the shared package. The
+  move itself, the strip and the stamp stay in the daemon, so the human check
+  below is what proves them.
 
 ### s4g. the trash destination is chosen by the request
 - Contracts: C30, C31.

@@ -46,7 +46,6 @@ struct HelperRequestWireTests {
   static let destinations: [HelperRemovalDestination] = [
     .permanent,
     .userTrash(userHome: HelperFixture.userHome),
-    .safetyNetStore(storeDirectory: HelperFixture.safetyNetStore),
   ]
 
   static let targets: [AbsolutePath] = [
@@ -248,6 +247,10 @@ struct HelperWireDirectionTests {
         changedAt: HelperFixture.changeInstant
       )
     ),
+    .archived(correlationID: ArchiveFixture.itemID, report: ArchiveFixture.report),
+    .restoredArchive(
+      correlationID: ArchiveFixture.itemID, originPath: HelperFixture.systemAllowedTarget),
+    .discardedArchive(correlationID: ArchiveFixture.itemID),
     .refused(correlationID: nil, reason: .versionMismatch),
     .failed(correlationID: HelperFixture.operationID, reason: "gone"),
   ]
@@ -282,7 +285,7 @@ struct HelperWireDirectionTests {
     let codec = HelperWireCodec()
     let request = HelperFixture.remove(
       HelperFixture.systemAllowedTarget,
-      destination: .safetyNetStore(storeDirectory: HelperFixture.safetyNetStore))
+      destination: .userTrash(userHome: HelperFixture.userHome))
     let first = try codec.encode(request)
     let second = try codec.encode(request)
     #expect(first == second)

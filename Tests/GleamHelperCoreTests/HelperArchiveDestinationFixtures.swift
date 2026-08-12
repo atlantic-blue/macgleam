@@ -42,6 +42,17 @@ enum ArchiveFixture {
     AbsolutePath(normalising: value)
   }
 
+  /// What the helper reports about an archive it made: the values it stamped
+  /// onto the payload, which a later description answers with unchanged.
+  static let report = PrivilegedArchiveReport(
+    originPath: HelperFixture.systemAllowedTarget,
+    metadata: FileMetadataSnapshot(
+      posixPermissions: 0o755,
+      extendedAttributes: ["com.apple.quarantine": Data([0x01, 0x02])],
+      created: HelperFixture.changeInstant,
+      modified: HelperFixture.changeInstant),
+    allocatedBytes: 8192)
+
   // MARK: Requests
 
   static func archive(

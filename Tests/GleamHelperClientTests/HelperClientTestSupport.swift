@@ -374,6 +374,9 @@ extension HelperRequest {
       return attribution.correlationID
     case .runMaintenance(_, _, let operationID):
       return operationID
+    case .archiveIntoSafetyNet(_, _, let itemID), .describeArchived(_, let itemID),
+      .restoreArchived(_, let itemID), .discardArchived(_, let itemID):
+      return itemID
     }
   }
 
@@ -390,6 +393,8 @@ extension HelperRequest {
       return planID
     case .runMaintenance(_, let planID, _):
       return planID
+    case .archiveIntoSafetyNet, .describeArchived, .restoreArchived, .discardArchived:
+      return nil
     }
   }
 

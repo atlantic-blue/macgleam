@@ -329,15 +329,81 @@ extension DiskFileSystem: FileSystemMutating {
     }
   }
 
+  /// Deleting descends, and it repairs traversal on the way.
+  ///
+  /// Removing a directory's children needs search and write permission on the
+  /// directory holding them, so a payload the SafetyNet store contained by
+  /// stripping its execute bits cannot be handed to `removeItem` as it stands:
+  /// it fails with permission denied on a real volume. This adds owner search
+  /// and write to each directory it must enter, removes each directory after
+  /// its children, and clears every bit it added if it cannot finish, so an
+  /// interrupted purge leaves the payload as contained as it found it.
+  ///
+  /// It changes no file's mode, ever, so nothing gains the ability to run that
+  /// could not run before, and it adds nothing for group or other, so the
+  /// opening reaches only this process, which owns the payload and could have
+  /// granted itself the same thing directly.
   public func delete(_ path: AbsolutePath) async throws {
     guard FileManager.default.fileExists(atPath: path.value) else {
       throw FileSystemError.notFound(path)
     }
+    var repaired: [(path: String, mode: mode_t)] = []
     do {
-      try FileManager.default.removeItem(atPath: path.value)
+      try Self.removeDescending(path.value, repaired: &repaired)
     } catch {
-      throw Self.cocoaError(error, at: path)
+      for opening in repaired.reversed() {
+        _ = chmod(opening.path, opening.mode)
+      }
+      throw error
     }
+  }
+
+  /// One node: a file is unlinked, a directory is entered, emptied and
+  /// removed. A directory this process cannot repair, because it neither owns
+  /// it nor is root, fails the delete rather than partly emptying it.
+  private static func removeDescending(
+    _ path: String,
+    repaired: inout [(path: String, mode: mode_t)]
+  ) throws {
+    var record = stat()
+    guard lstat(path, &record) == 0 else {
+      throw posixError(errno, at: AbsolutePath(normalising: path))
+    }
+    guard (record.st_mode & S_IFMT) == S_IFDIR else {
+      guard unlink(path) == 0 else {
+        throw posixError(errno, at: AbsolutePath(normalising: path))
+      }
+      return
+    }
+    let mode = record.st_mode & 0o7777
+    if mode & 0o300 != 0o300 {
+      guard chmod(path, mode | 0o300) == 0 else {
+        throw posixError(errno, at: AbsolutePath(normalising: path))
+      }
+      repaired.append((path, mode))
+    }
+    for child in try contents(of: path) {
+      try removeDescending(path + "/" + child, repaired: &repaired)
+    }
+    guard rmdir(path) == 0 else {
+      throw posixError(errno, at: AbsolutePath(normalising: path))
+    }
+  }
+
+  private static func contents(of path: String) throws -> [String] {
+    guard let directory = opendir(path) else {
+      throw posixError(errno, at: AbsolutePath(normalising: path))
+    }
+    defer { closedir(directory) }
+    var names: [String] = []
+    while let entry = readdir(directory) {
+      let name = withUnsafeBytes(of: entry.pointee.d_name) { raw in
+        String(cString: raw.baseAddress!.assumingMemoryBound(to: CChar.self))
+      }
+      guard name != ".", name != ".." else { continue }
+      names.append(name)
+    }
+    return names
   }
 
   public func createDirectory(at path: AbsolutePath) async throws {

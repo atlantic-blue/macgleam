@@ -33,7 +33,52 @@ public struct HelperReplyRouter: Sendable {
         return .refused(correlationID: nil, reason: .malformedRequest)
       }
       return .success(correlationID: correlationID, bytesReclaimed: bytesReclaimed)
+    case .archiveIntoSafetyNet, .describeArchived, .restoreArchived, .discardArchived:
+      // The archive family has its own three replies, each carrying what only
+      // it can report. A bare success would say the work happened and nothing
+      // about what was observed, which is the whole content of an archive.
+      return .refused(correlationID: request.correlationID, reason: .malformedRequest)
     }
+  }
+
+  /// The reply to an archive made or an archive described. One reply for both,
+  /// because the report of making an archive and a description of that archive
+  /// are one fact read at two moments, which is what lets a store whose reply
+  /// was lost ask again and recover.
+  public func archived(
+    _ request: HelperRequest,
+    report: PrivilegedArchiveReport
+  ) -> HelperResponse {
+    switch request {
+    case .archiveIntoSafetyNet(_, _, let itemID), .describeArchived(_, let itemID):
+      return .archived(correlationID: itemID, report: report)
+    case .handshake, .remove, .setLaunchItemEnabled, .runMaintenance, .restoreArchived,
+      .discardArchived:
+      return .refused(correlationID: request.correlationID, reason: .malformedRequest)
+    }
+  }
+
+  /// The reply to a payload put back. It carries where it went, read from the
+  /// payload's own stamp, so the store checks the move against the item it
+  /// holds rather than taking it on trust.
+  public func restored(
+    _ request: HelperRequest,
+    to originPath: AbsolutePath
+  ) -> HelperResponse {
+    guard case .restoreArchived(_, let itemID) = request else {
+      return .refused(correlationID: request.correlationID, reason: .malformedRequest)
+    }
+    return .restoredArchive(correlationID: itemID, originPath: originPath)
+  }
+
+  /// The reply to a payload deleted. It carries no byte figure: the purge
+  /// total is the sum of sizes recorded at store time, and a second figure
+  /// measured here could only disagree with it.
+  public func discarded(_ request: HelperRequest) -> HelperResponse {
+    guard case .discardArchived(_, let itemID) = request else {
+      return .refused(correlationID: request.correlationID, reason: .malformedRequest)
+    }
+    return .discardedArchive(correlationID: itemID)
   }
 
   /// The reply to a launch item change that took effect. Any other request

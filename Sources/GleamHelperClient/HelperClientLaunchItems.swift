@@ -63,7 +63,8 @@ extension HelperClient: PrivilegedLaunchItemChanging {
     case .failed(_, let reason):
       throw PrivilegedLaunchItemFailure.refused(
         reason: HelperSentence.helperFailed(reason, operation))
-    case .success, .handshakeAccepted, .handshakeRefused:
+    case .success, .handshakeAccepted, .handshakeRefused, .archived, .restoredArchive,
+      .discardedArchive:
       throw PrivilegedLaunchItemFailure.refused(
         reason: HelperSentence.replyOfTheWrongKind(operation))
     }
