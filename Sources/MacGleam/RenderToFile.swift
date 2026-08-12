@@ -47,7 +47,7 @@ enum RenderToFile {
   static func render(
     _ request: Request, hub: HubModel, cleanup: CleanupDependencies,
     diskMap: DiskMapDependencies, protection: ProtectionDependencies,
-    fullSweep: FullSweepDependencies, licence: LicenceModel
+    fullSweep: FullSweepDependencies, licence: LicenceModel, updates: UpdatesModel
   ) throws {
     let renderer = ImageRenderer(
       content:
@@ -58,6 +58,7 @@ enum RenderToFile {
           protection: protection,
           fullSweep: fullSweep,
           licence: licence,
+          updates: updates,
           initialSelection: request.selection
         )
         .frame(width: request.size.width, height: request.size.height)

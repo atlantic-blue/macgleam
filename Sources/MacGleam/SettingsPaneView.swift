@@ -12,6 +12,7 @@ import SwiftUI
 /// evaluate is an app nobody buys.
 struct SettingsPaneView: View {
   let licence: LicenceModel
+  let updates: UpdatesModel
   @Environment(\.colorScheme) private var colorScheme
   @State private var licenceKey = ""
 
@@ -20,6 +21,7 @@ struct SettingsPaneView: View {
       Text("Settings")
         .gleamType(.heading)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
+      updatesSection
       licenceSection
       Spacer()
     }
@@ -27,6 +29,43 @@ struct SettingsPaneView: View {
     .padding(.vertical, GleamSpacing.points(5))
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .task { await licence.refresh() }
+  }
+
+  /// Which updates this Mac gets, and when it last looked. The beta row says
+  /// what it costs, because somebody switching to it is agreeing to run
+  /// software that has had less use.
+  private var updatesSection: some View {
+    VStack(alignment: .leading, spacing: GleamSpacing.points(1)) {
+      Text("Updates")
+        .gleamType(.body)
+        .fontWeight(.semibold)
+        .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
+      Picker("Channel", selection: channel) {
+        ForEach(UpdateChannel.allCases, id: \.self) { channel in
+          Text(channel.rawValue.capitalized).tag(channel)
+        }
+      }
+      .pickerStyle(.segmented)
+      .frame(maxWidth: 260)
+      Text(updates.policy.channel.explanation)
+        .gleamType(.caption)
+        .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
+      HStack(spacing: GleamSpacing.points(1)) {
+        PrimaryButton(
+          title: "Check now",
+          action: { Task { await updates.check() } },
+          isEnabled: true)
+        Text(updates.lastCheckLine)
+          .gleamType(.caption)
+          .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
+      }
+    }
+  }
+
+  private var channel: Binding<UpdateChannel> {
+    Binding(
+      get: { updates.policy.channel },
+      set: { selected in Task { await updates.select(channel: selected) } })
   }
 
   private var licenceSection: some View {

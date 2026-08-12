@@ -13,6 +13,12 @@ let package = Package(
         .executable(name: "MacGleam", targets: ["MacGleam"]),
         .executable(name: "GleamHelper", targets: ["GleamHelper"])
     ],
+    dependencies: [
+        // The update framework. Pinned to a major version rather than a
+        // branch: an app that updates itself is the last place to take
+        // whatever a repository happens to hold today.
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0")
+    ],
     targets: [
         .target(
             name: "GleamDesign",
@@ -204,6 +210,7 @@ let package = Package(
         "CleanupEngine", "CleanupModule", "DiskMapEngine", "DiskMapModule",
         "ProtectionEngine", "ProtectionModule", "FullSweepModule",
         "LeftoversEngine", "PerformanceEngine",
+        .product(name: "Sparkle", package: "Sparkle"),
       ],
             path: "Sources/MacGleam"
         )

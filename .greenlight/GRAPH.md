@@ -1076,20 +1076,26 @@ they were done alongside.
 ### s7d. the update framework
 - Contracts: C's update section, the `AppUpdating` conformance.
 - Depends on: s7a.
-- Why it exists: s7a ships the policy, the two channels, the bundle keys and
-  the endpoint invariant. It does not ship Sparkle. The package resolves and
-  the checkout succeeds, and fetching its binary artifact hangs in this
-  environment on a keychain lookup for github.com, so the framework could not
-  be compiled or run here. Shipping code that cannot be built is worse than
-  naming the gap: the conformance is one commit once the artifact fetches, and
-  a fresh continuous integration runner has no keychain to hang on.
+- Why it exists: s7a shipped the policy, the two channels, the bundle keys and
+  the endpoint invariant, and not the framework, because fetching Sparkle's
+  binary artifact hung on a keychain lookup for github.com. The cause turned
+  out to be exactly that and nothing else: building with the home directory
+  pointed at a scratch path finds no keychain entries, downloads the artifact
+  and compiles. A fresh runner has no keychain either.
 - What it carries: the package dependency, an `AppUpdating` conformance over
   `SPUStandardUpdaterController` reading its feed from the policy, and the
   Settings row that switches channel.
 - Verification: an update from the beta channel installs and relaunches; a
   tampered appcast entry is rejected before it is offered; the updater never
   installs without being asked.
-- Tier: verify.
+- The framework sits behind `AppUpdating`, so the rules stay this app's: the
+  feed comes from the policy rather than from the bundle, a check looks and
+  asks, and a build with no updater says so rather than looking like a build
+  with nothing to update.
+- Tier: verify. Human check: run a versioned build against a beta appcast on a
+  real machine and watch it install and relaunch. Done 2026-08-12; the check
+  itself needs the appcast signing key, so it waits on the same ceremony as
+  the release pipeline.
 
 ### s7b. release pipeline
 - Contracts: none new; the deployment section of DESIGN.md becomes a

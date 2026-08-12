@@ -22,6 +22,7 @@ struct AppShellView: View {
   let protection: ProtectionDependencies
   let fullSweep: FullSweepDependencies
   let licence: LicenceModel
+  let updates: UpdatesModel
   @State private var navigation: HubNavigationState
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -34,6 +35,7 @@ struct AppShellView: View {
     protection: ProtectionDependencies,
     fullSweep: FullSweepDependencies,
     licence: LicenceModel,
+    updates: UpdatesModel,
     initialSelection: HubDestination = HubNavigationState.initial.selection
   ) {
     self.model = model
@@ -42,6 +44,7 @@ struct AppShellView: View {
     self.protection = protection
     self.fullSweep = fullSweep
     self.licence = licence
+    self.updates = updates
     _navigation = State(
       initialValue: HubNavigationState(selection: initialSelection, moduleStateSlots: [:]))
   }
@@ -93,7 +96,7 @@ struct AppShellView: View {
         ProtectionModuleView(
           model: protection.model, safetyNet: protection.safetyNet, idlePane: content)
       case .settings:
-        SettingsPaneView(licence: licence)
+        SettingsPaneView(licence: licence, updates: updates)
       case .diskMap:
         DiskMapView(
           model: diskMap.model, executor: diskMap.executor, idlePane: content)
