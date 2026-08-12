@@ -58,7 +58,7 @@ struct HelperTransportContractTests {
       .send(
         HelperFixture.remove(HelperFixture.systemAllowedTarget),
         from: HelperFixture.trustedClient)
-    #expect(reply == .success(operationID: HelperFixture.operationID, bytesReclaimed: 4096))
+    #expect(reply == .success(correlationID: HelperFixture.operationID, bytesReclaimed: 4096))
   }
 
   @Test("a refused remove comes back naming the operation it refused, so the report reconciles")
@@ -69,7 +69,7 @@ struct HelperTransportContractTests {
         HelperFixture.remove(
           HelperFixture.systemDenylistedTarget, operationID: HelperFixture.otherOperationID),
         from: HelperFixture.trustedClient)
-    #expect(reply == .refused(operationID: HelperFixture.otherOperationID, reason: .denylisted))
+    #expect(reply == .refused(correlationID: HelperFixture.otherOperationID, reason: .denylisted))
   }
 
   @Test("a refused handshake comes back naming no operation")
@@ -77,7 +77,7 @@ struct HelperTransportContractTests {
     let policy = makeHelperPolicy(denylist: try await HelperFixture.verifiedDenylist())
     let reply = try transport(policy: policy)
       .send(HelperFixture.handshake(), from: HelperFixture.intruderClient)
-    #expect(reply == .refused(operationID: nil, reason: .identityRejected))
+    #expect(reply == .refused(correlationID: nil, reason: .identityRejected))
   }
 
   // MARK: The version disagreement the app acts on
@@ -160,7 +160,7 @@ struct HelperTransportContractTests {
       denylist: try await HelperFixture.verifiedDenylist(), contractVersion: 7)
     let reply = try transport(policy: policy, helperContractVersion: 7)
       .send(HelperFixture.handshake(version: 3), from: HelperFixture.intruderClient)
-    #expect(reply == .refused(operationID: nil, reason: .identityRejected))
+    #expect(reply == .refused(correlationID: nil, reason: .identityRejected))
   }
 
   // MARK: A refused connection stays refused
@@ -187,7 +187,7 @@ struct HelperTransportContractTests {
         HelperFixture.remove(HelperFixture.systemAllowedTarget),
         from: HelperFixture.trustedClient)
     #expect(
-      reply == .refused(operationID: HelperFixture.operationID, reason: .versionMismatch))
+      reply == .refused(correlationID: HelperFixture.operationID, reason: .versionMismatch))
   }
 
   @Test("a user domain remove comes back refused notSystemDomain")
@@ -197,7 +197,7 @@ struct HelperTransportContractTests {
       .send(
         HelperFixture.remove(HelperFixture.userAllowedTarget), from: HelperFixture.trustedClient)
     #expect(
-      reply == .refused(operationID: HelperFixture.operationID, reason: .notSystemDomain))
+      reply == .refused(correlationID: HelperFixture.operationID, reason: .notSystemDomain))
   }
 
   @Test("an admitted launch item change comes back as the recorded change")
@@ -210,7 +210,7 @@ struct HelperTransportContractTests {
     #expect(
       reply
         == .launchItemChanged(
-          operationID: HelperFixture.operationID,
+          correlationID: HelperFixture.operationID,
           change: LaunchItemChange(
             item: HelperFixture.systemLaunchItem,
             previousEnabled: true,
@@ -228,7 +228,7 @@ struct HelperTransportContractTests {
       .send(
         HelperFixture.runMaintenance(.rebuildLaunchServicesDatabase),
         from: HelperFixture.trustedClient)
-    #expect(reply == .success(operationID: HelperFixture.operationID, bytesReclaimed: 0))
+    #expect(reply == .success(correlationID: HelperFixture.operationID, bytesReclaimed: 0))
   }
 
   @Test("a target with spaces and unicode survives the transport and is still admitted")
@@ -237,7 +237,7 @@ struct HelperTransportContractTests {
     let target = HelperFixture.path("/Library/Application Support/Ünïcödé 🚀/файл.log")
     let reply = try transport(policy: policy)
       .send(HelperFixture.remove(target), from: HelperFixture.trustedClient)
-    #expect(reply == .success(operationID: HelperFixture.operationID, bytesReclaimed: 4096))
+    #expect(reply == .success(correlationID: HelperFixture.operationID, bytesReclaimed: 4096))
   }
 
   @Test("the transport never admits a message the helper's policy refused")
@@ -251,7 +251,7 @@ struct HelperTransportContractTests {
     for request in requests {
       let reply = try transport(policy: policy).send(request, from: HelperFixture.trustedClient)
       #expect(
-        reply == .refused(operationID: HelperFixture.operationID, reason: .versionMismatch))
+        reply == .refused(correlationID: HelperFixture.operationID, reason: .versionMismatch))
     }
   }
 

@@ -333,7 +333,7 @@ struct ExecutorDegradedHelperTests {
     let transport = RecordingHelperTransport(
       script: [
         .rawPayload(Data([0xFF, 0xFE])),
-        .message(.success(operationID: operations[3].id, bytesReclaimed: 0)),
+        .message(.success(correlationID: operations[3].id, bytesReclaimed: 0)),
       ])
     let client = makeHelperClient(
       transport: transport,

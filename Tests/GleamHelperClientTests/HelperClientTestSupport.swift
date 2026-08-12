@@ -345,7 +345,7 @@ final class RecordingHelperTransport: HelperTransporting, @unchecked Sendable {
     }
     guard let next else {
       if let bytes = defaultSuccessBytes, let operationID = request?.replyOperationID {
-        return try codec.encode(.success(operationID: operationID, bytesReclaimed: bytes))
+        return try codec.encode(.success(correlationID: operationID, bytesReclaimed: bytes))
       }
       state.withLock { $0.overranScript = true }
       throw HelperTransportScriptExhausted()
@@ -370,8 +370,8 @@ extension HelperRequest {
       return nil
     case .remove(_, _, _, let operationID):
       return operationID
-    case .setLaunchItemEnabled(_, _, _, let operationID):
-      return operationID
+    case .setLaunchItemEnabled(_, _, let attribution):
+      return attribution.correlationID
     case .runMaintenance(_, _, let operationID):
       return operationID
     }
@@ -385,7 +385,8 @@ extension HelperRequest {
       return nil
     case .remove(_, _, let planID, _):
       return planID
-    case .setLaunchItemEnabled(_, _, let planID, _):
+    case .setLaunchItemEnabled(_, _, let attribution):
+      guard case .operation(let planID, _) = attribution else { return nil }
       return planID
     case .runMaintenance(_, let planID, _):
       return planID

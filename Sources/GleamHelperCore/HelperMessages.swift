@@ -6,7 +6,7 @@ import GleamCore
 /// contract is without one of them being an older build. Any change to the
 /// message set below bumps this in the same commit as the change.
 public enum HelperContract {
-  public static let version: UInt16 = 1
+  public static let version: UInt16 = 2
 }
 
 /// The complete message set from MacGleam.app to GleamHelper.
@@ -21,30 +21,41 @@ public enum HelperRequest: Codable, Sendable, Equatable {
   case handshake(contractVersion: UInt16)
   case remove(
     target: AbsolutePath, destination: HelperRemovalDestination, planID: UUID, operationID: UUID)
-  case setLaunchItemEnabled(item: LaunchItemID, enabled: Bool, planID: UUID, operationID: UUID)
+  /// The attribution is the plan operation or the direct change this belongs
+  /// to (C24), and it replaces the plan and operation identifiers the other
+  /// requests carry. It is not optional and `ChangeAttribution` has no case
+  /// meaning none, so a privileged launch item change that says nothing about
+  /// who asked for it cannot be built, let alone sent.
+  case setLaunchItemEnabled(item: LaunchItemID, enabled: Bool, attribution: ChangeAttribution)
   case runMaintenance(task: MaintenanceTask, planID: UUID, operationID: UUID)
 
-  /// The plan this request belongs to, and nil for the handshake, which
-  /// belongs to the connection rather than to any plan.
+  /// The plan this request belongs to. Nil for the handshake, which belongs to
+  /// the connection rather than to any plan, and nil for a launch item change
+  /// somebody made directly in the interface, which belongs to no plan either.
   public var planID: UUID? {
     switch self {
     case .handshake:
       return nil
-    case .remove(_, _, let planID, _), .setLaunchItemEnabled(_, _, let planID, _),
-      .runMaintenance(_, let planID, _):
+    case .remove(_, _, let planID, _), .runMaintenance(_, let planID, _):
+      return planID
+    case .setLaunchItemEnabled(_, _, let attribution):
+      guard case .operation(let planID, _) = attribution else { return nil }
       return planID
     }
   }
 
-  /// The operation this request performs, and nil for the handshake, which
-  /// performs none.
-  public var operationID: UUID? {
+  /// The identifier the reply echoes to tie itself to this request. Nil for
+  /// the handshake, which performs nothing. For a planned operation it is the
+  /// operation identifier; for a direct change it is the change identifier,
+  /// which appears in no plan, so a refusal reconciles one to one either way.
+  public var correlationID: UUID? {
     switch self {
     case .handshake:
       return nil
-    case .remove(_, _, _, let operationID), .setLaunchItemEnabled(_, _, _, let operationID),
-      .runMaintenance(_, _, let operationID):
+    case .remove(_, _, _, let operationID), .runMaintenance(_, _, let operationID):
       return operationID
+    case .setLaunchItemEnabled(_, _, let attribution):
+      return attribution.correlationID
     }
   }
 }
@@ -68,14 +79,14 @@ public enum HelperResponse: Codable, Sendable, Equatable {
   /// both by construction, so the app never has to infer which side is
   /// behind. The two are never equal in this reply.
   case handshakeRefused(helperContractVersion: UInt16, clientContractVersion: UInt16)
-  case success(operationID: UUID, bytesReclaimed: UInt64)
-  case launchItemChanged(operationID: UUID, change: LaunchItemChange)
+  case success(correlationID: UUID, bytesReclaimed: UInt64)
+  case launchItemChanged(correlationID: UUID, change: LaunchItemChange)
   /// Every refusal that is not a version disagreement, including a handshake
-  /// refused on identity. It names the operation it refused where there is
-  /// one, and it names no version: a client the helper could not verify is
-  /// told nothing about the helper.
-  case refused(operationID: UUID?, reason: HelperRefusal)
-  case failed(operationID: UUID, reason: String)
+  /// refused on identity. It echoes the correlation identifier of the request
+  /// it refused where there is one, and it names no version: a client the
+  /// helper could not verify is told nothing about the helper.
+  case refused(correlationID: UUID?, reason: HelperRefusal)
+  case failed(correlationID: UUID, reason: String)
 }
 
 public enum HelperRefusal: String, Codable, Sendable, Equatable {

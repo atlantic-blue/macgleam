@@ -2,11 +2,11 @@
 stage:    implement
 updated:  2026-08-12
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     s3f the helper contract at version two, then s4f, s4d, then M5
+next:     s4f the helper archives into the store, then s4d, then M5
 blocked:  none. The live window cannot be captured (the terminal has no
           Screen Recording permission), so visual checks run off offscreen
           renders and the human checks stay queued below.
-prs:      atlantic-blue/macgleam#1 to #30, merged in order
+prs:      atlantic-blue/macgleam#1 to #32, merged in order
 steps:
   - [x] s0a tokens and workspace (atlantic-blue/macgleam#1)
   - [x] s0b the shell model (atlantic-blue/macgleam#2)
@@ -32,7 +32,7 @@ steps:
   - [x] s3c maintenance (atlantic-blue/macgleam#24)
   - [x] s3d login items (atlantic-blue/macgleam#25)
   - [x] s3e process monitor (atlantic-blue/macgleam#26)
-  - [ ] s3f the helper contract at version two
+  - [x] s3f the helper contract at version two (atlantic-blue/macgleam#32)
   - [x] s4a safety net store (atlantic-blue/macgleam#27)
   - [x] s4b app inventory (atlantic-blue/macgleam#28)
   - [x] s4c uninstall (atlantic-blue/macgleam#29)

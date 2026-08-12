@@ -262,6 +262,11 @@ final class FakePrivilegedLaunchItemChanger: PrivilegedLaunchItemChanging {
   struct Handover: Sendable, Equatable {
     let item: LaunchItemID
     let enabled: Bool
+    /// What crossed the boundary about who asked for the change. It is
+    /// recorded because carrying it across is the guarantee: the privileged
+    /// side has to be able to name the plan operation or the direct change,
+    /// and a fake that dropped it would let an unattributed wire pass.
+    let attribution: ChangeAttribution
   }
 
   private let recorded = OSAllocatedUnfairLock(initialState: [Handover]())
@@ -289,9 +294,12 @@ final class FakePrivilegedLaunchItemChanger: PrivilegedLaunchItemChanging {
 
   func setLaunchItemEnabled(
     _ enabled: Bool,
-    item: LaunchItemID
+    item: LaunchItemID,
+    attribution: ChangeAttribution
   ) async throws -> LaunchItemChange {
-    recorded.withLock { $0.append(Handover(item: item, enabled: enabled)) }
+    recorded.withLock {
+      $0.append(Handover(item: item, enabled: enabled, attribution: attribution))
+    }
     if let failure = failures[item] {
       throw failure
     }
