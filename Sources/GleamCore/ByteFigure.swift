@@ -1,8 +1,11 @@
-/// The one byte figure style every cleanup surface uses, matching the hub's
-/// status line: decimal units, one decimal place at most, plain "bytes"
-/// under a kilobyte.
-enum ByteFigure {
-  static func string(_ bytes: UInt64) -> String {
+/// The one byte figure style every surface uses: decimal units, one decimal
+/// place at most, plain "bytes" under a kilobyte.
+///
+/// It lives here rather than in each surface because two of them disagreeing
+/// about how to write 1,500,000 bytes is two products. Decimal rather than
+/// binary units, to agree with what the Finder shows for the same file.
+public enum ByteFigure {
+  public static func string(_ bytes: UInt64) -> String {
     let units = ["KB", "MB", "GB", "TB", "PB"]
     if bytes < 1000 {
       return bytes == 1 ? "1 byte" : "\(bytes) bytes"

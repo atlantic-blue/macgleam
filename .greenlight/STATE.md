@@ -2,7 +2,7 @@
 stage:    implement
 updated:  2026-08-12
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     s6c the menu bar, then M7 launch
+next:     M7 launch: s7a sparkle, s7b release pipeline, s7c licensing
 blocked:  none. The live window cannot be captured (the terminal has no
           Screen Recording permission), so visual checks run off offscreen
           renders and the human checks stay queued below.
@@ -47,7 +47,7 @@ steps:
   - [ ] s5e the signature matcher, a decision for Julian first
   - [x] s6a full sweep orchestrator (atlantic-blue/macgleam#40)
   - [x] s6b smart care surface (atlantic-blue/macgleam#41)
-  - [ ] s6c menu bar
+  - [x] s6c menu bar (atlantic-blue/macgleam#42)
   - [ ] M7 launch: s7a sparkle, s7b release pipeline, s7c licensing
 ```
 
@@ -107,6 +107,13 @@ that half works.
 
 Verify tier slices are merged on tests and self checks but stay open until
 Julian judges them on a running app. Open items:
+
+- s6c the menu bar: judge it at a glance and watch its footprint, and check
+  the popover sizes correctly, which is the known AppKit interop seam. Self
+  check done: 15 new tests over the lines a sample produces; mutations on the
+  memory attention rule and on the empty volume guard watched failing then
+  passing. Not proved by a test: whether the three figures are the right three,
+  and whether the item is legible in a crowded menu bar.
 
 - s6b the smart care surface: run a Full Sweep on a scratch account and judge
   the scene, especially the empty result as a reward moment rather than a

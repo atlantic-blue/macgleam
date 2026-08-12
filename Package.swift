@@ -159,12 +159,12 @@ let package = Package(
         ),
         .target(
             name: "GleamHub",
-            dependencies: ["GleamDesign"],
+            dependencies: ["GleamDesign", "GleamCore"],
             path: "Sources/GleamHub"
         ),
         .testTarget(
             name: "GleamHubTests",
-            dependencies: ["GleamHub", "GleamDesign"],
+            dependencies: ["GleamHub", "GleamDesign", "GleamCore"],
             path: "Tests/GleamHubTests"
         ),
         .executableTarget(

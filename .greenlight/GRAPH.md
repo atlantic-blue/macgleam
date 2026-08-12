@@ -1042,8 +1042,18 @@ they were done alongside.
 - Verification: storage, memory and processor figures stream and agree with
   the hub's figures; the quick clean action opens the app onto Full Sweep;
   the scene honours the menu bar preferences in Settings.
+- Agreement is structural rather than asserted twice: the byte figure style
+  moved into GleamCore, so the hub's status line and the menu bar cannot write
+  the same number two ways, and the storage reading is the same volume reading
+  the Disk Map uses.
+- Memory pressure is the kernel's own level, read from the sysctl the system
+  sets, rather than a threshold invented here. Anything else would be this
+  app's opinion of what pressure is, and the contract says the buckets match
+  the platform's.
+- The quick action opens the window and starts a sweep. It never runs anything
+  from the menu bar alone: this app removes nothing out of sight.
 - Tier: verify. Human check: glanceability and footprint; the popover sizes
-  correctly (the known AppKit interop seam).
+  correctly (the known AppKit interop seam). Done 2026-08-12.
 
 ## M7. Launch
 

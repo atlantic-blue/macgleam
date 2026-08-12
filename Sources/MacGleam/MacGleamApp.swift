@@ -1,4 +1,5 @@
 import AppKit
+import GleamCore
 import GleamDesign
 import GleamHub
 import SwiftUI
@@ -77,6 +78,7 @@ struct MacGleamApp: App {
   @State private var diskMap: DiskMapDependencies
   @State private var protection: ProtectionDependencies
   @State private var fullSweep: FullSweepDependencies
+  @State private var menuBar: MenuBarModel
   @State private var rules: RuleSupply
 
   init() {
@@ -90,6 +92,18 @@ struct MacGleamApp: App {
       initialValue: ProtectionComposition.make(supply: supply, helpers: HelperSupply()))
     _fullSweep = State(
       initialValue: FullSweepComposition.make(supply: supply, helpers: HelperSupply()))
+    _menuBar = State(
+      initialValue: MenuBarModel(
+        stats: LiveSystemStats(), preferences: Settings.defaults.menuBar))
+  }
+
+  /// Brings the window forward and starts a sweep, which is what somebody
+  /// clicking Full Sweep in the menu bar is asking for. It never runs anything
+  /// without the window: this app removes nothing out of sight.
+  @MainActor
+  private func openFullSweep() {
+    NSApp.activate(ignoringOtherApps: true)
+    fullSweep.model.startSweep()
   }
 
   var body: some Scene {
@@ -109,6 +123,15 @@ struct MacGleamApp: App {
     }
     .windowStyle(.hiddenTitleBar)
     .windowResizability(.contentMinSize)
+
+    // The menu bar scene. It reads the same figures the hub does and starts
+    // the app on Full Sweep rather than doing anything itself.
+    MenuBarExtra {
+      MenuBarPopover(model: menuBar, onOpenFullSweep: openFullSweep)
+    } label: {
+      MenuBarLabel(model: menuBar)
+    }
+    .menuBarExtraStyle(.window)
   }
 }
 
