@@ -2719,6 +2719,36 @@ public enum HelperContract {
     public static let version: UInt16 = 2
 }
 
+/// Which reply answers which request. In the shared package rather than in
+/// the daemon, so the echo is testable: the daemon is an executable target
+/// and nothing links it.
+///
+/// Guarantees:
+/// - A reply carries the `correlationID` of the request that caused it, for
+///   every request that performs work and both kinds of attribution.
+/// - A handshake's completion is its acceptance, naming the version in force.
+/// - No reply to a handshake claims work was done, and a launch item change
+///   is never answered to a request that did not ask for one: both come back
+///   as `malformedRequest`, because a reply of the wrong kind is worse than
+///   no reply.
+/// - A version disagreement is the one refusal that names numbers. Every
+///   other refusal, on any request, names no version at all.
+public struct HelperReplyRouter: Sendable {
+    public init()
+    public func completed(
+        _ request: HelperRequest,
+        bytesReclaimed: UInt64,
+        contractVersion: UInt16 = HelperContract.version
+    ) -> HelperResponse
+    public func changed(_ request: HelperRequest, to change: LaunchItemChange) -> HelperResponse
+    public func failed(_ request: HelperRequest, because reason: String) -> HelperResponse
+    public func refused(
+        _ request: HelperRequest,
+        because refusal: HelperRefusal,
+        mismatch: HelperVersionMismatch?
+    ) -> HelperResponse
+}
+
 public enum HelperRemovalDestination: Codable, Sendable, Equatable {
     /// Move into the requesting user's trash, transferring ownership so the
     /// user can restore it. See GRAPH.md open questions for the unresolved
@@ -2763,19 +2793,21 @@ public enum HelperRefusal: String, Codable, Sendable, Equatable {
 }
 ```
 
-Migration note for the C30 amendment (s3d). The wire encoding changes, which
-is what the version bump is for. Nothing is stored and no message is
-persisted, so nothing migrates. The source level costs against the tree as it
-stands:
+Migration note for the C30 amendment, carried out in s3f on 2026-08-12. The
+wire encoding changed, which is what the version bump is for. Nothing is
+stored and no message is persisted, so nothing migrated. What it cost at the
+source level, all of it now done:
 
 - `HelperRequest`'s `planID` accessor cannot answer for every mutating
   request any more, because a direct change has no plan. It becomes a
   `correlationID` accessor that always answers, plus an optional `planID` for
   the two requests that still carry one.
-- The helper's message handler reads an operation identifier out of
-  `setLaunchItemEnabled` to build its reply. It reads the attribution's
-  `correlationID` instead, and the same value comes back on refusal, so the
-  handler needs no case analysis to answer a direct change.
+- The helper's message handler read an operation identifier out of
+  `setLaunchItemEnabled` to build its reply. Deciding which reply answers
+  which request moved out of the daemon into `HelperReplyRouter` in the shared
+  package, because the echo is a contract promise and the daemon is an
+  executable target that no test links, so the promise had nowhere to be
+  proved. The handler does the work and the router shapes the answer.
 - The helper client builds `setLaunchItemEnabled` from an operation and a
   plan identifier. Under C17's amendment it does not build this request from
   an operation at all: it takes an item and an attribution, and it is the
@@ -4070,15 +4102,10 @@ These span boundaries and get their own always true tests:
   that never existed. The helper echoes whichever it was as the reply's
   `correlationID`, which is how a refusal finds its way back to the thing that
   caused it.
-  NOT YET TRUE END TO END, as of 2026-08-11. Attribution is mandatory on the
-  manager and the executor supplies it, so no planned change reaches the
-  manager unattributed. It stops there: the C30 version 2 migration that puts
-  a `ChangeAttribution` on the wire and renames the reply slot to
-  `correlationID` is not in the tree, because it breaks seven helper test
-  files at compile time and those suites must move to version 2 first. So
-  today no privileged launch item change has a production path at all, which
-  is why nothing is silently unattributed; the gap would open the moment one
-  is wired. Slice s3f carries the migration, and this note goes when it lands.
+  True end to end as of s3f, 2026-08-12. The attribution is on the wire, the
+  reply slot is `correlationID`, and `HelperClient` is the production
+  `PrivilegedLaunchItemChanging`, so a system scope change made in the
+  interface has a path that carries its own identifier the whole way and back.
 - The denylist is enforced at three independent points: engine plan time
   (C15), executor run time (C17), helper admission (C31). Removing any one
   enforcement still leaves a blocked path unremovable.

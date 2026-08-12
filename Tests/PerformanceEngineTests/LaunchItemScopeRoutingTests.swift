@@ -41,7 +41,11 @@ struct LaunchItemScopeRoutingTests {
 
     _ = try await world.manager.setEnabled(false, item: item)
 
-    #expect(world.privileged.handovers == [.init(item: item, enabled: false)])
+    let handover = try #require(world.privileged.handovers.first)
+    #expect(world.privileged.handovers.count == 1)
+    #expect(handover.item == item)
+    #expect(handover.enabled == false)
+    #expect(handover.attribution.planID == nil, "a switch flipped by hand belongs to no plan")
     #expect(
       world.source.sawNoAttempt,
       "this process cannot change a system registration, so it must not try")
@@ -163,7 +167,14 @@ struct LaunchItemScopeRoutingTests {
 
     _ = await executorCollect(executor, executing: plan)
 
-    #expect(world.privileged.handovers == [.init(item: item, enabled: false)])
+    let operation = try #require(plan.operations.first)
+    #expect(
+      world.privileged.handovers == [
+        .init(
+          item: item,
+          enabled: false,
+          attribution: .operation(planID: plan.id, operationID: operation.id))
+      ])
     #expect(world.source.sawNoAttempt)
   }
 

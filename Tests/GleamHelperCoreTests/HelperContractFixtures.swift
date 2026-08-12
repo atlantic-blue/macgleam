@@ -151,14 +151,29 @@ enum HelperFixture {
     .remove(target: target, destination: destination, planID: planID, operationID: operationID)
   }
 
+  /// The planned change: the attribution names the plan and the operation it
+  /// belongs to. There is no unattributed form of this fixture because there
+  /// is no unattributed form of the request.
   static func setLaunchItemEnabled(
     _ item: LaunchItemID,
     enabled: Bool = false,
-    planID: UUID = HelperFixture.planID,
-    operationID: UUID = HelperFixture.operationID
+    attribution: ChangeAttribution = .operation(
+      planID: HelperFixture.planID, operationID: HelperFixture.operationID)
+  ) -> HelperRequest {
+    .setLaunchItemEnabled(item: item, enabled: enabled, attribution: attribution)
+  }
+
+  /// The change somebody made in the interface: it belongs to no plan, and
+  /// its identifier is minted for the change and names nothing else.
+  static let directChangeID = uuid(0x05)
+
+  static func directLaunchItemChange(
+    _ item: LaunchItemID,
+    enabled: Bool = false,
+    changeID: UUID = HelperFixture.directChangeID
   ) -> HelperRequest {
     .setLaunchItemEnabled(
-      item: item, enabled: enabled, planID: planID, operationID: operationID)
+      item: item, enabled: enabled, attribution: .directChange(changeID: changeID))
   }
 
   static func runMaintenance(
@@ -327,7 +342,7 @@ struct LoopbackHelperTransport {
     guard case .handshake = request, reason == .versionMismatch,
       let mismatch = policy.versionMismatch
     else {
-      return .refused(operationID: request.operationID, reason: reason)
+      return .refused(correlationID: request.correlationID, reason: reason)
     }
     return .handshakeRefused(
       helperContractVersion: mismatch.helperContractVersion,
@@ -341,10 +356,10 @@ struct LoopbackHelperTransport {
     case .handshake:
       return .handshakeAccepted(contractVersion: helperContractVersion)
     case .remove(_, _, _, let operationID):
-      return .success(operationID: operationID, bytesReclaimed: 4096)
-    case .setLaunchItemEnabled(let item, let enabled, _, let operationID):
+      return .success(correlationID: operationID, bytesReclaimed: 4096)
+    case .setLaunchItemEnabled(let item, let enabled, let attribution):
       return .launchItemChanged(
-        operationID: operationID,
+        correlationID: attribution.correlationID,
         change: LaunchItemChange(
           item: item,
           previousEnabled: !enabled,
@@ -353,7 +368,7 @@ struct LoopbackHelperTransport {
         )
       )
     case .runMaintenance(_, _, let operationID):
-      return .success(operationID: operationID, bytesReclaimed: 0)
+      return .success(correlationID: operationID, bytesReclaimed: 0)
     }
   }
 }

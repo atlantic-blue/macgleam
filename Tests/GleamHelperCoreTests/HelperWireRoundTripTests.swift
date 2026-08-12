@@ -108,7 +108,7 @@ struct HelperRequestWireTests {
     let codec = HelperWireCodec()
     let decoded = try codec.decodeRequest(from: codec.encode(request))
     #expect(decoded.planID == HelperFixture.otherPlanID)
-    #expect(decoded.operationID == HelperFixture.otherOperationID)
+    #expect(decoded.correlationID == HelperFixture.otherOperationID)
   }
 }
 
@@ -176,14 +176,14 @@ struct HelperResponseWireTests {
   @Test("a success round trips at every reclaimed byte count", arguments: reclaimedByteCounts)
   func successRoundTripsAtEveryByteCount(bytes: UInt64) throws {
     try expectResponseRoundTrip(
-      .success(operationID: HelperFixture.operationID, bytesReclaimed: bytes))
+      .success(correlationID: HelperFixture.operationID, bytesReclaimed: bytes))
   }
 
   @Test("a launch item change round trips with a far future instant")
   func launchItemChangeRoundTripsWithFarFutureInstant() throws {
     try expectResponseRoundTrip(
       .launchItemChanged(
-        operationID: HelperFixture.operationID,
+        correlationID: HelperFixture.operationID,
         change: LaunchItemChange(
           item: HelperFixture.systemLaunchItem,
           previousEnabled: true,
@@ -197,18 +197,18 @@ struct HelperResponseWireTests {
   @Test("every refusal round trips carrying the refused operation", arguments: refusals)
   func everyRefusalRoundTripsCarryingTheOperation(refusal: HelperRefusal) throws {
     try expectResponseRoundTrip(
-      .refused(operationID: HelperFixture.operationID, reason: refusal))
+      .refused(correlationID: HelperFixture.operationID, reason: refusal))
   }
 
   @Test("a refusal with no operation round trips as no operation", arguments: refusals)
   func refusalWithNoOperationRoundTrips(refusal: HelperRefusal) throws {
-    try expectResponseRoundTrip(.refused(operationID: nil, reason: refusal))
+    try expectResponseRoundTrip(.refused(correlationID: nil, reason: refusal))
   }
 
   @Test("a failure round trips its reason verbatim", arguments: failureReasons)
   func failureRoundTripsItsReasonVerbatim(reason: String) throws {
     try expectResponseRoundTrip(
-      .failed(operationID: HelperFixture.operationID, reason: reason))
+      .failed(correlationID: HelperFixture.operationID, reason: reason))
   }
 
   @Test("the refusal raw values are the five the contract names")
@@ -238,9 +238,9 @@ struct HelperWireDirectionTests {
     .handshakeAccepted(contractVersion: HelperContract.version),
     .handshakeRefused(
       helperContractVersion: HelperContract.version, clientContractVersion: 0),
-    .success(operationID: HelperFixture.operationID, bytesReclaimed: 1),
+    .success(correlationID: HelperFixture.operationID, bytesReclaimed: 1),
     .launchItemChanged(
-      operationID: HelperFixture.operationID,
+      correlationID: HelperFixture.operationID,
       change: LaunchItemChange(
         item: HelperFixture.systemLaunchItem,
         previousEnabled: true,
@@ -248,8 +248,8 @@ struct HelperWireDirectionTests {
         changedAt: HelperFixture.changeInstant
       )
     ),
-    .refused(operationID: nil, reason: .versionMismatch),
-    .failed(operationID: HelperFixture.operationID, reason: "gone"),
+    .refused(correlationID: nil, reason: .versionMismatch),
+    .failed(correlationID: HelperFixture.operationID, reason: "gone"),
   ]
 
   @Test("a request payload cannot be read as a response", arguments: requests)
@@ -295,27 +295,27 @@ struct HelperRequestIdentifierTests {
   @Test("a handshake belongs to no plan and no operation")
   func handshakeBelongsToNoPlanAndNoOperation() {
     #expect(HelperFixture.handshake().planID == nil)
-    #expect(HelperFixture.handshake().operationID == nil)
+    #expect(HelperFixture.handshake().correlationID == nil)
   }
 
   @Test("a remove names the plan and operation it belongs to")
   func removeNamesItsPlanAndOperation() {
     let request = HelperFixture.remove(HelperFixture.systemAllowedTarget)
     #expect(request.planID == HelperFixture.planID)
-    #expect(request.operationID == HelperFixture.operationID)
+    #expect(request.correlationID == HelperFixture.operationID)
   }
 
   @Test("a launch item change names the plan and operation it belongs to")
   func launchItemChangeNamesItsPlanAndOperation() {
     let request = HelperFixture.setLaunchItemEnabled(HelperFixture.systemLaunchItem)
     #expect(request.planID == HelperFixture.planID)
-    #expect(request.operationID == HelperFixture.operationID)
+    #expect(request.correlationID == HelperFixture.operationID)
   }
 
   @Test("a maintenance run names the plan and operation it belongs to")
   func maintenanceRunNamesItsPlanAndOperation() {
     let request = HelperFixture.runMaintenance()
     #expect(request.planID == HelperFixture.planID)
-    #expect(request.operationID == HelperFixture.operationID)
+    #expect(request.correlationID == HelperFixture.operationID)
   }
 }

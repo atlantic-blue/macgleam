@@ -501,7 +501,13 @@ they were done alongside.
   no plan and in no `ExecutionReport`; every reply echoes the correlation
   identifier of the request that caused it, for a planned operation and for a
   direct change alike; a version 1 client is refused with both numbers named.
-- Tier: auto.
+- Also landed here, because the promise had nowhere to be proved otherwise:
+  deciding which reply answers which request moved out of the daemon, an
+  executable target no test links, into `HelperReplyRouter` in the shared
+  package. And `HelperClient` became the production
+  `PrivilegedLaunchItemChanging`, so the attribution has an actual path to the
+  wire; until this slice there was none, which is what kept the gap theoretical.
+- Tier: auto. Done 2026-08-12.
 
 ### s3e. process monitor
 - Contracts: C25, amended in this slice on five points, each a contract change

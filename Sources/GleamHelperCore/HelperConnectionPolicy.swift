@@ -104,7 +104,7 @@ public final class HelperConnectionPolicy: HelperPolicy, @unchecked Sendable {
       return nil
     case .remove(let target, _, _, _):
       return refusal(forTarget: target)
-    case .setLaunchItemEnabled(let item, _, _, _):
+    case .setLaunchItemEnabled(let item, _, _):
       guard let location = launchItems.location(of: item) else { return .malformedRequest }
       return refusal(forTarget: location)
     }

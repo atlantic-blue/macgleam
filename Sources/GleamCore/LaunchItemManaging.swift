@@ -55,10 +55,17 @@ public protocol UserScopeLaunchItemChanging: Sendable {
 /// failures. It is the only place in the app that can change a system scope
 /// registration. The change it returns is the one the helper made and reported
 /// back, so its instant is the helper's rather than this process's.
+///
+/// It carries the attribution across the boundary rather than dropping it, and
+/// the parameter has no default, so a privileged change nobody asked for
+/// cannot be written. The helper echoes the attribution's correlation
+/// identifier, which is how a refusal reconciles to the plan operation or to
+/// the direct change that caused it.
 public protocol PrivilegedLaunchItemChanging: Sendable {
   func setLaunchItemEnabled(
     _ enabled: Bool,
-    item: LaunchItemID
+    item: LaunchItemID,
+    attribution: ChangeAttribution
   ) async throws -> LaunchItemChange
 }
 

@@ -19,6 +19,14 @@ public enum ChangeAttribution: Codable, Sendable, Equatable, Hashable {
   /// else: no plan carries it and no `ExecutionReport` names it.
   case directChange(changeID: UUID)
 
+  /// The plan this change belongs to, and nil for a direct change, which
+  /// belongs to none. Nil is the whole point rather than a missing value: a
+  /// change somebody made by hand has no plan to be reconciled against.
+  public var planID: UUID? {
+    guard case .operation(let planID, _) = self else { return nil }
+    return planID
+  }
+
   /// The identifier a reply echoes to tie itself to the request that caused
   /// it. Never nil, so reconciliation needs no special case for either kind.
   public var correlationID: UUID {
