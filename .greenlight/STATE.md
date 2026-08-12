@@ -1,12 +1,12 @@
 ```state
-stage:    implement
+stage:    done
 updated:  2026-08-12
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     the launch credentials, all of which are Julian's
+next:     Julian's: the four credentials, and the s5e decision
 blocked:  none. The live window cannot be captured (the terminal has no
           Screen Recording permission), so visual checks run off offscreen
           renders and the human checks stay queued below.
-prs:      atlantic-blue/macgleam#1 to #34, merged in order
+prs:      atlantic-blue/macgleam#1 to #46, merged in order
 steps:
   - [x] s0a tokens and workspace (atlantic-blue/macgleam#1)
   - [x] s0b the shell model (atlantic-blue/macgleam#2)
