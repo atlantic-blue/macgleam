@@ -103,6 +103,16 @@ let package = Package(
             path: "Tests/PerformanceEngineTests"
         ),
         .target(
+            name: "ProtectionEngine",
+            dependencies: ["GleamCore"],
+            path: "Sources/ProtectionEngine"
+        ),
+        .testTarget(
+            name: "ProtectionEngineTests",
+            dependencies: ["ProtectionEngine", "GleamCore"],
+            path: "Tests/ProtectionEngineTests"
+        ),
+        .target(
             name: "ApplicationsEngine",
             dependencies: ["GleamCore"],
             path: "Sources/ApplicationsEngine"

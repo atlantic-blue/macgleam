@@ -910,7 +910,33 @@ they were done alongside.
   unwanted paths from the curated list are found; one failing rule disables
   itself without sinking the scan; a detection plan contains only quarantine
   operations, proven over the generated plan space.
-- Tier: auto.
+- Two bounds this slice states rather than hides. Signatures are read against
+  what the machine can run, because matching every file on a volume through a
+  rule engine reads the whole disk twice over and the things these signatures
+  describe are executables; a payload hidden inside a document and unpacked
+  later is not found, which is the cost. And a compiled rule set matches its
+  own rules alone, so each source is compiled separately, which is what makes
+  one bad rule survivable.
+- Tier: auto. Done 2026-08-12, with the library itself carried by s5e.
+
+### s5e. the signature matcher
+- Contracts: C28's production conformance.
+- Depends on: s5a.
+- Why it exists: s5a ships the boundary, the engine and the adware half. It
+  does not ship a matcher, so a build today scans the curated list and says
+  plainly that signatures were not checked. Vendoring libyara is a third party
+  C dependency with its own build, its own licence and its own update path,
+  and a security feature is the last place to put an approximation in while
+  deciding: a matcher that half works is worse than one that says it is not
+  there.
+- What it carries: the library, the XProtect rule source on the running
+  machine as the rule catalogue's source, and the conformance tests C28 names.
+- Verification: a seeded European Institute for Computer Antivirus Research
+  test file is matched by the real library; a rule source that does not
+  compile throws naming the rule rather than a library string; compiled rules
+  match concurrently.
+- Tier: auto. A decision for Julian first: whether to vendor the library or to
+  ship without the signature half.
 
 ### s5b. quarantine flow
 - Contracts: C27 wired to C18 and the interface.
