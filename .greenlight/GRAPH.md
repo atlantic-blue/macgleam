@@ -1007,7 +1007,16 @@ they were done alongside.
   summary; exactly one summary, after all jobs; the combined plan preserves
   every underlying engine invariant; no stub job can appear (the enum is the
   proof).
-- Tier: auto.
+- Concurrency is asserted without a clock: every scripted engine waits at a
+  gate until all three have started, so a sequential orchestrator never
+  finishes and fails by hanging rather than by a timing assertion that would
+  pass on a slow machine.
+- The orchestrator holds one rule of its own and no more. Each engine plans
+  its own rows, so every module invariant holds here unchanged, and the
+  maintenance exclusion is applied at plan time over everything selected
+  rather than at selection time, because the review is exactly what a sweep
+  does not have.
+- Tier: auto. Done 2026-08-12.
 
 ### s6b. smart care surface
 - Contracts: wires C29 to the hub; the orb's scanning, result and clean
