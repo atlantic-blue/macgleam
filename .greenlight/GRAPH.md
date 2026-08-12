@@ -966,7 +966,19 @@ they were done alongside.
   tampered or replayed (older version) manifest is rejected leaving current
   rules intact; the helper only honours a catalogue it verified itself; the
   publish workflow signs with the rules key held only in that pipeline.
-- Tier: auto.
+- The helper honours its embedded baseline and nothing else, which satisfies
+  the third clause by construction rather than by a check: it has no channel,
+  no network and no path to one. A denylist extension published through the
+  channel therefore protects at the engine and the executor and not at the
+  helper's own admission, which is the conservative direction: the helper's
+  floor is the strictest set it has ever shipped with.
+- Tier: auto. Done 2026-08-12, with one credential wall: the rules key itself.
+  The publisher takes it from `RULES_SIGNING_KEY` in the pipeline's secrets and
+  from nowhere else, refuses to run without it, and verifies what it signed
+  against the pinned public key before writing anything. Minting the key and
+  standing up `rules.macgleam.app` are Julian's, and until they exist a
+  refresh finds nothing and the app runs on its baseline, which is exactly
+  what it does today.
 
 ## M6. Full Sweep and the menu bar
 

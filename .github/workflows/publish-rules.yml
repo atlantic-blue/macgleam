@@ -1,0 +1,61 @@
+name: Publish rules
+
+# The rules channel's publisher. It signs a catalogue with the rules key and
+# publishes the signed manifest, and it is the only place that key exists: it
+# is a repository secret, it is never written to disk unencrypted, and no
+# developer machine holds a copy. A catalogue signed anywhere else is refused
+# by every MacGleam on the planet, because the app verifies against the pinned
+# public key rather than against where the bytes came from.
+#
+# Run by hand rather than on a push. A rules update is a decision about what
+# every installation will delete without asking again, so it is somebody's
+# deliberate act with the version they intend.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The catalogue version to publish. It must be strictly greater than the one in force, or every client will refuse it.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refuse an unsigned publish
+        env:
+          RULES_SIGNING_KEY: ${{ secrets.RULES_SIGNING_KEY }}
+        run: |
+          if [ -z "$RULES_SIGNING_KEY" ]; then
+            echo "No rules signing key is configured, so nothing can be published."
+            echo "The key lives only in this repository's secrets. See .greenlight/GRAPH.md s5d."
+            exit 1
+          fi
+
+      - name: Sign the catalogue
+        env:
+          RULES_SIGNING_KEY: ${{ secrets.RULES_SIGNING_KEY }}
+          CATALOG_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          swift run GleamRulesPublisher \
+            --catalog rules/catalog.json \
+            --version "$CATALOG_VERSION" \
+            --out dist/catalog.json
+
+      - name: Refuse a manifest the app would refuse
+        run: |
+          set -euo pipefail
+          swift run GleamRulesPublisher --verify dist/catalog.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: catalog
+          path: dist/catalog.json
+          if-no-files-found: error

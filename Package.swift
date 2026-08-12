@@ -153,6 +153,11 @@ let package = Package(
             path: "Sources/GleamHelper"
         ),
         .executableTarget(
+            name: "GleamRulesPublisher",
+            dependencies: ["GleamCore"],
+            path: "Sources/GleamRulesPublisher"
+        ),
+        .executableTarget(
             name: "GleamBaselineGenerator",
             dependencies: ["GleamCore"],
             path: "Sources/GleamBaselineGenerator"

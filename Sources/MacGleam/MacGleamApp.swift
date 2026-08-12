@@ -37,7 +37,10 @@ final class MacGleamAppDelegate: NSObject, NSApplicationDelegate {
   @MainActor
   private func renderAndExit(_ request: RenderToFile.Request) {
     let onboarding = DiskAccessOnboardingModel(monitor: RealFullDiskAccessMonitor())
-    let diskMap = DiskMapComposition.make()
+    // A render never asks the channel for anything: it draws what a build
+    // holds, so a picture does not depend on a network.
+    let supply = RuleSupply()
+    let diskMap = DiskMapComposition.make(supply: supply)
     Task { @MainActor in
       if let folder = request.mapFolder {
         await RenderToFile.mapAndSettle(diskMap.model, folder: folder)
@@ -46,7 +49,7 @@ final class MacGleamAppDelegate: NSObject, NSApplicationDelegate {
         try RenderToFile.render(
           request,
           hub: HubModel(state: .firstRun(now: Date())),
-          cleanup: CleanupComposition.make(onboarding: onboarding),
+          cleanup: CleanupComposition.make(onboarding: onboarding, supply: supply),
           diskMap: diskMap
         )
         FileHandle.standardOutput.write(Data("rendered \(request.destination.path)\n".utf8))
@@ -70,12 +73,15 @@ struct MacGleamApp: App {
   @State private var onboardingModel: DiskAccessOnboardingModel
   @State private var cleanup: CleanupDependencies
   @State private var diskMap: DiskMapDependencies
+  @State private var rules: RuleSupply
 
   init() {
     let onboarding = DiskAccessOnboardingModel(monitor: RealFullDiskAccessMonitor())
+    let supply = RuleSupply()
     _onboardingModel = State(initialValue: onboarding)
-    _cleanup = State(initialValue: CleanupComposition.make(onboarding: onboarding))
-    _diskMap = State(initialValue: DiskMapComposition.make())
+    _rules = State(initialValue: supply)
+    _cleanup = State(initialValue: CleanupComposition.make(onboarding: onboarding, supply: supply))
+    _diskMap = State(initialValue: DiskMapComposition.make(supply: supply))
   }
 
   var body: some Scene {
@@ -87,6 +93,9 @@ struct MacGleamApp: App {
         diskMap: diskMap
       )
       .frame(minWidth: 1120, minHeight: 760)
+      // Best effort, once per launch. A catalogue that does not arrive
+      // changes nothing: the app runs on the one it already has.
+      .task { await rules.refresh() }
     }
     .windowStyle(.hiddenTitleBar)
     .windowResizability(.contentMinSize)
