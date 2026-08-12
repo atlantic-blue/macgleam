@@ -880,8 +880,25 @@ they were done alongside.
 - Verification: orphans from deleted fixture apps are found, never
   preselected, and removal follows the Trash default; files belonging to
   installed apps are never flagged as orphans.
+- Two rules the sweep adds beyond the association rule, because it acts on
+  files nobody speaks for and has no second opinion the way an uninstall does.
+  An identity that is not shaped like a bundle identifier is never swept, which
+  is what keeps a folder somebody called `Vendor` out of it. And nothing whose
+  identity is Apple's is swept: the system's own applications are not installed
+  the way a downloaded one is, so the absence of an owner says nothing about
+  them.
+- The running application is excluded from the inventory, so its own files
+  answer to no offered application. The sweep therefore asks a wider question
+  than the inventory: every identifier a bundle on the disk claims, read from
+  the bundles themselves. Without that, MacGleam would offer to delete its own
+  state.
 - Tier: verify. Human check: sweep a real machine and read the findings for
-  false positives before acting.
+  false positives before acting. One shape of false positive is known and
+  accepted: a file named in dotted form that no bundle claims is swept even
+  when a person would recognise it, `backup-of-com.example.mail-settings.plist`
+  in the fixture world being exactly that. It is offered at review risk and
+  never preselected, which is the honest answer to a guess.
+- Done 2026-08-12.
 
 ## M5. Protection
 

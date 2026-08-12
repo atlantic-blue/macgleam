@@ -87,8 +87,13 @@ extension ApplicationsEngine {
     yield(.phase(.determinate(estimatedTotalFiles: survey.counters.filesSeen)))
     let applications = try await survey.applications(
       fileSystem: context.fileSystem, excluding: runningApplicationBundleID)
+    let claimed = try await survey.claimedBundleIDs(fileSystem: context.fileSystem)
     var counters = survey.counters
-    for finding in Self.findings(for: applications, survey: survey, sessionID: context.sessionID) {
+    let everyFinding =
+      Self.findings(for: applications, survey: survey, sessionID: context.sessionID)
+      + Self.orphanFindings(
+        survey.orphanedCandidates(claimedBundleIDs: claimed), sessionID: context.sessionID)
+    for finding in everyFinding {
       try Task.checkCancellation()
       counters.itemCount += finding.itemCount
       counters.bytesReclaimable += finding.byteSize
@@ -133,6 +138,36 @@ extension ApplicationsEngine {
         + "itself, and every file left behind is listed beside it rather than folded "
         + "into a total.",
       isPreselected: false)
+  }
+
+  /// The sweep: files in the recognised locations that no application on this
+  /// Mac claims, batched like any other finding.
+  ///
+  /// They are offered at review risk and never preselected, and the sentence
+  /// says why rather than asserting the application is gone. A file whose
+  /// application was installed somewhere this scan does not look at is the
+  /// false positive this category can have, and the honest answer to that is
+  /// to make the person decide rather than to decide for them.
+  private static func orphanFindings(
+    _ orphans: [(path: AbsolutePath, bytes: UInt64)],
+    sessionID: UUID
+  ) -> [Finding] {
+    let entries = orphans.map { PathEntry(path: $0.path, allocatedBytes: $0.bytes) }
+    return stride(from: 0, to: entries.count, by: ScanStreamPolicy.maximumFindingEntries).map {
+      start in
+      Finding(
+        id: UUID(),
+        sessionID: sessionID,
+        category: .orphanedLeftover,
+        entries: Array(
+          entries[start..<min(start + ScanStreamPolicy.maximumFindingEntries, entries.count)]),
+        risk: .review,
+        explanation: "Each of these is named for an application, and no application on this "
+          + "Mac answers to that name. Nothing here is selected for you: an application "
+          + "installed somewhere MacGleam does not look would leave files that read exactly "
+          + "like these.",
+        isPreselected: false)
+    }
   }
 
   /// The attributed leftovers, in batches of at most the entry cap so one

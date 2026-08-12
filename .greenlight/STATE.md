@@ -2,7 +2,7 @@
 stage:    implement
 updated:  2026-08-12
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     s4d the leftover sweep, then M5 protection
+next:     M5 protection: s5a malware scan, then s5b, s5c, s5d
 blocked:  none. The live window cannot be captured (the terminal has no
           Screen Recording permission), so visual checks run off offscreen
           renders and the human checks stay queued below.
@@ -39,7 +39,7 @@ steps:
   - [x] s4e the store sizes what it stored (atlantic-blue/macgleam#30)
   - [x] s4f the helper archives into the store (atlantic-blue/macgleam#33)
   - [x] s4g the trash destination is the connecting user's own (atlantic-blue/macgleam#34)
-  - [ ] s4d leftover sweep
+  - [x] s4d leftover sweep (atlantic-blue/macgleam#35)
   - [x] s5a malware and adware detection (atlantic-blue/macgleam#36)
   - [ ] s5b quarantine flow
   - [ ] s5c privacy cleanup
@@ -96,6 +96,13 @@ that half works.
 
 Verify tier slices are merged on tests and self checks but stay open until
 Julian judges them on a running app. Open items:
+
+- s4d the leftover sweep: sweep a real machine and read the findings before
+  acting on any of them. Self check done: 16 new tests, 1471 green; mutations
+  on the shape rule, on the wider claimed identifiers and on the deletion mode
+  branch watched failing then passing. What a test cannot judge: whether the
+  findings on a real disk read as obviously safe to remove, which is the whole
+  question for a category that acts on files nobody claims.
 
 - s4f the privileged archive: uninstall an application from /Applications on a
   scratch account, confirm the archive is listed with a real size, restore it

@@ -119,6 +119,35 @@ extension ApplicationSurvey {
     return installed
   }
 
+  /// The candidates the sweep may offer, with the bytes each occupies, in
+  /// path order.
+  ///
+  /// `claimedBundleIDs` is every identifier anything on this Mac answers to,
+  /// which is wider than the inventory the uninstall offers: the running
+  /// application is excluded from that inventory and its own files are still
+  /// nobody's to sweep.
+  func orphanedCandidates(claimedBundleIDs: Set<String>) -> [(path: AbsolutePath, bytes: UInt64)] {
+    candidateBytes
+      .filter { LeftoverAssociation.isSweepable($0.key, claimedBundleIDs: claimedBundleIDs) }
+      .map { (path: $0.key.root, bytes: $0.value) }
+      .sorted { $0.path < $1.path }
+  }
+
+  /// Every identifier a bundle on this disk claims, whether or not the
+  /// inventory offers it. Read from the bundles themselves rather than from
+  /// the offered list, because the difference between the two is exactly the
+  /// running application, whose files would otherwise look orphaned.
+  func claimedBundleIDs(fileSystem: any FileSystemReading) async throws -> Set<String> {
+    var claimed: Set<String> = []
+    for root in bundleBytes.keys.sorted() {
+      try Task.checkCancellation()
+      guard let identity = await ApplicationBundle.identity(atRoot: root, fileSystem: fileSystem)
+      else { continue }
+      claimed.insert(identity.bundleID)
+    }
+    return claimed
+  }
+
   /// Every candidate that an installed application owns outright, by bundle
   /// identifier. A candidate nobody owns is in no list at all, which is what
   /// keeps an unattributed file out of every uninstall.

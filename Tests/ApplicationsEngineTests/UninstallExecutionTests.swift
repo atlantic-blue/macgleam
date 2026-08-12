@@ -119,7 +119,10 @@ struct UninstallExecutionTests {
   @Test("a path that belongs to nobody survives an uninstall of every application on the disk")
   func unattributablePathsSurviveAWholesaleUninstall() async throws {
     let setup = try await uninstallSetup()
-    let selection = setup.outcome.findings
+    // Every uninstall row, and no swept orphan: the sweep is a separate
+    // review a person ticks separately, and what this pins is that
+    // uninstalling everything installed never reaches a file nobody claimed.
+    let selection = setup.outcome.findings.filter { applicationBundleID(of: $0) != nil }
     let plan = try ApplicationsEngine().plan(
       selection: selection, context: makeUninstallPlanContext(rules: setup.catalog))
     #expect(plan.operations.isEmpty == false, "nothing was planned, so nothing was proved")
@@ -136,5 +139,38 @@ struct UninstallExecutionTests {
         await setup.fileSystem.exists(path),
         "\(path.value) belongs to nobody and an uninstall took it anyway")
     }
+  }
+
+  @Test("a swept orphan goes to the Trash, and the files an application owns stay put")
+  func aSweptOrphanGoesToTheTrash() async throws {
+    let setup = try await uninstallSetup()
+    let orphans = setup.outcome.findings.filter { $0.category == .orphanedLeftover }
+    let plan = try ApplicationsEngine().plan(
+      selection: orphans, context: makeUninstallPlanContext(rules: setup.catalog))
+    #expect(plan.operations.isEmpty == false, "nothing was planned, so nothing was proved")
+    let denylist = try await applicationsDenylist()
+    let store = makeUninstallSafetyNet(fileSystem: setup.fileSystem, denylist: denylist)
+    let executor = makeUninstallExecutor(
+      fileSystem: setup.fileSystem, denylist: denylist, safetyNet: store)
+
+    for await _ in executor.execute(plan) {}
+
+    let swept = Set(orphans.flatMap(\.entries).map(\.path))
+    #expect(swept.isEmpty == false)
+    for path in swept {
+      #expect(
+        await !setup.fileSystem.exists(path),
+        "\(path.value) was swept, so it is not where it was")
+    }
+    for path in ApplicationWorld.expectedLeftoverPaths(of: ApplicationWorld.mail) {
+      #expect(
+        await setup.fileSystem.exists(path),
+        "\(path.value) belongs to an installed application and a sweep never touches it")
+    }
+    #expect(
+      await setup.fileSystem.exists(ApplicationsFixture.path("/Applications/ExampleMail.app")))
+    #expect(
+      try await store.items(includingRestored: true).isEmpty,
+      "a sweep is a removal, so nothing about it fills the SafetyNet")
   }
 }

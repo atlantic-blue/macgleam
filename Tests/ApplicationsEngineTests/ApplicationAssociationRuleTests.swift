@@ -293,6 +293,17 @@ struct ApplicationAssociationRuleTests {
       #expect(outcome.entryPaths(ofBundle: entry.bundleID) == [entry.installLocation])
       #expect(outcome.entryPaths(ofLeftoversFor: entry.bundleID) == leftoverPaths(of: entry))
     }
-    #expect(outcome.everyEntryPath.isDisjoint(with: ApplicationWorld.unattributablePaths))
+    let attributed = Set(
+      (outcome.bundleFindings + outcome.leftoverFindings).flatMap(\.entries).map(\.path))
+    #expect(attributed.isDisjoint(with: ApplicationWorld.unattributablePaths))
+    // The sweep names paths on purpose, and only ever ones no application
+    // claimed. Anything it named that the association rule had attributed
+    // would be the same file claimed twice.
+    let swept = Set(
+      outcome.findings
+        .filter { $0.category == .orphanedLeftover }
+        .flatMap(\.entries)
+        .map(\.path))
+    #expect(swept.isSubset(of: ApplicationWorld.unattributablePaths))
   }
 }
