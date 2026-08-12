@@ -82,6 +82,7 @@ extension ProtectionEngine {
       counters.filesSeen += 1
       guard !context.rules.denylist.blocks(record.path) else { continue }
       detections.matchAdware(record)
+      detections.matchPrivacy(record)
       if let signatures {
         for identifier in try await matchedSignatures(record, against: signatures, context) {
           detections.matchMalware(record, signatureIdentifier: identifier)

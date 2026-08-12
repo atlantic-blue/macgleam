@@ -2818,7 +2818,15 @@ public struct ApplicationsEngine: GleamEngine {
 ///   recent item lists, Wi-Fi network history) are never preselected; each
 ///   is an explicit user selection. Privacy selections plan as
 ///   `deletePermanently` (there is no meaningful trash for a history
-///   database row) and the explanation names exactly what is cleared.
+///   database row, and keeping a copy of what somebody asked to be rid of is
+///   the opposite of the ask) and the explanation names exactly what is
+///   cleared and exactly what survives. Clearing cookies signs somebody out
+///   of every site that remembered them and clearing history does not, so a
+///   row that does not say what survives is a row nobody can decide about.
+/// - One row per trace per browser profile, and the browser's name comes out
+///   of the path rather than being guessed at. A second profile is a second
+///   set of traces and gets its own rows: two people sharing a Mac through
+///   two Chrome profiles are two decisions.
 /// - A YARA rule compile failure disables that rule with a logged warning
 ///   and never aborts the whole scan. Each rule source is compiled on its
 ///   own, because a single document holding every rule would take the whole
