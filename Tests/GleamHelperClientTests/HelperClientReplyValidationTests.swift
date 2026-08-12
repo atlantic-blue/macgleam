@@ -22,7 +22,7 @@ struct HelperClientReplyValidationTests {
   func successNamingTheOperationCompletesIt() async throws {
     let operation = HelperClientFixture.trash(HelperClientFixture.systemTarget)
     let transport = RecordingHelperTransport(
-      script: [.message(.success(operationID: operation.id, bytesReclaimed: 4096))])
+      script: [.message(.success(correlationID: operation.id, bytesReclaimed: 4096))])
     let client = makeApprovedHelperClient(transport: transport)
 
     let result = await client.perform(operation, planID: UUID())
@@ -40,7 +40,7 @@ struct HelperClientReplyValidationTests {
       changedAt: HelperClientFixture.executionInstant
     )
     let transport = RecordingHelperTransport(
-      script: [.message(.launchItemChanged(operationID: operation.id, change: change))])
+      script: [.message(.launchItemChanged(correlationID: operation.id, change: change))])
     let client = makeApprovedHelperClient(transport: transport)
 
     let result = await client.perform(operation, planID: UUID())
@@ -52,7 +52,7 @@ struct HelperClientReplyValidationTests {
   func denylistRefusalIsReportedAsSkipped() async throws {
     let operation = HelperClientFixture.trash(HelperClientFixture.systemTarget)
     let transport = RecordingHelperTransport(
-      script: [.message(.refused(operationID: operation.id, reason: .denylisted))])
+      script: [.message(.refused(correlationID: operation.id, reason: .denylisted))])
     let client = makeApprovedHelperClient(transport: transport)
 
     let result = await client.perform(operation, planID: UUID())
@@ -69,7 +69,7 @@ struct HelperClientReplyValidationTests {
       script: [
         .message(
           .failed(
-            operationID: operation.id,
+            correlationID: operation.id,
             reason: "The file is on a read only volume, so nothing was removed."))
       ])
     let client = makeApprovedHelperClient(transport: transport)
@@ -85,7 +85,7 @@ struct HelperClientReplyValidationTests {
   func replyNamingADifferentOperationFailsThatOperation() async throws {
     let operation = HelperClientFixture.trash(HelperClientFixture.systemTarget)
     let transport = RecordingHelperTransport(
-      script: [.message(.success(operationID: UUID(), bytesReclaimed: 999))])
+      script: [.message(.success(correlationID: UUID(), bytesReclaimed: 999))])
     let client = makeApprovedHelperClient(transport: transport)
 
     let result = await client.perform(operation, planID: UUID())
@@ -100,7 +100,7 @@ struct HelperClientReplyValidationTests {
   func refusalNamingADifferentOperationIsNotTrusted() async throws {
     let operation = HelperClientFixture.trash(HelperClientFixture.systemTarget)
     let transport = RecordingHelperTransport(
-      script: [.message(.refused(operationID: UUID(), reason: .denylisted))])
+      script: [.message(.refused(correlationID: UUID(), reason: .denylisted))])
     let client = makeApprovedHelperClient(transport: transport)
 
     let result = await client.perform(operation, planID: UUID())
@@ -113,7 +113,7 @@ struct HelperClientReplyValidationTests {
   func refusalNamingNoOperationFailsTheOperation() async throws {
     let operation = HelperClientFixture.trash(HelperClientFixture.systemTarget)
     let transport = RecordingHelperTransport(
-      script: [.message(.refused(operationID: nil, reason: .malformedRequest))])
+      script: [.message(.refused(correlationID: nil, reason: .malformedRequest))])
     let client = makeApprovedHelperClient(transport: transport)
 
     let result = await client.perform(operation, planID: UUID())
@@ -133,7 +133,7 @@ struct HelperClientReplyValidationTests {
   func otherRefusalsFailTheOperation(reason: HelperRefusal) async throws {
     let operation = HelperClientFixture.trash(HelperClientFixture.systemTarget)
     let transport = RecordingHelperTransport(
-      script: [.message(.refused(operationID: operation.id, reason: reason))])
+      script: [.message(.refused(correlationID: operation.id, reason: reason))])
     let client = makeApprovedHelperClient(transport: transport)
 
     let result = await client.perform(operation, planID: UUID())
@@ -164,7 +164,7 @@ struct HelperClientReplyValidationTests {
       changedAt: HelperClientFixture.executionInstant
     )
     let transport = RecordingHelperTransport(
-      script: [.message(.launchItemChanged(operationID: operation.id, change: change))])
+      script: [.message(.launchItemChanged(correlationID: operation.id, change: change))])
     let client = makeApprovedHelperClient(transport: transport)
 
     let result = await client.perform(operation, planID: UUID())
@@ -176,7 +176,7 @@ struct HelperClientReplyValidationTests {
   func successAnsweringALaunchItemChangeFailsIt() async throws {
     let operation = HelperClientFixture.launchItem()
     let transport = RecordingHelperTransport(
-      script: [.message(.success(operationID: operation.id, bytesReclaimed: 0))])
+      script: [.message(.success(correlationID: operation.id, bytesReclaimed: 0))])
     let client = makeApprovedHelperClient(transport: transport)
 
     let result = await client.perform(operation, planID: UUID())
@@ -252,7 +252,7 @@ struct HelperClientReplyValidationTests {
     let transport = RecordingHelperTransport(
       script: [
         .rawPayload(Data([0xFF, 0xFF])),
-        .message(.success(operationID: next.id, bytesReclaimed: 512)),
+        .message(.success(correlationID: next.id, bytesReclaimed: 512)),
       ])
     let client = makeApprovedHelperClient(transport: transport)
 

@@ -104,8 +104,9 @@ struct HelperClientRequestTests {
     #expect(
       request
         == .setLaunchItemEnabled(
-          item: HelperClientFixture.systemLaunchItem, enabled: false, planID: planID,
-          operationID: operation.id))
+          item: HelperClientFixture.systemLaunchItem,
+          enabled: false,
+          attribution: .operation(planID: planID, operationID: operation.id)))
   }
 
   @Test("a maintenance task is transmitted as the task it is", arguments: MaintenanceTask.allCases)

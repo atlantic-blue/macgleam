@@ -34,7 +34,7 @@ public actor HelperClient: PrivilegedOperationPerforming {
     case refused(reason: String)
   }
 
-  private enum Exchange {
+  enum Exchange {
     case reply(HelperResponse)
     /// Failed before any bytes left, so the target is certainly untouched.
     case notSent(reason: String)
@@ -93,7 +93,7 @@ public actor HelperClient: PrivilegedOperationPerforming {
 
   /// Read before every privileged operation, never once at launch: approval
   /// can land or be withdrawn between two operations of the same plan.
-  private func registrationRefusal(for operation: GleamCore.Operation) async -> String? {
+  func registrationRefusal(for operation: GleamCore.Operation) async -> String? {
     switch await registration.ensureRegistered() {
     case .enabled:
       return nil
@@ -108,7 +108,7 @@ public actor HelperClient: PrivilegedOperationPerforming {
 
   // MARK: - Handshake
 
-  private func handshakeRefusal(for operation: GleamCore.Operation) async -> String? {
+  func handshakeRefusal(for operation: GleamCore.Operation) async -> String? {
     switch handshake {
     case .agreed:
       return nil
@@ -182,7 +182,9 @@ public actor HelperClient: PrivilegedOperationPerforming {
       return removal(of: target, to: store, operation, planID)
     case .setLaunchItemEnabled(let item, let enabled):
       return .setLaunchItemEnabled(
-        item: item, enabled: enabled, planID: planID, operationID: operation.id)
+        item: item,
+        enabled: enabled,
+        attribution: .operation(planID: planID, operationID: operation.id))
     case .runMaintenance(let task):
       return .runMaintenance(task: task, planID: planID, operationID: operation.id)
     }
@@ -206,7 +208,7 @@ public actor HelperClient: PrivilegedOperationPerforming {
   private func result(of reply: HelperResponse, for operation: GleamCore.Operation)
     -> OperationResult
   {
-    guard reply.operationID == operation.id else {
+    guard reply.correlationID == operation.id else {
       return .failed(reason: HelperSentence.replyNamesAnotherOperation(operation))
     }
     switch reply {
@@ -241,7 +243,7 @@ public actor HelperClient: PrivilegedOperationPerforming {
 
   // MARK: - Bytes
 
-  private func exchange(_ request: HelperRequest) async -> Exchange {
+  func exchange(_ request: HelperRequest) async -> Exchange {
     let payload: Data
     do {
       payload = try codec.encode(request)
@@ -264,17 +266,17 @@ public actor HelperClient: PrivilegedOperationPerforming {
 }
 
 extension HelperResponse {
-  /// The operation a reply answers, and nil for the two handshake replies and
+  /// The request a reply answers, and nil for the two handshake replies and
   /// for a refusal that named none.
-  fileprivate var operationID: UUID? {
+  var correlationID: UUID? {
     switch self {
     case .handshakeAccepted, .handshakeRefused:
       return nil
-    case .success(let operationID, _), .launchItemChanged(let operationID, _),
-      .failed(let operationID, _):
-      return operationID
-    case .refused(let operationID, _):
-      return operationID
+    case .success(let correlationID, _), .launchItemChanged(let correlationID, _),
+      .failed(let correlationID, _):
+      return correlationID
+    case .refused(let correlationID, _):
+      return correlationID
     }
   }
 }

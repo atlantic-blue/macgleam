@@ -128,7 +128,8 @@ public struct LaunchItemManager: LaunchItemManaging {
       throw LaunchItemError.changeFailed(reason: Self.helperMissingSentence(for: item))
     }
     do {
-      return try await privileged.setLaunchItemEnabled(enabled, item: item.identifier)
+      return try await privileged.setLaunchItemEnabled(
+        enabled, item: item.identifier, attribution: attribution)
     } catch let failure as PrivilegedLaunchItemFailure {
       throw Self.error(for: failure, item: item)
     } catch let error as LaunchItemError {

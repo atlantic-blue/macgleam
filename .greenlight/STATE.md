@@ -1,32 +1,12 @@
 ```state
 stage:    implement
-updated:  2026-08-11
+updated:  2026-08-12
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     s4e store sizing, then s4f the helper archive gap, then s4d
+next:     s4f the helper archives into the store, then s4d, then M5
 blocked:  none. The live window cannot be captured (the terminal has no
           Screen Recording permission), so visual checks run off offscreen
           renders and the human checks stay queued below.
-prs:      atlantic-blue/macgleam#1
-          atlantic-blue/macgleam#2
-          atlantic-blue/macgleam#3
-          atlantic-blue/macgleam#4
-          atlantic-blue/macgleam#5
-          atlantic-blue/macgleam#6
-          atlantic-blue/macgleam#7
-          atlantic-blue/macgleam#8
-          atlantic-blue/macgleam#9
-          atlantic-blue/macgleam#10
-          atlantic-blue/macgleam#11
-          atlantic-blue/macgleam#12
-          atlantic-blue/macgleam#13
-          atlantic-blue/macgleam#14
-          atlantic-blue/macgleam#15
-          atlantic-blue/macgleam#16
-          atlantic-blue/macgleam#17
-          atlantic-blue/macgleam#18
-          atlantic-blue/macgleam#19
-          atlantic-blue/macgleam#20
-          atlantic-blue/macgleam#21
+prs:      atlantic-blue/macgleam#1 to #32, merged in order
 steps:
   - [x] s0a tokens and workspace (atlantic-blue/macgleam#1)
   - [x] s0b the shell model (atlantic-blue/macgleam#2)
@@ -46,10 +26,22 @@ steps:
   - [x] s2f Lumina tokens and the navigation rail (atlantic-blue/macgleam#19)
   - [x] s2g the disk map as a treemap (atlantic-blue/macgleam#19)
   - [x] s2h the specified light appearance (atlantic-blue/macgleam#20)
+  - [x] s2i the rail's keys (atlantic-blue/macgleam#22) and module state
   - [x] s3a helper message set and admission policy (atlantic-blue/macgleam#21)
-  - [ ] s2i the rail's intents and preserved module state
-  - [ ] s3b the helper daemon
-  - [ ] the rest of M3 to M7 per .greenlight/GRAPH.md
+  - [x] s3b the helper daemon (atlantic-blue/macgleam#23)
+  - [x] s3c maintenance (atlantic-blue/macgleam#24)
+  - [x] s3d login items (atlantic-blue/macgleam#25)
+  - [x] s3e process monitor (atlantic-blue/macgleam#26)
+  - [x] s3f the helper contract at version two (atlantic-blue/macgleam#32)
+  - [x] s4a safety net store (atlantic-blue/macgleam#27)
+  - [x] s4b app inventory (atlantic-blue/macgleam#28)
+  - [x] s4c uninstall (atlantic-blue/macgleam#29)
+  - [x] s4e the store sizes what it stored (atlantic-blue/macgleam#30)
+  - [ ] s4f the helper archives into the store
+  - [ ] s4d leftover sweep
+  - [ ] M5 protection: s5a malware, s5b quarantine, s5c privacy, s5d rules
+  - [ ] M6 full sweep: s6a orchestrator, s6b smart care, s6c menu bar
+  - [ ] M7 launch: s7a sparkle, s7b release pipeline, s7c licensing
 ```
 
 ## The interface changed shape on 2026-08-10
@@ -85,6 +77,15 @@ confirmed). Julian is away; product decisions get batched and flagged here.
 
 Verify tier slices are merged on tests and self checks but stay open until
 Julian judges them on a running app. Open items:
+
+- s2i module state and the rail's keys: drive the whole app with the keyboard
+  alone, start a scan and dismiss a result without touching the pointer, fold
+  two categories in the Cleanup review, go to the Disk Map and come back, and
+  confirm the folds are where you left them. Self check done: 1345 tests
+  green, 22 of them new; mutation on the slot store and on the decode watched
+  failing then passing. Not proved by a test: that the fold animation on
+  return reads as the pane arriving rather than as a jump cut, because the
+  view choreography does not draw offscreen.
 
 - s2f the rail and the panes: every module opens on the same shape, the rail
   reads as one column rather than a list of unrelated things, and the five
@@ -136,22 +137,26 @@ for both now say so. The orb survives as the rail's health light and its
 breathing is part of the s2f check above; the zoom grammar survives in the
 Disk Map and is judged in the s2d and s2g checks.
 
-## One contracted promise is not wired
+## Both contracted promises are wired
 
-Found while reconciling the documents on 2026-08-11, both in C37, both now
-named in CONTRACTS.md and carried by a new slice s2i in GRAPH.md. Both
-statements are against what has merged.
+Found while reconciling the documents on 2026-08-11, both in C37, both closed
+as s2i.
 
-- Return and escape were dead keys, a live defect, and that half is now
-  closed. `HubKeyResolver` takes what the open pane can do and returns a
-  moved state, an intent the pane runs, or ignored, so a press is claimed only
-  when something happens. Return runs a pane's primary action; escape
-  dismisses where there is something to dismiss and never cancels work. One
-  audible consequence: the ends of the rail now beep instead of going silent.
-- Module state does not survive navigation. `storingSlot` has no caller
-  outside the tests, so no module encodes anything on leaving and the slots
-  the shell carries forward are always empty. The type, the store and the pass
-  through property are all real and tested; nothing uses them.
+- Return and escape were dead keys, a live defect, closed 2026-08-11.
+  `HubKeyResolver` takes what the open pane can do and returns a moved state,
+  an intent the pane runs, or ignored, so a press is claimed only when
+  something happens. Return runs a pane's primary action; escape dismisses
+  where there is something to dismiss and never cancels work. One audible
+  consequence: the ends of the rail now beep instead of going silent.
+- Module state survives navigation as of 2026-08-12.
+  `ModuleStateExchange.navigate` is the one function every rail move goes
+  through, from the pointer and from the arrow keys alike: it asks the
+  departing module for a slot and hands the arriving module back what it
+  left. Cleanup is the first module with one, carrying which review
+  categories are folded away; that state moved out of the review view, which
+  the rail rebuilds on every return. Disk Map keeps no slot because C39 gives
+  it none; its state survives because the model outlives the pane, and the
+  tests prove the exchange never touches it.
 
 ## Notes for resume
 

@@ -20,6 +20,7 @@ final class HelperMessageHandler: NSObject, GleamHelperXPC, @unchecked Sendable 
   private let client: ClientIdentity
   private let removal: HelperRemoval
   private let codec = HelperWireCodec()
+  private let replies = HelperReplyRouter()
   private let now: @Sendable () -> Date
   private let log = Logger(subsystem: GleamHelperService.label, category: "requests")
 
@@ -38,7 +39,7 @@ final class HelperMessageHandler: NSObject, GleamHelperXPC, @unchecked Sendable 
   func handle(_ payload: Data, withReply reply: @escaping @Sendable (Data) -> Void) {
     guard let request = try? codec.decodeRequest(from: payload) else {
       log.error("A request that is not a contract message arrived and was refused.")
-      answer(.refused(operationID: nil, reason: .malformedRequest), with: reply)
+      answer(.refused(correlationID: nil, reason: .malformedRequest), with: reply)
       return
     }
     switch policy.admit(request, from: client) {
@@ -52,21 +53,10 @@ final class HelperMessageHandler: NSObject, GleamHelperXPC, @unchecked Sendable 
 
   // MARK: - Refusals
 
-  /// A version disagreement is the one refusal that names numbers, because the
-  /// app has to say which side is behind. Every other refusal names the
-  /// operation and nothing else.
   private func response(to request: HelperRequest, refusing refusal: HelperRefusal)
     -> HelperResponse
   {
-    guard case .handshake = request, refusal == .versionMismatch,
-      let mismatch = policy.versionMismatch
-    else {
-      return .refused(operationID: request.operationID, reason: refusal)
-    }
-    return .handshakeRefused(
-      helperContractVersion: mismatch.helperContractVersion,
-      clientContractVersion: mismatch.clientContractVersion
-    )
+    replies.refused(request, because: refusal, mismatch: policy.versionMismatch)
   }
 
   // MARK: - Work
@@ -74,49 +64,52 @@ final class HelperMessageHandler: NSObject, GleamHelperXPC, @unchecked Sendable 
   private func perform(_ request: HelperRequest) async -> HelperResponse {
     switch request {
     case .handshake:
-      return .handshakeAccepted(contractVersion: HelperContract.version)
-    case .remove(let target, let destination, _, let operationID):
-      return await performRemoval(target, destination, operationID)
-    case .setLaunchItemEnabled(let item, let enabled, _, let operationID):
-      return performLaunchItemChange(item, enabled, operationID)
-    case .runMaintenance(let task, _, let operationID):
-      return performMaintenance(task, operationID)
+      return replies.completed(request, bytesReclaimed: 0)
+    case .remove(let target, let destination, _, _):
+      return await performRemoval(target, destination, request)
+    case .setLaunchItemEnabled(let item, let enabled, _):
+      return performLaunchItemChange(item, enabled, request)
+    case .runMaintenance(let task, _, _):
+      return performMaintenance(task, request)
     }
   }
 
   private func performRemoval(
     _ target: AbsolutePath,
     _ destination: HelperRemovalDestination,
-    _ operationID: UUID
+    _ request: HelperRequest
   ) async -> HelperResponse {
     do {
       let bytesReclaimed = try await removal.remove(target, to: destination)
       log.info("Removed an admitted target of \(bytesReclaimed) bytes.")
-      return .success(operationID: operationID, bytesReclaimed: bytesReclaimed)
+      return replies.completed(request, bytesReclaimed: bytesReclaimed)
     } catch {
-      return .failed(operationID: operationID, reason: Self.sentence(for: error))
+      return replies.failed(request, because: Self.sentence(for: error))
     }
   }
 
   private func performLaunchItemChange(
     _ item: LaunchItemID,
     _ enabled: Bool,
-    _ operationID: UUID
+    _ request: HelperRequest
   ) -> HelperResponse {
     do {
       let change = try HelperLaunchItems.setEnabled(enabled, item: item, now: now())
-      return .launchItemChanged(operationID: operationID, change: change)
+      return replies.changed(request, to: change)
     } catch {
-      return .failed(operationID: operationID, reason: Self.sentence(for: error))
+      return replies.failed(request, because: Self.sentence(for: error))
     }
   }
 
-  private func performMaintenance(_ task: MaintenanceTask, _ operationID: UUID) -> HelperResponse {
+  private func performMaintenance(
+    _ task: MaintenanceTask,
+    _ request: HelperRequest
+  ) -> HelperResponse {
     do {
       try HelperMaintenance.run(task)
-      return .success(operationID: operationID, bytesReclaimed: 0)
+      return replies.completed(request, bytesReclaimed: 0)
     } catch {
-      return .failed(operationID: operationID, reason: Self.sentence(for: error))
+      return replies.failed(request, because: Self.sentence(for: error))
     }
   }
 
