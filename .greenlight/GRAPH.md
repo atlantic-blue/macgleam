@@ -383,23 +383,30 @@ they were done alongside.
 - Contracts: C37 (HubIntent reaching the pane, ModuleStateSlot and
   storingSlot), consuming C38 and C39 for the panes that act on an intent.
 - Depends on: s2f.
-- Why it exists: C37 specifies both and, as of 2026-08-11, neither is wired in
-  anything that has merged. The resolver returns an intent for return and
-  escape and nothing reads it, so the shell consumes both keys and does
-  nothing with them; `storingSlot` has no caller outside the tests, so module
-  state does not survive navigation. The first is a live defect a keyboard
-  only user hit, and it was closed on 2026-08-11 through `HubKeyResolver`,
-  which claims a press only when it moves the rail or carries an intent the
-  open pane can run. What remains of this slice is the module state half.
+- Why it exists: C37 specified both and neither was wired. The resolver
+  returned an intent for return and escape and nothing read it, so the shell
+  consumed both keys and did nothing with them; `storingSlot` had no caller
+  outside the tests, so module state did not survive navigation. The first was
+  a live defect a keyboard only user hit, closed on 2026-08-11 through
+  `HubKeyResolver`, which claims a press only when it moves the rail or
+  carries an intent the open pane can run. The module state half closed on
+  2026-08-12 through `ModuleStateExchange`, the one function every rail move
+  goes through.
 - Verification: return over a built module runs that pane's primary action and
   escape dismisses whatever the pane has open, both driven through the shell
   rather than asserted at the resolver; a key the open pane does not use is
   reported unhandled rather than swallowed, so the system beep and the
   responder chain still work; leaving a module and coming back restores what
-  the module put in its slot, proved through the shell for at least Cleanup
-  and Disk Map, with the slot round trip carried to what the user sees next
-  rather than stopping at the store; a module with nothing to preserve stores
-  nothing and is unaffected.
+  the module put in its slot, with the round trip carried to what the user
+  sees next rather than stopping at the store: a category folded away in the
+  Cleanup review is still folded when the rail comes back, proved against a
+  freshly built presentation because that is what the rail hands the user; a
+  module with nothing to preserve stores nothing and is unaffected. Disk Map
+  is rail chrome rather than a module, so C39 gives it no slot; what is proved
+  for it instead is that a walk through the rail leaves the drilled in folder,
+  the selection and the map's usability exactly as they were, and writes no
+  slot for it. GRAPH.md previously asked for a slot round trip on Disk Map,
+  which C39 rules out; the contract wins and this entry is corrected.
 - Tier: verify. Human check: drive the whole app with the keyboard alone,
   starting a scan and dismissing a result without touching the pointer, and
   confirm a review selection survives navigating away and back.

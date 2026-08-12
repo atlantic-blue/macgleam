@@ -3155,26 +3155,29 @@ Revised 2026-08-10. The hexagon of six cards and the hub to module zoom are
 gone; the rail replaces them. `HubZoomDirection` and `HubZoomResolver` stay
 because Disk Map drills into folders with the same grammar (C39).
 
-**Two parts of this contract are specified and not yet wired**, as of the
-document reconciliation of 2026-08-11 and against what has merged. They are
-named here rather than weakened, because the specification is what the app
-should do and the gap is what it does today. Both belong to s2i (GRAPH.md),
-which carries them in its verification list.
+Both parts that this contract specified and did not wire are wired as of
+s2i, 2026-08-12.
 
-- `HubIntent` is wired as of 2026-08-11. The rail resolves a key press
-  through `HubKeyResolver.outcome(_:applying:pane:)`, which takes what the
-  open pane can actually do, and returns a moved state, an intent the pane
-  runs, or ignored. A press is claimed only when it moves the rail or carries
-  an intent the pane can run, so a key that does nothing is reported as
-  ignored and the system gives its own feedback. Return runs the pane's
-  primary action, escape runs a dismissal where one exists and never cancels
-  or destroys work.
-- `ModuleStateSlot` and `HubNavigationState.storingSlot`. The slot type, the
-  store and the pass through property all exist and are tested, but nothing
-  outside the tests calls `storingSlot`, so no module encodes its state on
-  leaving and module state does not in fact survive navigating away and back.
-  The slots the shell carries forward are always empty. Slice s2i carries
-  this one.
+- `HubIntent`. The rail resolves a key press through
+  `HubKeyResolver.outcome(_:applying:pane:)`, which takes what the open pane
+  can actually do, and returns a moved state, an intent the pane runs, or
+  ignored. A press is claimed only when it moves the rail or carries an
+  intent the pane can run, so a key that does nothing is reported as ignored
+  and the system gives its own feedback. Return runs the pane's primary
+  action, escape runs a dismissal where one exists and never cancels or
+  destroys work.
+- `ModuleStateSlot` and `HubNavigationState.storingSlot`, through
+  `ModuleStateExchange.navigate(_:to:preservers:)`. Every rail move, from the
+  pointer or from an arrow key, goes through that one function: it asks the
+  departing module for a slot, stores it, and hands the arriving module back
+  whatever it left. A module that preserves nothing answers nil and its slots
+  are untouched; a module that preserves anything answers a slot every time,
+  so leaving with an empty state overwrites the last one rather than letting
+  a stale fold return two visits later. Cleanup is the first module with a
+  slot: it carries which review categories the user folded away, which the
+  rail used to destroy by rebuilding the pane. Disk Map has no slot and needs
+  none, because it is rail chrome rather than a module and its model outlives
+  the pane (C39).
 
 ```swift
 import Foundation
@@ -3224,10 +3227,8 @@ public enum HubDestinationGroup: CaseIterable, Sendable, Equatable {
 /// Opaque data rather than a generic parameter is deliberate: a generic
 /// would make the navigation state's type depend on every module's state
 /// type. The cost is stated plainly: nothing at compile time proves a module
-/// decodes the type it encoded. Each module owns that round trip.
-///
-/// Specified, not yet wired: no module encodes into a slot today, so module
-/// state does not survive navigation. Wired in s2i.
+/// decodes the type it encoded. Each module owns that round trip, and a
+/// payload a module cannot read leaves it exactly as it was.
 public struct ModuleStateSlot: Codable, Sendable, Equatable {
     public let payload: Data
     public init(payload: Data)
@@ -3253,6 +3254,42 @@ public struct HubNavigationState: Codable, Sendable, Equatable {
     public func storingSlot(_ slot: ModuleStateSlot, for module: HubModule) -> HubNavigationState
 }
 
+/// A module surface that keeps state the rail would otherwise destroy, since
+/// the rail rebuilds the pane on every return.
+///
+/// Guarantees:
+/// - `stateSlot` returning nil means the module preserves nothing at all, a
+///   standing answer rather than "nothing changed". A module that answers a
+///   slot answers one every time, so an emptied state overwrites the stored
+///   slot instead of leaving a stale one to come back.
+/// - `restoreState` is called only when a slot exists, so an absent slot
+///   leaves the module at its own defaults, and a payload the module cannot
+///   decode leaves it exactly as it was.
+public protocol ModuleStatePreserving: AnyObject {
+    func stateSlot() -> ModuleStateSlot?
+    func restoreState(from slot: ModuleStateSlot)
+}
+
+/// One move of the rail: the departing module's state put away, the arriving
+/// module's state handed back.
+///
+/// Guarantees:
+/// - The only place a module is asked for a slot or given one, so both halves
+///   of the round trip happen exactly once per move and no caller can do half
+///   of it. The shell routes the pointer and the arrow keys through it alike.
+/// - Moving to the destination already selected is not a move: nothing is
+///   stored, nothing is restored, the state comes back identical.
+/// - Only a module has a slot. Leaving Disk Map or Settings stores nothing,
+///   and no module's slot is ever created, dropped or altered except the one
+///   being left.
+public enum ModuleStateExchange {
+    public static func navigate(
+        _ state: HubNavigationState,
+        to destination: HubDestination,
+        preservers: [HubModule: any ModuleStatePreserving]
+    ) -> HubNavigationState { fatalError("contract") }
+}
+
 /// The outcome of one key press: the next state, plus what the open pane is
 /// being asked to do.
 ///
@@ -3266,11 +3303,6 @@ public struct HubNavigationTransition: Sendable, Equatable {
 
 /// What a key press asks of the pane. The rail owns the selection; anything
 /// beyond moving it belongs to whatever is on screen.
-///
-/// Specified, not yet wired as of 2026-08-11: the shell discards the intent
-/// and marks the key handled, so return and escape do nothing at all. An
-/// intent nothing can run should leave the press unclaimed rather than
-/// swallow it. s2i.
 public enum HubIntent: String, CaseIterable, Sendable, Equatable {
     case activatePrimaryAction
     case dismiss
@@ -3297,8 +3329,9 @@ public enum HubIntent: String, CaseIterable, Sendable, Equatable {
 /// - No transition creates, drops or alters a module state slot:
 ///   `next.moduleStateSlots` always equals the input's, over any key
 ///   sequence, as a property test.
-/// - The resolver's half of the intent guarantee holds today; the pane's half
-///   does not exist yet. Return and escape reaching the open pane is s2i.
+/// - The resolver names the intent; HubKeyResolver decides whether the open
+///   pane can run it, so an intent nothing will run leaves the press
+///   unclaimed rather than swallowing it.
 public enum HubNavigationResolver {
     public static func transition(
         _ state: HubNavigationState,

@@ -11,9 +11,12 @@ import SwiftUI
 struct CleanupReviewView: View {
   let review: CleanupReviewState
   let model: CleanupModuleModel
+  /// The folds live outside the view because the rail rebuilds the view every
+  /// time it comes back to Cleanup, and a reading position thrown away on the
+  /// way to the Disk Map is a reading position lost.
+  let presentation: CleanupPresentation
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @State private var collapsedCategories: Set<FindingCategory> = []
   @State private var confirmingScope: PermanentDeletionScope?
 
   var body: some View {
@@ -49,7 +52,7 @@ struct CleanupReviewView: View {
   // MARK: - Category sections
 
   private func categorySection(_ group: CleanupReviewCategory) -> some View {
-    let isCollapsed = collapsedCategories.contains(group.category)
+    let isCollapsed = presentation.isCollapsed(group.category)
     return VStack(spacing: 0) {
       categoryHeader(group, isCollapsed: isCollapsed)
       if !isCollapsed {
@@ -83,7 +86,7 @@ struct CleanupReviewView: View {
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
       Button {
         withAnimation(GleamSpring.gentle.animation(reduceMotion: reduceMotion)) {
-          toggleCollapse(group.category)
+          presentation.toggleCollapse(group.category)
         }
       } label: {
         Image(systemName: "chevron.down")
@@ -191,14 +194,6 @@ struct CleanupReviewView: View {
 
   private func isCategoryFullySelected(_ group: CleanupReviewCategory) -> Bool {
     group.findings.allSatisfy { review.selectedFindingIDs.contains($0.id) }
-  }
-
-  private func toggleCollapse(_ category: FindingCategory) {
-    if collapsedCategories.contains(category) {
-      collapsedCategories.remove(category)
-    } else {
-      collapsedCategories.insert(category)
-    }
   }
 
   private func rowTitle(_ finding: Finding) -> String {

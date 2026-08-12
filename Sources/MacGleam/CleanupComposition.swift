@@ -30,7 +30,8 @@ enum CleanupComposition {
       ),
       degraded: OnboardingDegradedStateProvider(onboarding: onboarding)
     )
-    return CleanupDependencies(model: model, executor: executor)
+    return CleanupDependencies(
+      model: model, executor: executor, presentation: CleanupPresentation())
   }
 
   /// A baseline that fails to load leaves an empty catalogue: scans find
@@ -63,6 +64,9 @@ enum CleanupComposition {
 struct CleanupDependencies {
   let model: CleanupModuleModel
   let executor: CancellableCleanupExecutor
+  /// What the pane shows rather than what the module knows, so it outlives
+  /// the pane the rail rebuilds (C37's module state slot).
+  let presentation: CleanupPresentation
 }
 
 /// Mints one fresh session identifier per scan context, and plan contexts

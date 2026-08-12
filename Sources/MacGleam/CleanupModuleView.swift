@@ -11,6 +11,9 @@ import SwiftUI
 struct CleanupModuleView: View {
   let model: CleanupModuleModel
   let executor: CancellableCleanupExecutor
+  /// The folds the review list shows, kept outside the view so the rail
+  /// cannot destroy them on the way past.
+  let presentation: CleanupPresentation
   /// The standard pane this module shows before any work starts. Every
   /// module opens on the same shape; the module's own screens take over once
   /// a scan is running.
@@ -93,7 +96,7 @@ struct CleanupModuleView: View {
     case .scanning(let progress):
       CleanupScanProgressView(progress: progress, onCancel: { model.cancelScan() })
     case .reviewing(let review):
-      CleanupReviewView(review: review, model: model)
+      CleanupReviewView(review: review, model: model, presentation: presentation)
     case .executing(let progress):
       CleanupExecutionView(
         progress: progress,
