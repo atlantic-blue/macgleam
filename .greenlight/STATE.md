@@ -40,7 +40,11 @@ steps:
   - [x] s4f the helper archives into the store (atlantic-blue/macgleam#33)
   - [x] s4g the trash destination is the connecting user's own (atlantic-blue/macgleam#34)
   - [ ] s4d leftover sweep
-  - [ ] M5 protection: s5a malware, s5b quarantine, s5c privacy, s5d rules
+  - [x] s5a malware and adware detection (atlantic-blue/macgleam#36)
+  - [ ] s5b quarantine flow
+  - [ ] s5c privacy cleanup
+  - [ ] s5d rules channel
+  - [ ] s5e the signature matcher, a decision for Julian first
   - [ ] M6 full sweep: s6a orchestrator, s6b smart care, s6c menu bar
   - [ ] M7 launch: s7a sparkle, s7b release pipeline, s7c licensing
 ```
@@ -73,6 +77,20 @@ request and merge on green continuous integration are pre approved for this
 repo only, with the s0a evidence bar (isolated tests, blind implementation,
 own test run, mutation check watched both ways, lint, runner executed count
 confirmed). Julian is away; product decisions get batched and flagged here.
+
+## A decision waiting on Julian
+
+The Protection module detects adware from the curated list today and does not
+check malware signatures, because nothing ships a YARA matcher. The engine
+takes one and says plainly when it has none, so the shape is right and the
+library is the only thing missing.
+
+Vendoring libyara is a third party C dependency with its own build, licence
+and update path. The alternatives are to vendor it (s5e), or to ship the
+Protection module as adware and unwanted software removal alone and say so in
+the product. A security feature is the last place to put an approximation
+while that is decided, which is why this build has none rather than something
+that half works.
 
 ## Pending human verification
 

@@ -2807,7 +2807,17 @@ public struct ApplicationsEngine: GleamEngine {
 ///   `deletePermanently` (there is no meaningful trash for a history
 ///   database row) and the explanation names exactly what is cleared.
 /// - A YARA rule compile failure disables that rule with a logged warning
-///   and never aborts the whole scan.
+///   and never aborts the whole scan. Each rule source is compiled on its
+///   own, because a single document holding every rule would take the whole
+///   catalogue down with the worst line in it.
+/// - Signatures are read against what the machine can run. Matching every
+///   file on a volume through a rule engine reads the whole disk again, and
+///   the things these signatures describe are executables. A payload hidden
+///   inside a document and unpacked later is not found by this, and the scan
+///   says what it checked rather than implying it checked everything.
+/// - A build with no matcher scans the curated adware list alone and reports
+///   the absence as a degraded notice. It is never a build that quietly does
+///   half the job.
 public struct ProtectionEngine: GleamEngine { /* module == .protection */ }
 ```
 
