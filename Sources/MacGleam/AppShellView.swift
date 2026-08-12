@@ -19,6 +19,7 @@ struct AppShellView: View {
   let model: HubModel
   let cleanup: CleanupDependencies
   let diskMap: DiskMapDependencies
+  let protection: ProtectionDependencies
   @State private var navigation: HubNavigationState
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -28,11 +29,13 @@ struct AppShellView: View {
     model: HubModel,
     cleanup: CleanupDependencies,
     diskMap: DiskMapDependencies,
+    protection: ProtectionDependencies,
     initialSelection: HubDestination = HubNavigationState.initial.selection
   ) {
     self.model = model
     self.cleanup = cleanup
     self.diskMap = diskMap
+    self.protection = protection
     _navigation = State(
       initialValue: HubNavigationState(selection: initialSelection, moduleStateSlots: [:]))
   }
@@ -78,6 +81,9 @@ struct AppShellView: View {
           executor: cleanup.executor,
           presentation: cleanup.presentation,
           idlePane: content)
+      case .module(.protection) where content.action != nil:
+        ProtectionModuleView(
+          model: protection.model, safetyNet: protection.safetyNet, idlePane: content)
       case .diskMap:
         DiskMapView(
           model: diskMap.model, executor: diskMap.executor, idlePane: content)
@@ -161,6 +167,9 @@ struct AppShellView: View {
     case .module(.cleanup) where pane.action != nil:
       guard case .idle = cleanup.model.state else { return nil }
       return { cleanup.model.startScan() }
+    case .module(.protection) where pane.action != nil:
+      guard case .idle = protection.model.state else { return nil }
+      return { protection.model.startScan() }
     case .diskMap:
       guard case .idle = diskMap.model.state else { return nil }
       return { diskMap.model.startMapping(volume: DiskMapView.defaultVolume) }

@@ -46,12 +46,16 @@ enum RenderToFile {
   @MainActor
   static func render(
     _ request: Request, hub: HubModel, cleanup: CleanupDependencies,
-    diskMap: DiskMapDependencies
+    diskMap: DiskMapDependencies, protection: ProtectionDependencies
   ) throws {
     let renderer = ImageRenderer(
       content:
         AppShellView(
-          model: hub, cleanup: cleanup, diskMap: diskMap, initialSelection: request.selection
+          model: hub,
+          cleanup: cleanup,
+          diskMap: diskMap,
+          protection: protection,
+          initialSelection: request.selection
         )
         .frame(width: request.size.width, height: request.size.height)
         .environment(\.colorScheme, request.appearance)

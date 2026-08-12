@@ -50,7 +50,8 @@ final class MacGleamAppDelegate: NSObject, NSApplicationDelegate {
           request,
           hub: HubModel(state: .firstRun(now: Date())),
           cleanup: CleanupComposition.make(onboarding: onboarding, supply: supply),
-          diskMap: diskMap
+          diskMap: diskMap,
+          protection: ProtectionComposition.make(supply: supply, helpers: HelperSupply())
         )
         FileHandle.standardOutput.write(Data("rendered \(request.destination.path)\n".utf8))
         exit(0)
@@ -73,6 +74,7 @@ struct MacGleamApp: App {
   @State private var onboardingModel: DiskAccessOnboardingModel
   @State private var cleanup: CleanupDependencies
   @State private var diskMap: DiskMapDependencies
+  @State private var protection: ProtectionDependencies
   @State private var rules: RuleSupply
 
   init() {
@@ -82,6 +84,8 @@ struct MacGleamApp: App {
     _rules = State(initialValue: supply)
     _cleanup = State(initialValue: CleanupComposition.make(onboarding: onboarding, supply: supply))
     _diskMap = State(initialValue: DiskMapComposition.make(supply: supply))
+    _protection = State(
+      initialValue: ProtectionComposition.make(supply: supply, helpers: HelperSupply()))
   }
 
   var body: some Scene {
@@ -90,7 +94,8 @@ struct MacGleamApp: App {
         hubModel: hubModel,
         onboardingModel: onboardingModel,
         cleanup: cleanup,
-        diskMap: diskMap
+        diskMap: diskMap,
+        protection: protection
       )
       .frame(minWidth: 1120, minHeight: 760)
       // Best effort, once per launch. A catalogue that does not arrive
@@ -112,6 +117,7 @@ struct RootView: View {
   let onboardingModel: DiskAccessOnboardingModel
   let cleanup: CleanupDependencies
   let diskMap: DiskMapDependencies
+  let protection: ProtectionDependencies
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   private static let hubBlurWhileOnboarding: CGFloat = 8
@@ -119,13 +125,15 @@ struct RootView: View {
   /// The modules whose engine and module model have shipped. Everything else
   /// still gets a pane; the pane says the module is not built rather than
   /// offering an action that would do nothing.
-  static let builtModules: Set<HubModule> = [.cleanup]
+  static let builtModules: Set<HubModule> = [.cleanup, .protection]
 
   var body: some View {
     ZStack {
-      AppShellView(model: hubModel, cleanup: cleanup, diskMap: diskMap)
-        .blur(radius: showsExplanation ? Self.hubBlurWhileOnboarding : 0)
-        .allowsHitTesting(!showsExplanation)
+      AppShellView(
+        model: hubModel, cleanup: cleanup, diskMap: diskMap, protection: protection
+      )
+      .blur(radius: showsExplanation ? Self.hubBlurWhileOnboarding : 0)
+      .allowsHitTesting(!showsExplanation)
       if let sentence = degradedSentence {
         VStack {
           Spacer()
