@@ -97,6 +97,20 @@ names the placeholder, the publishers refuse without their keys, activation
 reports the server as unreachable, and a rules refresh finds nothing. Nothing
 pretends to work.
 
+## The launch credentials, all of them yours
+
+Every M7 slice is built to its credential boundary and none of them can run
+until the credentials exist. The release pipeline needs a Developer ID
+certificate, an App Store Connect key for notarising, the appcast signing key,
+and the Developer ID team identifier written into `ExpectedClientIdentity`.
+The rules channel needs its signing key and `rules.macgleam.app`. Licensing
+needs its signing key and `licence.macgleam.app`.
+
+Everything fails closed while they are missing: the release guard refuses and
+names the placeholder, the publishers refuse without their keys, activation
+reports the server as unreachable, and a rules refresh finds nothing. Nothing
+pretends to work.
+
 ## Two things waiting on Julian
 
 The rules channel is built and has nothing to fetch. `rules.macgleam.app` does
