@@ -1102,7 +1102,21 @@ they were done alongside.
   when ExpectedClientIdentity.macGleamApp (C31) does not carry the Developer
   ID team identifier, so the helper's client check cannot ship as a
   formality.
-- Tier: auto.
+- The identity guard is its own tool rather than a test, because it compares
+  what is compiled into the build against what the pipeline was given and only
+  the pipeline knows the second half. It runs before the signing identity is
+  imported: a placeholder has to stop the release before a signature makes it
+  look finished.
+- Signing order is inside out and asserted as an ordering in the workflow
+  text, because signing the app seals the hashes of everything inside it and a
+  nested executable signed afterwards invalidates the signature it is sealed
+  into.
+- Tier: auto. Done 2026-08-12, and it cannot run until the credentials exist:
+  the Developer ID certificate, the App Store Connect key for notarising, the
+  appcast signing key, and the team identifier in C31. Every one of them is a
+  repository secret and none of them is anything a laptop should hold. Run
+  against this tree the guard refuses, naming the placeholder, and the appcast
+  tool refuses without its key: both fail closed.
 
 ### s7c. licensing
 - Contracts: C34, completing C11.

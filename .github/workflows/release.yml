@@ -1,0 +1,159 @@
+name: Release
+
+# Everything that turns a tag into something somebody can run: archive, sign,
+# notarize, staple, package, and publish the appcast entry that tells every
+# installation the new version exists.
+#
+# Every key this needs lives in this repository's secrets and nowhere else. No
+# signing key ever exists on a laptop, which is the whole reason releases
+# happen here rather than from somebody's machine.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Which appcast the release is published to.
+        required: true
+        default: beta
+        type: choice
+        options: [beta, stable]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      # The helper admits exactly one client identity, and every other
+      # guarantee it makes assumes that check bites. A build carrying the
+      # stand in team identifier would ship a helper that admits nobody and
+      # a check that is a formality, so this refuses to go any further.
+      - name: Refuse to release with a placeholder client identity
+        env:
+          DEVELOPER_ID_TEAM: ${{ secrets.DEVELOPER_ID_TEAM }}
+        run: |
+          set -euo pipefail
+          swift run GleamReleaseGuard --team "${DEVELOPER_ID_TEAM:-}"
+
+      - name: Test
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tee test-output.log
+
+      - name: Fail on an empty test run
+        run: |
+          count=$(sed -E 's/\x1b\[[0-9;]*m//g' test-output.log | grep -Eo 'Test run with [0-9]+ tests' | grep -Eo '[0-9]+' | tail -1)
+          if [ -z "$count" ] || [ "$count" -eq 0 ]; then
+            echo "No tests executed: refusing to release on that."
+            exit 1
+          fi
+          echo "Executed $count tests."
+
+      - name: Import the signing identity
+        env:
+          DEVELOPER_ID_CERTIFICATE: ${{ secrets.DEVELOPER_ID_CERTIFICATE }}
+          DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEVELOPER_ID_CERTIFICATE:-}" ]; then
+            echo "No Developer ID certificate is configured, so nothing can be signed."
+            exit 1
+          fi
+          # A keychain that exists for this job and dies with the runner.
+          security create-keychain -p "$RANDOM$RANDOM" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$RANDOM$RANDOM" build.keychain 2>/dev/null || true
+          echo "$DEVELOPER_ID_CERTIFICATE" | base64 --decode > certificate.p12
+          security import certificate.p12 -k build.keychain \
+            -P "$DEVELOPER_ID_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm -f certificate.p12
+          security set-key-partition-list -S apple-tool:,apple: -k "" build.keychain >/dev/null
+
+      - name: Build and bundle
+        run: |
+          set -euo pipefail
+          swift build --configuration release --product MacGleam
+          swift build --configuration release --product GleamHelper
+          swift run GleamBundler --configuration release
+
+      # Inside out, which is the only order that works: signing the app seals
+      # the hashes of everything inside it, so a nested executable signed
+      # afterwards invalidates the signature it is sealed into.
+      - name: Sign
+        env:
+          DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
+        run: |
+          set -euo pipefail
+          codesign --force --options runtime --timestamp \
+            --sign "$DEVELOPER_ID_APPLICATION" \
+            dist/MacGleam.app/Contents/MacOS/GleamHelper
+          codesign --force --options runtime --timestamp \
+            --sign "$DEVELOPER_ID_APPLICATION" \
+            dist/MacGleam.app
+
+      - name: Notarize and staple
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
+        run: |
+          set -euo pipefail
+          echo "$APP_STORE_CONNECT_KEY" | base64 --decode > connect.p8
+          ditto -c -k --keepParent dist/MacGleam.app MacGleam.zip
+          xcrun notarytool submit MacGleam.zip \
+            --key connect.p8 \
+            --key-id "$APP_STORE_CONNECT_KEY_ID" \
+            --issuer "$APP_STORE_CONNECT_ISSUER_ID" \
+            --wait
+          rm -f connect.p8 MacGleam.zip
+          xcrun stapler staple dist/MacGleam.app
+
+      # What a clean machine will do with it. A build that fails this is a
+      # build somebody would be told is damaged, so it fails here instead.
+      - name: Assess the way Gatekeeper will
+        run: |
+          set -euo pipefail
+          spctl --assess --type execute --verbose=4 dist/MacGleam.app
+          codesign --verify --deep --strict --verbose=4 dist/MacGleam.app
+
+      - name: Build the disk image
+        run: |
+          set -euo pipefail
+          mkdir -p staging
+          cp -R dist/MacGleam.app staging/
+          ln -s /Applications staging/Applications
+          hdiutil create -volname MacGleam -srcfolder staging -ov -format UDZO MacGleam.dmg
+          codesign --force --timestamp --sign "${{ secrets.DEVELOPER_ID_APPLICATION }}" MacGleam.dmg
+
+      # The appcast entry is signed with the update key, which exists only
+      # here. An entry signed anywhere else is refused by every installation,
+      # because the public half is in the bundle.
+      - name: Publish the appcast entry
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          RELEASE_CHANNEL: ${{ inputs.channel || 'beta' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SPARKLE_PRIVATE_KEY:-}" ]; then
+            echo "No appcast signing key is configured, so nothing can be published."
+            exit 1
+          fi
+          swift run GleamAppcast \
+            --disk-image MacGleam.dmg \
+            --version "${GITHUB_REF_NAME#v}" \
+            --channel "$RELEASE_CHANNEL" \
+            --out appcast.xml
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: |
+            MacGleam.dmg
+            appcast.xml
+          if-no-files-found: error

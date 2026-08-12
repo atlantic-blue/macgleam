@@ -173,6 +173,16 @@ let package = Package(
             path: "Sources/GleamHelper"
         ),
         .executableTarget(
+            name: "GleamReleaseGuard",
+            dependencies: ["GleamHelperCore"],
+            path: "Sources/GleamReleaseGuard"
+        ),
+        .executableTarget(
+            name: "GleamAppcast",
+            dependencies: ["GleamCore"],
+            path: "Sources/GleamAppcast"
+        ),
+        .executableTarget(
             name: "GleamRulesPublisher",
             dependencies: ["GleamCore"],
             path: "Sources/GleamRulesPublisher"
