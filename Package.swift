@@ -74,12 +74,12 @@ let package = Package(
         ),
         .target(
             name: "CleanupModule",
-            dependencies: ["GleamCore", "CleanupEngine"],
+            dependencies: ["GleamCore", "CleanupEngine", "GleamHub"],
             path: "Sources/CleanupModule"
         ),
         .testTarget(
             name: "CleanupModuleTests",
-            dependencies: ["CleanupModule", "CleanupEngine", "GleamCore"],
+            dependencies: ["CleanupModule", "CleanupEngine", "GleamCore", "GleamHub"],
             path: "Tests/CleanupModuleTests"
         ),
         .target(

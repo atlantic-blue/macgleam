@@ -74,7 +74,10 @@ struct AppShellView: View {
       switch navigation.selection {
       case .module(.cleanup) where content.action != nil:
         CleanupModuleView(
-          model: cleanup.model, executor: cleanup.executor, idlePane: content)
+          model: cleanup.model,
+          executor: cleanup.executor,
+          presentation: cleanup.presentation,
+          idlePane: content)
       case .diskMap:
         DiskMapView(
           model: diskMap.model, executor: diskMap.executor, idlePane: content)
@@ -97,22 +100,29 @@ struct AppShellView: View {
     ModulePaneResolver.pane(for: navigation.selection, summaries: model.summaries)
   }
 
+  /// Every move goes through here, whether it came from the pointer or from
+  /// an arrow key, so a module's state is put away and handed back exactly
+  /// once per move and neither path can forget half of the round trip.
   private func select(_ destination: HubDestination) {
     guard destination != navigation.selection else { return }
+    let next = ModuleStateExchange.navigate(
+      navigation, to: destination, preservers: preservers)
     withAnimation(GleamSpring.snappy.animation(reduceMotion: reduceMotion)) {
-      navigation = HubNavigationState(
-        selection: destination,
-        moduleStateSlots: navigation.moduleStateSlots
-      )
+      navigation = next
     }
+  }
+
+  /// The modules that keep anything worth carrying across a move. A module
+  /// missing from here preserves nothing, which is the honest answer for the
+  /// five that are not built yet.
+  private var preservers: [HubModule: any ModuleStatePreserving] {
+    [.cleanup: cleanup.presentation]
   }
 
   private func handle(_ key: HubKeyEvent) -> KeyPress.Result {
     switch HubKeyResolver.outcome(navigation, applying: key, pane: paneCapabilities) {
     case .moved(let next):
-      withAnimation(GleamSpring.snappy.animation(reduceMotion: reduceMotion)) {
-        navigation = next
-      }
+      select(next.selection)
       return .handled
     case .acted(let intent):
       run(intent)
