@@ -69,7 +69,7 @@ enum HelperSentence {
       return
         "MacGleam's privileged helper would not agree a version on this connection, so "
         + "MacGleam will not send it any work."
-    case .denylisted, .notSystemDomain, .malformedRequest:
+    case .denylisted, .notSystemDomain, .malformedRequest, .destinationRejected:
       return
         "MacGleam's privileged helper refused the version check, so MacGleam will not send "
         + "it any work."
@@ -112,7 +112,7 @@ enum HelperSentence {
     "\(cause) MacGleam cannot say whether \(subject(of: operation)) was changed."
   }
 
-  private static func refusalCause(_ refusal: HelperRefusal) -> String {
+  static func refusalCause(_ refusal: HelperRefusal) -> String {
     switch refusal {
     case .denylisted:
       return "The privileged helper's own denylist blocks this item."
@@ -128,6 +128,10 @@ enum HelperSentence {
         + "it was installed for."
     case .malformedRequest:
       return "MacGleam's privileged helper could not make sense of the request."
+    case .destinationRejected:
+      return
+        "MacGleam's privileged helper refused to write where MacGleam asked, so nothing was "
+        + "moved."
     }
   }
 
@@ -155,5 +159,25 @@ enum HelperSentence {
     case .runMaintenance(let task):
       return task.rawValue
     }
+  }
+}
+
+extension HelperSentence {
+  /// A refusal of one of the SafetyNet archive requests. It names no path: the
+  /// store knows which item it asked about, and the sentence it wraps is the
+  /// one a person reads.
+  static func archiveRefused(_ refusal: HelperRefusal) -> String {
+    refusalCause(refusal)
+  }
+
+  /// An operation that reached the privileged boundary as a removal when it is
+  /// not one. Quarantine and archive go through the SafetyNet store, which
+  /// holds the manifest; a helper that took one directly would move a file
+  /// into the store with nothing recording it.
+  static func notTheHelpersWork(_ operation: GleamCore.Operation) -> String {
+    joined(
+      "This kind of work goes through MacGleam's SafetyNet rather than straight to the "
+        + "privileged helper.",
+      operation)
   }
 }

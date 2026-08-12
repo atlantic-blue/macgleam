@@ -26,6 +26,8 @@ enum SafetyNetFixture {
     storeInstant.addingTimeInterval(Fixture.thirtyDays)
   }
 
+  static let home = Fixture.path("/Users/julian")
+  static let environment = OwnershipEnvironment(currentUserHome: home, currentUserID: 501)
   static let applicationSupport = Fixture.path("/Users/julian/Library/Application Support")
   static let directory = Fixture.path(
     "/Users/julian/Library/Application Support/MacGleam/SafetyNet")
@@ -98,14 +100,43 @@ func safetyNetMake(
   fileSystem: any FileSystem,
   denylist: Denylist = makeDenylist([]),
   directory: AbsolutePath = SafetyNetFixture.directory,
+  ownership: any PathOwnershipPolicy = SafetyNetEverythingIsUserDomain(),
+  environment: OwnershipEnvironment = SafetyNetFixture.environment,
+  privileged: (any SafetyNetPrivilegedArchiving)? = nil,
   now: @escaping @Sendable () -> Date = { SafetyNetFixture.storeInstant }
 ) -> SafetyNetStore {
   SafetyNetStore(
     directory: directory,
     fileSystem: fileSystem,
     denylist: denylist,
+    ownership: ownership,
+    environment: environment,
+    privileged: privileged,
     now: now
   )
+}
+
+/// The default for the suites about the user process path: nothing needs
+/// privilege, so those tests say what they always said.
+struct SafetyNetEverythingIsUserDomain: PathOwnershipPolicy {
+  func ownership(of path: AbsolutePath, environment: OwnershipEnvironment) -> PathOwnership {
+    .userDomain
+  }
+}
+
+/// The ownership the privileged suites route on: the two system roots the
+/// privileged half exists for, and the fixture home for everything else. A
+/// deterministic stand in, so routing is pinned without depending on a
+/// concrete C16 implementation.
+struct SafetyNetSystemRoots: PathOwnershipPolicy {
+  static let roots = [Fixture.path("/Library"), Fixture.path("/Applications")]
+
+  func ownership(of path: AbsolutePath, environment: OwnershipEnvironment) -> PathOwnership {
+    for root in Self.roots where path == root || path.isDescendant(of: root) {
+      return .systemDomain
+    }
+    return .userDomain
+  }
 }
 
 // MARK: - Observing a file through the boundary

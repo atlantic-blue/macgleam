@@ -80,3 +80,14 @@ public struct HelperVersionMismatch: Sendable, Equatable {
 public protocol HelperLaunchItemLocating: Sendable {
   func location(of item: LaunchItemID) -> AbsolutePath?
 }
+
+/// The two facts the destination stage needs about a path, and no others: is
+/// this directory already there, and is this component a symbolic link.
+///
+/// Both answers are about the path itself and follow nothing. An answer that
+/// followed a link would describe the target rather than the link, which is
+/// the whole thing the check is looking for.
+public protocol HelperPathInspecting: Sendable {
+  func directoryExists(at path: AbsolutePath) -> Bool
+  func isSymbolicLink(at path: AbsolutePath) -> Bool
+}

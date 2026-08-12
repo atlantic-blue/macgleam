@@ -38,7 +38,8 @@ final class HelperListener: NSObject, NSXPCListenerDelegate {
     connection.exportedObject = HelperMessageHandler(
       policy: policy(for: environment),
       client: verifiedIdentity,
-      removal: HelperRemoval(fileSystem: DiskFileSystem())
+      removal: HelperRemoval(fileSystem: DiskFileSystem()),
+      archive: HelperArchive(fileSystem: DiskFileSystem())
     )
     connection.setCodeSigningRequirement(codeSigningRequirement)
     connection.resume()
@@ -52,7 +53,8 @@ final class HelperListener: NSObject, NSXPCListenerDelegate {
       denylist: denylist,
       ownership: HomeDirectoryOwnershipPolicy(),
       environment: environment,
-      launchItems: HelperLaunchItemLocator()
+      launchItems: HelperLaunchItemLocator(),
+      paths: HelperDiskPaths()
     )
   }
 

@@ -126,3 +126,42 @@ gets its own entry pointing at the one it supersedes.
   rather than a migration. Ownership rides on the same decision as privileged
   restore, recorded as open question 11 in GRAPH.md and opening at s5b.
   Status: locked, revisit with privileged restore.
+
+- 2026-08-11. The helper reports a privileged archive and the user process
+  records it. The manifest keeps one writer. Rejected: a manifest both
+  processes write, which would put a cross process locking question under a
+  file that is rewritten whole on every mutation, and would have a root process
+  writing into a directory the user owns. The helper measures the payload and
+  snapshots its metadata at the origin before the move, moves it to a path the
+  store named, strips its execute bits and reports what it observed, because
+  each of those is something only it can do: the origin may be unreadable to
+  the user process, and after the move the payload is root owned, so only the
+  mover can contain what it moved. The store chooses the payload path and the
+  item identifier before it asks, so a lost reply is settled by looking rather
+  than guessed at, and a payload in the store that no manifest entry names is
+  the one outcome the contract forbids. Status: locked.
+- 2026-08-11. A privileged payload stays root owned, so purge and restore of
+  one go back through the helper, and the message set grows an archive family
+  of four requests at contract version 3. Handing the payload to the user
+  account would have made purge free and would also have let anything running
+  as that user put the execute bits back on a quarantined bundle. Keeping the
+  owner also makes restore exact for nothing, because a rename does not change
+  an owner, which is why the file metadata snapshot still does not carry an
+  account name. The helper writes back only what its own stamp on the payload
+  says, never what the request says, and it requires that payload to be root
+  owned: restore is the first privileged operation that puts something back
+  rather than taking it away, and without that rule it is a way to have root
+  place chosen content at a chosen system path. Resolves GRAPH.md open question
+  11 for the mechanism. Status: locked.
+- 2026-08-11. Deleting a contained payload descends repairing traversal rather
+  than restoring the payload's execute bits. Removing a directory's children
+  needs search permission on the directory holding them, so a payload the store
+  contained cannot be deleted as it stands, verified on a real volume. The
+  rejected alternative fails on its own terms as well as on containment: a
+  payload holding a directory of its own that lacks execute still refuses to be
+  deleted, and an archive is arbitrary user data rather than only well formed
+  bundles. The descent adds owner search and write, only to directories, never
+  to a file, and clears every bit it added if it cannot finish. The rule lives
+  on the file system's `delete` so both implementations answer the same way,
+  and the in memory one has to enforce it or no test can see the defect.
+  Status: locked.

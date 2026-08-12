@@ -36,9 +36,6 @@ struct HelperPolicyDenylistTests {
         destination: .userTrash(userHome: HelperFixture.userHome)),
       HelperFixture.remove(
         HelperFixture.systemDenylistedTarget,
-        destination: .safetyNetStore(storeDirectory: HelperFixture.safetyNetStore)),
-      HelperFixture.remove(
-        HelperFixture.systemDenylistedTarget,
         planID: HelperFixture.otherPlanID,
         operationID: HelperFixture.otherOperationID),
     ]

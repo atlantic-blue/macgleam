@@ -153,14 +153,29 @@ final class CancellableCleanupExecutor: PlanExecuting, Sendable {
     isCancellationRequested.withLock { $0 = true }
   }
 
+  /// One run gets one connection to the privileged helper, shared by the
+  /// executor and by the SafetyNet store, and one store. The store is built
+  /// here rather than left out: until it is, every reversibility guarantee
+  /// describes a component nothing runs, and an archive fails with the
+  /// sentence about the store not being available in this build.
   private func executorForOneRun() -> PlanExecutor {
     let flag = isCancellationRequested
+    let run = helpers.makeRun()
     return PlanExecutor(
       fileSystem: fileSystem,
       denylist: denylist,
-      helper: helpers.makeHelper(),
+      helper: run.helper,
       ownershipPolicy: ownershipPolicy,
       environment: .current,
+      safetyNet: SafetyNetStore(
+        directory: helpers.storeDirectory,
+        fileSystem: fileSystem,
+        denylist: denylist,
+        ownership: ownershipPolicy,
+        environment: .current,
+        privileged: run.archiving,
+        now: { Date() }
+      ),
       now: { Date() },
       isCancelled: { flag.withLock { $0 } }
     )

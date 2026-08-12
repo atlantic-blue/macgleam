@@ -255,4 +255,76 @@ struct FileSystemUnreadableSubtreeTotalConformanceTests {
       #expect(outcome.inaccessible.contains { $0.path == payload })
     }
   }
+
+  // MARK: - Deleting one
+
+  @Test(
+    "a directory stripped of execute is deleted whole, contents and all",
+    arguments: FileSystemKind.allCases)
+  func aStrippedDirectoryIsDeletedWhole(kind: FileSystemKind) async throws {
+    try await withHarness(kind, tree: strippedTree) { harness in
+      let payload = harness.root.appending("payload")
+      try await harness.fileSystem.setPosixPermissions(strippedDirectoryMode, at: payload)
+
+      try await harness.fileSystem.delete(payload)
+
+      #expect(await !harness.fileSystem.exists(payload))
+      #expect(await !harness.fileSystem.exists(payload.appending("inside.txt")))
+      #expect(
+        await harness.fileSystem.exists(harness.root.appending("beside/visible.txt")),
+        "the delete descends into what it was given and nowhere else")
+    }
+  }
+
+  @Test(
+    "a stripped directory inside a stripped directory is deleted too",
+    arguments: FileSystemKind.allCases)
+  func aStrippedDirectoryInsideAStrippedDirectoryIsDeleted(kind: FileSystemKind) async throws {
+    try await withHarness(kind, tree: strippedTree) { harness in
+      let payload = harness.root.appending("payload")
+      // The inner one first: after the outer is stripped there is no way in.
+      // This is the case a single chmod at the payload root does not cover,
+      // and an uninstall archive is arbitrary user data rather than only well
+      // formed bundles, so it is the ordinary case rather than a contrived one.
+      try await harness.fileSystem.setPosixPermissions(
+        strippedDirectoryMode, at: payload.appending("nested"))
+      try await harness.fileSystem.setPosixPermissions(strippedDirectoryMode, at: payload)
+
+      try await harness.fileSystem.delete(payload)
+
+      #expect(await !harness.fileSystem.exists(payload))
+    }
+  }
+
+  @Test(
+    "deleting a stripped directory leaves the directory holding it as it was",
+    arguments: FileSystemKind.allCases)
+  func deletingAStrippedDirectoryLeavesItsParentAsItWas(kind: FileSystemKind) async throws {
+    try await withHarness(kind, tree: strippedTree) { harness in
+      let payload = harness.root.appending("payload")
+      try await harness.fileSystem.setPosixPermissions(strippedDirectoryMode, at: payload)
+      let parentMode = try await harness.fileSystem.posixPermissions(at: harness.root)
+
+      try await harness.fileSystem.delete(payload)
+
+      #expect(try await harness.fileSystem.posixPermissions(at: harness.root) == parentMode)
+    }
+  }
+
+  @Test(
+    "a stripped directory that is not deleted keeps its mode, so nothing is left open",
+    arguments: FileSystemKind.allCases)
+  func aStrippedDirectoryNotDeletedKeepsItsMode(kind: FileSystemKind) async throws {
+    try await withHarness(kind, tree: strippedTree) { harness in
+      let payload = harness.root.appending("payload")
+      try await harness.fileSystem.setPosixPermissions(strippedDirectoryMode, at: payload)
+
+      // Deleting something else entirely must not touch this one, which is
+      // the same guarantee an interrupted delete makes: the repair reaches
+      // only what the delete had to enter.
+      try await harness.fileSystem.delete(harness.root.appending("beside/visible.txt"))
+
+      #expect(try await harness.fileSystem.posixPermissions(at: payload) == strippedDirectoryMode)
+    }
+  }
 }

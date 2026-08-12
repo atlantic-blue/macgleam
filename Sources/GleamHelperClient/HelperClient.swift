@@ -93,6 +93,24 @@ public actor HelperClient: PrivilegedOperationPerforming {
 
   /// Read before every privileged operation, never once at launch: approval
   /// can land or be withdrawn between two operations of the same plan.
+  /// The same two gates, for the SafetyNet archive family, which names an
+  /// item rather than a plan operation.
+  func registrationRefusal(forArchiveOf path: AbsolutePath) async -> String? {
+    await registrationRefusal(for: Self.archiveStandIn(for: path))
+  }
+
+  func handshakeRefusal(forArchiveOf path: AbsolutePath) async -> String? {
+    await handshakeRefusal(for: Self.archiveStandIn(for: path))
+  }
+
+  /// An operation shaped value, for the sentences alone. The archive family
+  /// carries no operation, and the sentences are written around one, so this
+  /// keeps the words the same rather than growing a second vocabulary.
+  private static func archiveStandIn(for path: AbsolutePath) -> GleamCore.Operation {
+    GleamCore.Operation(
+      id: UUID(), findingID: UUID(), kind: .quarantine(target: path), privilege: .root)
+  }
+
   func registrationRefusal(for operation: GleamCore.Operation) async -> String? {
     switch await registration.ensureRegistered() {
     case .enabled:
@@ -161,7 +179,10 @@ public actor HelperClient: PrivilegedOperationPerforming {
   // MARK: - Operations
 
   private func transmit(_ operation: GleamCore.Operation, planID: UUID) async -> OperationResult {
-    switch await exchange(request(for: operation, planID: planID)) {
+    guard let request = request(for: operation, planID: planID) else {
+      return .failed(reason: HelperSentence.notTheHelpersWork(operation))
+    }
+    switch await exchange(request) {
     case .notSent(let reason):
       return .failed(reason: HelperSentence.joined(reason, operation))
     case .unanswered(let reason):
@@ -171,15 +192,20 @@ public actor HelperClient: PrivilegedOperationPerforming {
     }
   }
 
-  private func request(for operation: GleamCore.Operation, planID: UUID) -> HelperRequest {
+  /// Every operation kind the helper still performs. Quarantine and archive
+  /// are absent by design: they route through the SafetyNet store (C18), which
+  /// holds the manifest, and reach this process through
+  /// `SafetyNetPrivilegedArchiving` rather than as a removal. An executor
+  /// sending one here would move a file into the store without the store
+  /// knowing, which is the defect the archive family closes.
+  private func request(for operation: GleamCore.Operation, planID: UUID) -> HelperRequest? {
     switch operation.kind {
+    case .quarantine, .archive:
+      return nil
     case .moveToTrash(let target):
       return removal(of: target, to: .userTrash(userHome: userHome), operation, planID)
     case .deletePermanently(let target):
       return removal(of: target, to: .permanent, operation, planID)
-    case .quarantine(let target), .archive(let target, _):
-      let store = HelperRemovalDestination.safetyNetStore(storeDirectory: safetyNetStoreDirectory)
-      return removal(of: target, to: store, operation, planID)
     case .setLaunchItemEnabled(let item, let enabled):
       return .setLaunchItemEnabled(
         item: item,
@@ -227,7 +253,7 @@ public actor HelperClient: PrivilegedOperationPerforming {
       return .failed(reason: HelperSentence.refused(refusal, operation))
     case .failed(_, let reason):
       return .failed(reason: HelperSentence.helperFailed(reason, operation))
-    case .handshakeAccepted, .handshakeRefused:
+    case .handshakeAccepted, .handshakeRefused, .archived, .restoredArchive, .discardedArchive:
       return .failed(reason: HelperSentence.replyOfTheWrongKind(operation))
     }
   }
@@ -273,7 +299,8 @@ extension HelperResponse {
     case .handshakeAccepted, .handshakeRefused:
       return nil
     case .success(let correlationID, _), .launchItemChanged(let correlationID, _),
-      .failed(let correlationID, _):
+      .failed(let correlationID, _), .archived(let correlationID, _),
+      .restoredArchive(let correlationID, _), .discardedArchive(let correlationID):
       return correlationID
     case .refused(let correlationID, _):
       return correlationID

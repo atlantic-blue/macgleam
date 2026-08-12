@@ -71,8 +71,8 @@ struct HelperClientRequestTests {
     #expect(request.removalTarget == HelperClientFixture.systemTarget)
   }
 
-  @Test("quarantine and archive are transmitted as a removal into the store the app named")
-  func quarantineAndArchiveNameTheSafetyNetStore() async throws {
+  @Test("quarantine and archive never cross as a removal, whatever the plan says")
+  func quarantineAndArchiveNeverCrossAsARemoval() async throws {
     for operation in [
       HelperClientFixture.quarantine(HelperClientFixture.systemTarget),
       HelperClientFixture.archive(HelperClientFixture.systemTarget),
@@ -80,13 +80,20 @@ struct HelperClientRequestTests {
       let transport = RecordingHelperTransport(succeedingWith: 10)
       let client = makeApprovedHelperClient(transport: transport)
 
-      _ = await client.perform(operation, planID: UUID())
+      let result = await client.perform(operation, planID: UUID())
 
-      let request = try #require(try transport.sentOperationRequests().first)
       #expect(
-        request.removalDestination
-          == .safetyNetStore(storeDirectory: HelperClientFixture.safetyNetStore),
-        "the helper never chooses where a file goes")
+        try transport.sentOperationRequests().isEmpty,
+        """
+        these route through the SafetyNet store, which holds the manifest. A \
+        removal that happened to land in the store directory is how a payload \
+        came to sit there with nothing recording it
+        """)
+      #expect(!transport.transmitted(text: HelperClientFixture.systemTarget.value))
+      guard case .failed = result else {
+        Issue.record("an operation the helper does not perform cannot report success")
+        return
+      }
     }
   }
 

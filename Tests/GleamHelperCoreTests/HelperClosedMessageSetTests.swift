@@ -99,13 +99,13 @@ struct HelperClosedMessageSetTests {
     }
   }
 
-  @Test("a removal destination outside the contract's three fails to decode")
+  @Test("a removal destination outside the contract's two fails to decode")
   func removalDestinationOutsideTheContractFailsToDecode() throws {
     let codec = HelperWireCodec()
     let valid = try codec.encode(
       HelperFixture.remove(
         HelperFixture.systemAllowedTarget,
-        destination: .safetyNetStore(storeDirectory: HelperFixture.safetyNetStore)))
+        destination: .userTrash(userHome: HelperFixture.userHome)))
     let mutated = try helperWirePayload(
       valid, replacingDestinationWith: ["anywhere": ["path": "/"]])
     #expect(throws: (any Error).self) {

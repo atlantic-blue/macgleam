@@ -19,6 +19,7 @@ final class HelperMessageHandler: NSObject, GleamHelperXPC, @unchecked Sendable 
   private let policy: HelperConnectionPolicy
   private let client: ClientIdentity
   private let removal: HelperRemoval
+  private let archive: HelperArchive
   private let codec = HelperWireCodec()
   private let replies = HelperReplyRouter()
   private let now: @Sendable () -> Date
@@ -28,11 +29,13 @@ final class HelperMessageHandler: NSObject, GleamHelperXPC, @unchecked Sendable 
     policy: HelperConnectionPolicy,
     client: ClientIdentity,
     removal: HelperRemoval,
+    archive: HelperArchive,
     now: @escaping @Sendable () -> Date = { Date() }
   ) {
     self.policy = policy
     self.client = client
     self.removal = removal
+    self.archive = archive
     self.now = now
   }
 
@@ -71,6 +74,72 @@ final class HelperMessageHandler: NSObject, GleamHelperXPC, @unchecked Sendable 
       return performLaunchItemChange(item, enabled, request)
     case .runMaintenance(let task, _, _):
       return performMaintenance(task, request)
+    case .archiveIntoSafetyNet(let target, let storedPath, let itemID):
+      return await performArchive(target, storedPath, itemID, request)
+    case .describeArchived(let storedPath, _):
+      return await performDescribe(storedPath, request)
+    case .restoreArchived(let storedPath, _):
+      return await performRestore(storedPath, request)
+    case .discardArchived(let storedPath, _):
+      return await performDiscard(storedPath, request)
+    }
+  }
+
+  // MARK: - The SafetyNet archive
+
+  private func performArchive(
+    _ target: AbsolutePath,
+    _ storedPath: AbsolutePath,
+    _ itemID: UUID,
+    _ request: HelperRequest
+  ) async -> HelperResponse {
+    do {
+      let report = try await archive.archive(target, to: storedPath, itemID: itemID)
+      log.info("Archived an admitted target of \(report.allocatedBytes) bytes.")
+      return replies.archived(request, report: report)
+    } catch {
+      return replies.failed(request, because: Self.sentence(for: error))
+    }
+  }
+
+  private func performDescribe(
+    _ storedPath: AbsolutePath,
+    _ request: HelperRequest
+  ) async -> HelperResponse {
+    do {
+      return replies.archived(request, report: try await archive.describe(at: storedPath))
+    } catch {
+      return replies.failed(request, because: Self.sentence(for: error))
+    }
+  }
+
+  /// The origin a restore puts the payload back at comes from the payload's
+  /// own stamp, and it is then checked exactly as any other target would be:
+  /// system domain and not denylisted. Without that, a restore is a way to
+  /// have root place content at a chosen path.
+  private func performRestore(
+    _ storedPath: AbsolutePath,
+    _ request: HelperRequest
+  ) async -> HelperResponse {
+    do {
+      let originPath = try await archive.restore(at: storedPath) { origin in
+        policy.admitsRestoreOrigin(origin)
+      }
+      return replies.restored(request, to: originPath)
+    } catch {
+      return replies.failed(request, because: Self.sentence(for: error))
+    }
+  }
+
+  private func performDiscard(
+    _ storedPath: AbsolutePath,
+    _ request: HelperRequest
+  ) async -> HelperResponse {
+    do {
+      try await archive.discard(at: storedPath)
+      return replies.discarded(request)
+    } catch {
+      return replies.failed(request, because: Self.sentence(for: error))
     }
   }
 

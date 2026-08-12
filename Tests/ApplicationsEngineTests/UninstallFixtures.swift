@@ -101,6 +101,8 @@ func makeUninstallSafetyNet(
     directory: directory,
     fileSystem: fileSystem,
     denylist: denylist,
+    ownership: EverythingIsUserDomainOwnership(),
+    environment: UninstallFixture.environment,
     now: now
   )
 }
@@ -599,4 +601,13 @@ func storedItem(
 
 func storedOriginPaths(_ items: [SafetyNetItem]) -> Set<AbsolutePath> {
   Set(items.map(\.originPath))
+}
+
+/// Everything the uninstall fixtures hold sits in the fixture home, so this
+/// store needs no privileged half. A system domain payload is a different
+/// slice's concern and is refused rather than quietly stored.
+struct EverythingIsUserDomainOwnership: PathOwnershipPolicy {
+  func ownership(of path: AbsolutePath, environment: OwnershipEnvironment) -> PathOwnership {
+    .userDomain
+  }
 }

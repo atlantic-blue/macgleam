@@ -96,6 +96,12 @@ public struct PlanExecutor: PlanExecuting {
       yield(.operationFinished(operationID: operation.id, result: result))
       return result
     }
+    if isSafetyNetWork(operation) {
+      yield(.operationStarted(operationID: operation.id))
+      let result = await perform(operation)
+      yield(.operationFinished(operationID: operation.id, result: result))
+      return result
+    }
     let needsPrivilege = routedPrivilege(of: operation) == .root
     if needsPrivilege, helper == nil {
       halted = true
@@ -164,6 +170,24 @@ public struct PlanExecutor: PlanExecuting {
 
   // MARK: - Routing
 
+  /// A quarantine and an archive go to the SafetyNet store whatever the path's
+  /// ownership says, and the store does its own routing inside.
+  ///
+  /// Ownership routing decides between this process and the helper for a trash
+  /// move and a permanent deletion, and it decides nothing here: the store
+  /// holds the manifest, so the store is the thing that must know an archive
+  /// happened. An executor sending a system domain archive to the helper
+  /// directly moves a file into the store without the store knowing, which is
+  /// exactly the defect this closes.
+  private func isSafetyNetWork(_ operation: Operation) -> Bool {
+    switch operation.kind {
+    case .quarantine, .archive:
+      return true
+    case .moveToTrash, .deletePermanently, .setLaunchItemEnabled, .runMaintenance:
+      return false
+    }
+  }
+
   private func routedPrivilege(of operation: Operation) -> Operation.Privilege {
     guard let target = pathedTarget(of: operation) else { return operation.privilege }
     switch ownershipPolicy.ownership(of: target, environment: environment) {
@@ -208,9 +232,13 @@ public struct PlanExecutor: PlanExecuting {
   }
 
   /// The store owns where a quarantined or archived payload goes, so the
-  /// executor hands it the path and invents no storage location of its own. The
-  /// move reclaims the bytes it moved, measured before it, exactly as a trash
-  /// move reports them.
+  /// executor hands it the path and invents no storage location of its own.
+  ///
+  /// The bytes reported are the size the store recorded for the item it
+  /// returned, never a figure measured here. The executor cannot measure a
+  /// system domain payload reliably, the store already holds an exact
+  /// measurement taken at the origin before the move, and two measurements of
+  /// one file that could disagree are one measurement too many.
   private func moveIntoSafetyNet(
     _ target: AbsolutePath,
     source: SafetyNetItem.Source,
@@ -222,8 +250,11 @@ public struct PlanExecutor: PlanExecuting {
         + "so \(target.value) was left untouched."
       return .failed(reason: reason)
     }
-    return await reclaim(target) {
-      _ = try await safetyNet.store(target, source: source, groupID: groupID)
+    do {
+      let item = try await safetyNet.store(target, source: source, groupID: groupID)
+      return .completed(bytesReclaimed: item.allocatedBytes)
+    } catch {
+      return .failed(reason: failureSentence(for: error))
     }
   }
 

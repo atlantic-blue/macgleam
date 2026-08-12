@@ -28,14 +28,34 @@ final class HelperSupply: Sendable {
     self.safetyNetStoreDirectory = safetyNetStoreDirectory
   }
 
+  /// The two things one run needs from the privileged half: the executor's
+  /// helper, and the SafetyNet store's privileged archiving. Both are the one
+  /// client over the one connection, so a run's archive and its removals share
+  /// a handshake.
+  func makeRun() -> (
+    helper: any PrivilegedOperationPerforming,
+    archiving: any SafetyNetPrivilegedArchiving
+  ) {
+    let client = HelperClient(
+      transport: XPCHelperTransport(),
+      registration: registration,
+      userHome: userHome,
+      safetyNetStoreDirectory: safetyNetStoreDirectory
+    )
+    return (directing(client), client)
+  }
+
   func makeHelper() -> any PrivilegedOperationPerforming {
+    makeRun().helper
+  }
+
+  var storeDirectory: AbsolutePath {
+    safetyNetStoreDirectory
+  }
+
+  private func directing(_ client: HelperClient) -> any PrivilegedOperationPerforming {
     ApprovalDirectingHelper(
-      client: HelperClient(
-        transport: XPCHelperTransport(),
-        registration: registration,
-        userHome: userHome,
-        safetyNetStoreDirectory: safetyNetStoreDirectory
-      ),
+      client: client,
       registration: registration,
       directToApproval: { [hasDirectedToSettings] in
         let isFirstTime = hasDirectedToSettings.withLock { directed -> Bool in

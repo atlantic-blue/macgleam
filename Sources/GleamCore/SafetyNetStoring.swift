@@ -52,6 +52,12 @@ public enum SafetyNetError: Error, Sendable, Equatable {
   case alreadyRestored(UUID)
   case confirmationMismatch
   case denylistedPath(AbsolutePath)
+  /// The payload needs the privileged half and this store has none, so
+  /// nothing moved. Names the path that needed it.
+  case privilegeUnavailable(AbsolutePath)
+  /// The privileged half described an archive that is not the one asked
+  /// about: another origin, or a report for another item. Names the item.
+  case privilegedReportDisagreed(UUID)
 }
 
 extension SafetyNetError: LocalizedError {
@@ -69,6 +75,14 @@ extension SafetyNetError: LocalizedError {
       return "The confirmation does not match the items being purged."
     case .denylistedPath(let path):
       return "\(path.value) is protected and cannot be moved into the SafetyNet."
+    case .privilegeUnavailable(let path):
+      return
+        "\(path.value) needs MacGleam's privileged helper, which is not available, so nothing "
+        + "was moved."
+    case .privilegedReportDisagreed(let identifier):
+      return
+        "The privileged helper described a different archive from \(identifier.uuidString), so "
+        + "nothing was recorded."
     }
   }
 }

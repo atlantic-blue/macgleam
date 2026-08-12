@@ -18,8 +18,6 @@ struct HelperRemoval: Sendable {
       try await fileSystem.delete(target)
     case .userTrash(let userHome):
       try await moveIntoDirectory(target, directory: trashDirectory(of: userHome), giveTo: userHome)
-    case .safetyNetStore(let storeDirectory):
-      try await moveIntoDirectory(target, directory: storeDirectory, giveTo: nil)
     }
     return bytes
   }
