@@ -53,7 +53,8 @@ final class MacGleamAppDelegate: NSObject, NSApplicationDelegate {
           cleanup: CleanupComposition.make(onboarding: onboarding, supply: supply),
           diskMap: diskMap,
           protection: ProtectionComposition.make(supply: supply, helpers: HelperSupply()),
-          fullSweep: FullSweepComposition.make(supply: supply, helpers: HelperSupply())
+          fullSweep: FullSweepComposition.make(supply: supply, helpers: HelperSupply()),
+          licence: LicenceComposition.make()
         )
         FileHandle.standardOutput.write(Data("rendered \(request.destination.path)\n".utf8))
         exit(0)
@@ -79,6 +80,7 @@ struct MacGleamApp: App {
   @State private var protection: ProtectionDependencies
   @State private var fullSweep: FullSweepDependencies
   @State private var menuBar: MenuBarModel
+  @State private var licence: LicenceModel
   @State private var rules: RuleSupply
 
   init() {
@@ -92,6 +94,7 @@ struct MacGleamApp: App {
       initialValue: ProtectionComposition.make(supply: supply, helpers: HelperSupply()))
     _fullSweep = State(
       initialValue: FullSweepComposition.make(supply: supply, helpers: HelperSupply()))
+    _licence = State(initialValue: LicenceComposition.make())
     _menuBar = State(
       initialValue: MenuBarModel(
         stats: LiveSystemStats(), preferences: Settings.defaults.menuBar))
@@ -114,7 +117,8 @@ struct MacGleamApp: App {
         cleanup: cleanup,
         diskMap: diskMap,
         protection: protection,
-        fullSweep: fullSweep
+        fullSweep: fullSweep,
+        licence: licence
       )
       .frame(minWidth: 1120, minHeight: 760)
       // Best effort, once per launch. A catalogue that does not arrive
@@ -147,6 +151,7 @@ struct RootView: View {
   let diskMap: DiskMapDependencies
   let protection: ProtectionDependencies
   let fullSweep: FullSweepDependencies
+  let licence: LicenceModel
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   private static let hubBlurWhileOnboarding: CGFloat = 8
@@ -163,7 +168,8 @@ struct RootView: View {
         cleanup: cleanup,
         diskMap: diskMap,
         protection: protection,
-        fullSweep: fullSweep
+        fullSweep: fullSweep,
+        licence: licence
       )
       .blur(radius: showsExplanation ? Self.hubBlurWhileOnboarding : 0)
       .allowsHitTesting(!showsExplanation)

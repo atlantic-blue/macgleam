@@ -21,6 +21,7 @@ struct AppShellView: View {
   let diskMap: DiskMapDependencies
   let protection: ProtectionDependencies
   let fullSweep: FullSweepDependencies
+  let licence: LicenceModel
   @State private var navigation: HubNavigationState
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -32,6 +33,7 @@ struct AppShellView: View {
     diskMap: DiskMapDependencies,
     protection: ProtectionDependencies,
     fullSweep: FullSweepDependencies,
+    licence: LicenceModel,
     initialSelection: HubDestination = HubNavigationState.initial.selection
   ) {
     self.model = model
@@ -39,6 +41,7 @@ struct AppShellView: View {
     self.diskMap = diskMap
     self.protection = protection
     self.fullSweep = fullSweep
+    self.licence = licence
     _navigation = State(
       initialValue: HubNavigationState(selection: initialSelection, moduleStateSlots: [:]))
   }
@@ -89,6 +92,8 @@ struct AppShellView: View {
       case .module(.protection) where content.action != nil:
         ProtectionModuleView(
           model: protection.model, safetyNet: protection.safetyNet, idlePane: content)
+      case .settings:
+        SettingsPaneView(licence: licence)
       case .diskMap:
         DiskMapView(
           model: diskMap.model, executor: diskMap.executor, idlePane: content)

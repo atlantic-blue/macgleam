@@ -2,7 +2,7 @@
 stage:    implement
 updated:  2026-08-12
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     M7 launch: s7a sparkle, s7b release pipeline, s7c licensing
+next:     s7a sparkle updates, then s7b the release pipeline
 blocked:  none. The live window cannot be captured (the terminal has no
           Screen Recording permission), so visual checks run off offscreen
           renders and the human checks stay queued below.
@@ -48,7 +48,9 @@ steps:
   - [x] s6a full sweep orchestrator (atlantic-blue/macgleam#40)
   - [x] s6b smart care surface (atlantic-blue/macgleam#41)
   - [x] s6c menu bar (atlantic-blue/macgleam#42)
-  - [ ] M7 launch: s7a sparkle, s7b release pipeline, s7c licensing
+  - [ ] s7a sparkle updates
+  - [ ] s7b release pipeline
+  - [x] s7c licensing (atlantic-blue/macgleam#43)
 ```
 
 ## The interface changed shape on 2026-08-10
@@ -107,6 +109,15 @@ that half works.
 
 Verify tier slices are merged on tests and self checks but stay open until
 Julian judges them on a running app. Open items:
+
+- s7c licensing: read the trial and purchase surfaces as a stranger would and
+  say whether they are honest. Everything works in every state, so the only
+  thing expiry changes is one sentence in Settings. Self check done: 15 new
+  tests against a controlled clock, including day fourteen against day fifteen
+  and a licence edited after signing; mutations on the trial boundary and on
+  the activation verification watched failing then passing. Waiting on you: the
+  production licence signing key and `licence.macgleam.app`, both of which are
+  the same ceremony as the rules key.
 
 - s6c the menu bar: judge it at a glance and watch its footprint, and check
   the popover sizes correctly, which is the known AppKit interop seam. Self
