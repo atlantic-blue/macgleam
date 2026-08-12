@@ -72,10 +72,17 @@ struct UninstallPlanSafetyTests {
   @Test("selecting every application the scan offered still plans archives and nothing else")
   func selectingEverythingPlansOnlyArchives() async throws {
     let setup = try await uninstallSetup()
+    // Every uninstall row the scan offered. The swept orphans it also offers
+    // are a different review with a different answer, covered in the sweep's
+    // own suite; what this pins is that the widest uninstall selection there
+    // is still archives and nothing else.
+    let everyUninstallRow = setup.outcome.findings.filter {
+      applicationBundleID(of: $0) != nil
+    }
 
     for mode in [Settings.DeletionMode.trash, .permanent] {
       let plan = try ApplicationsEngine().plan(
-        selection: setup.outcome.findings,
+        selection: everyUninstallRow,
         context: makeUninstallPlanContext(
           rules: setup.catalog, settings: makeApplicationsSettings(deletionMode: mode))
       )
@@ -227,21 +234,32 @@ struct UninstallPlanSafetyTests {
     }
   }
 
-  @Test("a row claiming an orphaned leftover plans no trash operation in this module's plan")
-  func anOrphanRowPlansNoTrashHere() async throws {
+  @Test("an orphan row beside an uninstall is removed, and joins no uninstall group")
+  func anOrphanRowBesideAnUninstallJoinsNoGroup() async throws {
     let setup = try await uninstallSetup()
-    // The leftover sweep (s4d) removes orphans with the Trash default. That
-    // is a different plan for a different review; smuggling an orphan row
-    // into an uninstall must not import its removal.
     let orphan = makeApplicationFinding(
       category: .orphanedLeftover,
       paths: ["\(ApplicationWorld.preferences)/\(ApplicationWorld.ghost).plist"]
     )
+    let uninstall = uninstallSelection(of: [ApplicationWorld.solo], in: setup.outcome)
 
-    planExpectingArchiveOnly(
-      [orphan],
+    let plan = try ApplicationsEngine().plan(
+      selection: uninstall + [orphan],
       context: makeUninstallPlanContext(
-        rules: setup.catalog, settings: makeApplicationsSettings(deletionMode: .permanent)))
+        rules: setup.catalog, settings: makeApplicationsSettings(deletionMode: .trash)))
+
+    let orphanPath = ApplicationsFixture.path(
+      "\(ApplicationWorld.preferences)/\(ApplicationWorld.ghost).plist")
+    let orphanOperations = plan.operations.filter { operationTarget(of: $0) == orphanPath }
+    #expect(orphanOperations.count == 1)
+    guard case .moveToTrash = orphanOperations.first?.kind else {
+      Issue.record("a swept orphan follows the deletion mode, and the default is the Trash")
+      return
+    }
+    // The uninstall beside it is untouched: still archived, still one group.
+    #expect(
+      archiveTargets(in: plan) == [ApplicationsFixture.path("/Applications/ExampleSolo.app")],
+      "an orphan in the selection changes nothing about the application beside it")
   }
 
   // MARK: The running application

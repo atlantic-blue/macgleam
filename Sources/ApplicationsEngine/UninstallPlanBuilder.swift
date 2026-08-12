@@ -1,10 +1,10 @@
 import Foundation
 import GleamCore
 
-/// Turns a reviewed uninstall selection into archive operations, one per path,
-/// grouped per application.
+/// Turns a reviewed selection into operations: an uninstall into archives, one
+/// per path and grouped per application, and a swept orphan into a removal.
 ///
-/// Archive is the only operation this builder can construct. There is no
+/// Archive is the only operation an uninstall can construct. There is no
 /// deletion mode here and no branch to reach a removal from: a forged finding,
 /// a category added later or a settings change cannot put a `moveToTrash` or a
 /// `deletePermanently` inside an uninstall, because nothing in here builds one.
@@ -36,6 +36,10 @@ struct UninstallPlanBuilder {
   /// so a selection of only those plans an empty plan rather than a partial
   /// one.
   mutating func add(_ finding: Finding) {
+    if case .orphanedLeftover = finding.category {
+      addSweep(finding)
+      return
+    }
     guard let bundleID = Self.uninstalledBundleID(of: finding.category),
       bundleID != excludedBundleID
     else { return }
@@ -45,6 +49,13 @@ struct UninstallPlanBuilder {
     for entry in targeted {
       totalBytes += entry.allocatedBytes
       operations.append(archive(entry.path, findingID: finding.id, groupID: groupID))
+    }
+  }
+
+  private mutating func addSweep(_ finding: Finding) {
+    for entry in finding.entries where !context.rules.denylist.blocks(entry.path) {
+      totalBytes += entry.allocatedBytes
+      operations.append(remove(entry.path, findingID: finding.id))
     }
   }
 
@@ -77,6 +88,16 @@ struct UninstallPlanBuilder {
       id: UUID(),
       findingID: findingID,
       kind: .archive(target: path, groupID: groupID),
+      privilege: ownership == .userDomain ? .user : .root)
+  }
+
+  private func remove(_ path: AbsolutePath, findingID: UUID) -> GleamCore.Operation {
+    let ownership = context.ownership.ownership(of: path, environment: environment)
+    return GleamCore.Operation(
+      id: UUID(),
+      findingID: findingID,
+      kind: context.settings.deletionMode == .permanent
+        ? .deletePermanently(target: path) : .moveToTrash(target: path),
       privilege: ownership == .userDomain ? .user : .root)
   }
 
