@@ -20,11 +20,14 @@ struct OutboundEndpointTests {
     "licence.macgleam.app",
   ]
 
-  /// Hosts that appear in source for reasons that are not this app talking to
-  /// them: a package to build against, a document to point a reader at.
+  /// Web addresses that appear in source and are not somewhere this app
+  /// talks to: a package to build against, a document to point a reader at,
+  /// and an XML namespace, which is a name that happens to look like an
+  /// address and is never fetched by anything.
   private static let notEndpoints: Set<String> = [
     "github.com",
     "www.asd-ste100.org",
+    "www.andymatuschak.org",
   ]
 
   private static let repositoryRoot: URL = {
