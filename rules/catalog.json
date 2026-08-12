@@ -1,0 +1,36 @@
+{
+  "adwareRules": [],
+  "cleanupRules": [],
+  "denylist": {
+    "patterns": [
+      {
+        "pattern": "/System"
+      },
+      {
+        "pattern": "/usr"
+      },
+      {
+        "pattern": "/bin"
+      },
+      {
+        "pattern": "/sbin"
+      },
+      {
+        "pattern": "/etc"
+      },
+      {
+        "pattern": "/private/etc"
+      },
+      {
+        "pattern": "/dev"
+      },
+      {
+        "pattern": "/Library/Apple"
+      }
+    ]
+  },
+  "signature": "",
+  "version": {
+    "value": 1
+  }
+}

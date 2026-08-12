@@ -43,7 +43,7 @@ steps:
   - [x] s5a malware and adware detection (atlantic-blue/macgleam#36)
   - [ ] s5b quarantine flow
   - [x] s5c privacy cleanup (atlantic-blue/macgleam#37)
-  - [ ] s5d rules channel
+  - [x] s5d rules channel (atlantic-blue/macgleam#38)
   - [ ] s5e the signature matcher, a decision for Julian first
   - [ ] M6 full sweep: s6a orchestrator, s6b smart care, s6c menu bar
   - [ ] M7 launch: s7a sparkle, s7b release pipeline, s7c licensing
@@ -77,6 +77,15 @@ request and merge on green continuous integration are pre approved for this
 repo only, with the s0a evidence bar (isolated tests, blind implementation,
 own test run, mutation check watched both ways, lint, runner executed count
 confirmed). Julian is away; product decisions get batched and flagged here.
+
+## Two things waiting on Julian
+
+The rules channel is built and has nothing to fetch. `rules.macgleam.app` does
+not exist and the rules signing key has not been minted, so a refresh finds
+nothing and the app runs on its embedded baseline. The publisher takes the key
+from the pipeline's secrets and from nowhere else, and refuses to run without
+it, so standing the channel up is: mint the key, set `RULES_SIGNING_KEY`, host
+the signed manifest.
 
 ## A decision waiting on Julian
 

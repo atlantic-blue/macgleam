@@ -10,8 +10,11 @@ import os
 /// Support, and the onboarding model as the degraded provider.
 @MainActor
 enum CleanupComposition {
-  static func make(onboarding: DiskAccessOnboardingModel) -> CleanupDependencies {
-    let rules = loadRules()
+  static func make(
+    onboarding: DiskAccessOnboardingModel,
+    supply: RuleSupply
+  ) -> CleanupDependencies {
+    let rules = supply.rules
     let ownershipPolicy = HomeDirectoryOwnershipPolicy()
     let executor = CancellableCleanupExecutor(
       fileSystem: DiskFileSystem(),
@@ -25,7 +28,7 @@ enum CleanupComposition {
       settings: SettingsStore(directory: settingsDirectory()),
       sessions: LiveCleanupSessionProvider(
         fileSystem: DiskFileSystem(),
-        rules: rules,
+        supply: supply,
         ownership: ownershipPolicy
       ),
       degraded: OnboardingDegradedStateProvider(onboarding: onboarding)
@@ -73,21 +76,25 @@ struct CleanupDependencies {
 /// bound to exactly the session they are asked for.
 struct LiveCleanupSessionProvider: CleanupSessionProviding {
   let fileSystem: DiskFileSystem
-  let rules: RuleCatalog
+  /// The rules are read per session rather than held, so a catalogue the
+  /// channel published while the app was open is in force for the next scan
+  /// rather than at the next launch.
+  let supply: RuleSupply
   let ownership: any PathOwnershipPolicy
 
   func makeScanContext(settings: Settings, hasFullDiskAccess: Bool) async -> ScanContext {
     ScanContext(
       sessionID: UUID(),
       fileSystem: fileSystem,
-      rules: rules,
+      rules: supply.rules,
       settings: settings,
       hasFullDiskAccess: hasFullDiskAccess
     )
   }
 
   func makePlanContext(sessionID: UUID, settings: Settings) async -> PlanContext {
-    PlanContext(sessionID: sessionID, rules: rules, settings: settings, ownership: ownership)
+    PlanContext(
+      sessionID: sessionID, rules: supply.rules, settings: settings, ownership: ownership)
   }
 }
 

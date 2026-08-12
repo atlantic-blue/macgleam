@@ -9,8 +9,8 @@ import GleamCore
 /// store and the real Full Disk Access monitor.
 @MainActor
 enum DiskMapComposition {
-  static func make() -> DiskMapDependencies {
-    let rules = CleanupComposition.loadRules()
+  static func make(supply: RuleSupply) -> DiskMapDependencies {
+    let rules = supply.rules
     let ownershipPolicy = HomeDirectoryOwnershipPolicy()
     let executor = CancellableCleanupExecutor(
       fileSystem: DiskFileSystem(),
@@ -24,7 +24,7 @@ enum DiskMapComposition {
       settings: SettingsStore(directory: CleanupComposition.settingsDirectory()),
       sessions: LiveDiskMapSessionProvider(
         fileSystem: DiskFileSystem(),
-        rules: rules,
+        supply: supply,
         ownership: ownershipPolicy
       ),
       access: RealFullDiskAccessMonitor()
@@ -43,20 +43,22 @@ struct DiskMapDependencies {
 /// bound to exactly the session they are asked for.
 struct LiveDiskMapSessionProvider: DiskMapSessionProviding {
   let fileSystem: DiskFileSystem
-  let rules: RuleCatalog
+  /// Read per session, so a published catalogue reaches the next map.
+  let supply: RuleSupply
   let ownership: any PathOwnershipPolicy
 
   func makeScanContext(settings: Settings, hasFullDiskAccess: Bool) async -> ScanContext {
     ScanContext(
       sessionID: UUID(),
       fileSystem: fileSystem,
-      rules: rules,
+      rules: supply.rules,
       settings: settings,
       hasFullDiskAccess: hasFullDiskAccess
     )
   }
 
   func makePlanContext(sessionID: UUID, settings: Settings) async -> PlanContext {
-    PlanContext(sessionID: sessionID, rules: rules, settings: settings, ownership: ownership)
+    PlanContext(
+      sessionID: sessionID, rules: supply.rules, settings: settings, ownership: ownership)
   }
 }
