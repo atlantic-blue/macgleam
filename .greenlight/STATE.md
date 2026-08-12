@@ -42,7 +42,7 @@ steps:
   - [x] s4d leftover sweep (atlantic-blue/macgleam#35)
   - [x] s5a malware and adware detection (atlantic-blue/macgleam#36)
   - [ ] s5b quarantine flow
-  - [ ] s5c privacy cleanup
+  - [x] s5c privacy cleanup (atlantic-blue/macgleam#37)
   - [x] s5d rules channel (atlantic-blue/macgleam#38)
   - [ ] s5e the signature matcher, a decision for Julian first
   - [ ] M6 full sweep: s6a orchestrator, s6b smart care, s6c menu bar
@@ -105,6 +105,14 @@ that half works.
 
 Verify tier slices are merged on tests and self checks but stay open until
 Julian judges them on a running app. Open items:
+
+- s5c privacy cleanup: clear one browser's cookies on a scratch profile and
+  confirm the history survived, then the other way round. Self check done: 12
+  new tests over a fixture disk holding five browsers and the two lists macOS
+  keeps, with bookmarks and saved passwords sitting beside them; mutations on
+  the privacy branch of the plan builder and on preselection watched failing
+  then passing. What a test cannot judge: whether the sentences are the ones a
+  person needs to decide with, which is the whole of this feature.
 
 - s4d the leftover sweep: sweep a real machine and read the findings before
   acting on any of them. Self check done: 16 new tests, 1471 green; mutations

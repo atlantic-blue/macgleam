@@ -23,10 +23,26 @@ struct QuarantinePlanBuilder {
   }
 
   mutating func add(_ finding: Finding) {
+    if Self.isPrivacy(finding.category) {
+      addPrivacy(finding)
+      return
+    }
     guard Self.isDetection(finding.category) else { return }
     for entry in finding.entries where !context.rules.denylist.blocks(entry.path) {
       totalBytes += entry.allocatedBytes
       operations.append(quarantine(entry.path, findingID: finding.id))
+    }
+  }
+
+  /// A privacy row is cleared rather than contained. There is no meaningful
+  /// trash for a history database and no meaningful restore either: keeping a
+  /// copy of what somebody asked to be rid of is the opposite of what they
+  /// asked for. So these are the one thing this module deletes, and they are
+  /// deleted only because a person ticked them: nothing here is preselected.
+  private mutating func addPrivacy(_ finding: Finding) {
+    for entry in finding.entries where !context.rules.denylist.blocks(entry.path) {
+      totalBytes += entry.allocatedBytes
+      operations.append(clear(entry.path, findingID: finding.id))
     }
   }
 
@@ -46,6 +62,25 @@ struct QuarantinePlanBuilder {
       findingID: findingID,
       kind: .quarantine(target: path),
       privilege: ownership == .userDomain ? .user : .root)
+  }
+
+  private func clear(_ path: AbsolutePath, findingID: UUID) -> GleamCore.Operation {
+    let ownership = context.ownership.ownership(of: path, environment: environment)
+    return GleamCore.Operation(
+      id: UUID(),
+      findingID: findingID,
+      kind: .deletePermanently(target: path),
+      privilege: ownership == .userDomain ? .user : .root)
+  }
+
+  static func isPrivacy(_ category: FindingCategory) -> Bool {
+    switch category {
+    case .browserHistory, .browserCookies, .browserSiteData, .recentItemsList,
+      .wifiNetworkHistory:
+      return true
+    default:
+      return false
+    }
   }
 
   static func isDetection(_ category: FindingCategory) -> Bool {
