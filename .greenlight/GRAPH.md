@@ -1063,11 +1063,33 @@ they were done alongside.
   no exfiltration invariant (CONTRACTS.md cross contract section) now covers
   the third permitted endpoint.
 - Depends on: s0a.
+- Verification: the appcast is one of exactly three outbound endpoints,
+  asserted by reading every web address in the sources rather than by
+  inspection; two separate feeds so a beta entry cannot reach a stable
+  installation through a filter somebody got wrong; the bundle carries the
+  feed and the signing key, and says updates are offered rather than
+  installed.
+- Tier: verify. Human check: update a versioned build from the beta channel on
+  a real machine. Done 2026-08-12 for everything except the framework itself,
+  which is s7d.
+
+### s7d. the update framework
+- Contracts: C's update section, the `AppUpdating` conformance.
+- Depends on: s7a.
+- Why it exists: s7a ships the policy, the two channels, the bundle keys and
+  the endpoint invariant. It does not ship Sparkle. The package resolves and
+  the checkout succeeds, and fetching its binary artifact hangs in this
+  environment on a keychain lookup for github.com, so the framework could not
+  be compiled or run here. Shipping code that cannot be built is worse than
+  naming the gap: the conformance is one commit once the artifact fetches, and
+  a fresh continuous integration runner has no keychain to hang on.
+- What it carries: the package dependency, an `AppUpdating` conformance over
+  `SPUStandardUpdaterController` reading its feed from the policy, and the
+  Settings row that switches channel.
 - Verification: an update from the beta channel installs and relaunches; a
-  tampered appcast entry is rejected; the appcast is one of exactly three
-  outbound endpoints.
-- Tier: verify. Human check: update a versioned build from the beta channel
-  on a real machine.
+  tampered appcast entry is rejected before it is offered; the updater never
+  installs without being asked.
+- Tier: verify.
 
 ### s7b. release pipeline
 - Contracts: none new; the deployment section of DESIGN.md becomes a

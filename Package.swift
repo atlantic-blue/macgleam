@@ -184,6 +184,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "GleamBundler",
+            dependencies: ["GleamCore"],
             path: "Sources/GleamBundler"
         ),
         .executableTarget(
