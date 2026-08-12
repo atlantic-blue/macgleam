@@ -954,9 +954,16 @@ they were done alongside.
 - Depends on: s1g.
 - Verification: findings per browser and per data kind, none preselected;
   each removal clears exactly the selected item against fixture browser
-  profiles; explanations name what is cleared.
-- Tier: verify. Human check: clear one browser's cookies on a scratch
-  profile and confirm history survived.
+  profiles; explanations name what is cleared and what survives.
+- The recognised locations are a written table rather than a derived rule,
+  because every entry is a claim about what a person loses. Safari, Chrome,
+  Edge, Brave and Firefox, plus the two lists macOS keeps itself: the recent
+  items lists, which are per person, and the wireless network history, which
+  is per machine. The neighbours are what the fixture disk is really for:
+  bookmarks sit beside history and saved passwords beside cookies, and a scan
+  that took the folder rather than the file would take all four.
+- Tier: verify. Human check: clear one browser's cookies on a scratch profile
+  and confirm history survived. Done 2026-08-12.
 
 ### s5d. rules channel
 - Contracts: C19 (live channel), the channel publish workflow, helper

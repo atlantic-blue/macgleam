@@ -22,14 +22,14 @@ struct ProtectionPlanTests {
   ]
 
   /// Categories from other modules, which this builder must ignore rather
-  /// than quarantine: a Protection plan holding somebody else's row would
-  /// quarantine a cache.
+  /// than act on: a Protection plan holding somebody else's row would
+  /// quarantine a cache. The privacy categories are this module's own and are
+  /// cleared rather than quarantined, which their own suite covers.
   private static let foreignCategories: [FindingCategory] = [
     .userCache,
     .log,
     .largeFile,
     .orphanedLeftover,
-    .browserHistory(browser: "Safari"),
     .applicationBundle(bundleID: "com.example.mail"),
   ]
 

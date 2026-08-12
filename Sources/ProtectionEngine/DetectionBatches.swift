@@ -13,6 +13,7 @@ struct DetectionBatches {
   private let sessionID: UUID
   private var adwareEntries: [Int: [PathEntry]] = [:]
   private var malwareEntries: [String: [PathEntry]] = [:]
+  private var privacyEntries: [PrivacyLocations.Target: UInt64] = [:]
 
   init(adwareRules: [AdwareRule], sessionID: UUID) {
     self.adwareRules = adwareRules
@@ -32,6 +33,14 @@ struct DetectionBatches {
     }
   }
 
+  /// A privacy trace is one row per thing it is, not per file inside it. A
+  /// browser's site data is a directory of hundreds of files and one decision,
+  /// so the bytes gather at the root and the row names the root.
+  mutating func matchPrivacy(_ record: FileRecord) {
+    guard let target = PrivacyLocations.target(containing: record.path.components) else { return }
+    privacyEntries[target, default: 0] += record.allocatedBytes
+  }
+
   mutating func matchMalware(_ record: FileRecord, signatureIdentifier: String) {
     malwareEntries[signatureIdentifier, default: []].append(
       PathEntry(path: record.path, allocatedBytes: record.allocatedBytes))
@@ -41,7 +50,27 @@ struct DetectionBatches {
   /// quarantine is reversible for thirty days, so the default is to contain
   /// what was found rather than to leave it running while somebody decides.
   func findings() -> [Finding] {
-    malwareFindings() + adwareFindings()
+    malwareFindings() + adwareFindings() + privacyFindings()
+  }
+
+  /// Privacy rows are never preselected. Everything else this module finds is
+  /// something nobody chose to have; a browser history is something a person
+  /// made, and clearing it is theirs to ask for rather than ours to assume.
+  private func privacyFindings() -> [Finding] {
+    privacyEntries
+      .map { (target: $0.key, bytes: $0.value) }
+      .sorted { $0.target.root < $1.target.root }
+      .map { entry in
+        Finding(
+          id: UUID(),
+          sessionID: sessionID,
+          category: PrivacyLocations.category(of: entry.target.kind, browser: entry.target.browser),
+          entries: [PathEntry(path: entry.target.root, allocatedBytes: entry.bytes)],
+          risk: .review,
+          explanation: PrivacyLocations.explanation(
+            of: entry.target.kind, browser: entry.target.browser),
+          isPreselected: false)
+      }
   }
 
   private func malwareFindings() -> [Finding] {
