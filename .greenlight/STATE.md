@@ -2,7 +2,7 @@
 stage:    implement
 updated:  2026-08-12
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
-next:     s7a sparkle updates, then s7b the release pipeline
+next:     s7b the release pipeline, then s7d the update framework
 blocked:  none. The live window cannot be captured (the terminal has no
           Screen Recording permission), so visual checks run off offscreen
           renders and the human checks stay queued below.
@@ -48,7 +48,8 @@ steps:
   - [x] s6a full sweep orchestrator (atlantic-blue/macgleam#40)
   - [x] s6b smart care surface (atlantic-blue/macgleam#41)
   - [x] s6c menu bar (atlantic-blue/macgleam#42)
-  - [ ] s7a sparkle updates
+  - [x] s7a update channels and the appcast keys (atlantic-blue/macgleam#44)
+  - [ ] s7d the update framework, blocked on fetching its binary artifact
   - [ ] s7b release pipeline
   - [x] s7c licensing (atlantic-blue/macgleam#43)
 ```
@@ -81,6 +82,15 @@ request and merge on green continuous integration are pre approved for this
 repo only, with the s0a evidence bar (isolated tests, blind implementation,
 own test run, mutation check watched both ways, lint, runner executed count
 confirmed). Julian is away; product decisions get batched and flagged here.
+
+## The update framework is not in the build
+
+Sparkle's package resolves and checks out, and fetching its binary artifact
+hangs here on a keychain lookup for github.com: the same zip downloads in four
+seconds with curl, so it is this environment rather than the network. The
+policy, the two channels, the bundle keys and the endpoint invariant all
+shipped in s7a; the framework and its conformance are s7d, one commit once the
+artifact fetches, and a fresh runner has no keychain to hang on.
 
 ## Two things waiting on Julian
 

@@ -1,4 +1,5 @@
 import Foundation
+import GleamCore
 
 /// Assembles MacGleam.app.
 ///
@@ -96,6 +97,13 @@ struct Bundler {
       to: bundleURL.appending(path: "Contents/Library/LaunchDaemons/\(Self.helperLabel).plist"))
   }
 
+  /// The public half of the appcast signing key. The private half exists only
+  /// in the release pipeline's secrets, so an update signed anywhere else is
+  /// refused by every installation. This is a development stage placeholder
+  /// until the launch ceremony mints the real pair, and a placeholder here
+  /// fails closed: nothing verifies against it, so nothing installs.
+  static let appcastPublicKey = "REPLACE_AT_LAUNCH_WITH_THE_APPCAST_PUBLIC_KEY"
+
   private func writeInformationPropertyList() throws {
     let keys: [String: Any] = [
       "CFBundleExecutable": Self.executableName,
@@ -109,6 +117,18 @@ struct Bundler {
       "LSMinimumSystemVersion": Self.minimumSystemVersion,
       "NSHighResolutionCapable": true,
       "LSApplicationCategoryType": "public.app-category.utilities",
+      // The update feed and the key its entries are signed with. Both live in
+      // the bundle rather than in code, because a build's own identity is
+      // what an updater reads before it trusts anything it downloads, and a
+      // feed nobody can see in the bundle is a feed nobody can audit.
+      "SUFeedURL": UpdateChannel.stable.appcastURL.absoluteString,
+      "SUPublicEDKey": Self.appcastPublicKey,
+      // Updates are offered, never installed unasked. The two together are
+      // what makes an app that can replace itself one that never does it
+      // while nobody is looking.
+      "SUEnableAutomaticChecks": true,
+      "SUAutomaticallyUpdate": false,
+      "SUScheduledCheckInterval": Int(UpdatePolicy.dailyInterval),
     ]
     let data = try PropertyListSerialization.data(
       fromPropertyList: keys,
