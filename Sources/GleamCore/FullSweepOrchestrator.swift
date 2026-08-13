@@ -26,7 +26,11 @@ public struct FullSweepOrchestrator: FullSweepOrchestrating {
 
   public func scan(_ context: ScanContext) -> AsyncThrowingStream<FullSweepEvent, Error> {
     AsyncThrowingStream { continuation in
-      let work = Task {
+      // A walk runs below whatever asked for it. Reading a few hundred
+      // thousand files at the interface's own priority makes the whole machine
+      // feel slow while a scan is on, and nobody is waiting on any single file
+      // of it.
+      let work = Task(priority: .utility) {
         await runJobs(context) { continuation.yield($0) }
         continuation.finish()
       }

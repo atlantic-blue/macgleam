@@ -114,6 +114,41 @@ struct PerformanceGateTests {
     #expect(elapsed < cleanupScanBudgetSeconds)
   }
 
+  // MARK: Progress cadence
+
+  @Test("a scan reports progress on a cadence rather than once for every file")
+  func aScanReportsProgressOnACadence() async throws {
+    let fixture = try SharedPerformanceFixture.get()
+    let context = try makeScopedScanContext(for: fixture, recorder: EnumerationRecorder())
+
+    var progressEvents = 0
+    var finalCounters: ScanCounters?
+    for try await event in CleanupEngine().scan(context) {
+      if case .progress(let counters) = event {
+        progressEvents += 1
+        finalCounters = counters
+      }
+    }
+    let filesSeen = finalCounters?.filesSeen ?? 0
+    let ceiling = Int(filesSeen / ProgressCadence.step) + ProgressCadence.allowedExtraReports
+
+    print(
+      "PERFORMANCE GATE progress events: \(progressEvents) (ceiling \(ceiling)) "
+        + "over \(filesSeen) files seen"
+    )
+
+    #expect(filesSeen >= UInt64(PerformanceFixture.intendedFileCount))
+    #expect(
+      progressEvents <= ceiling,
+      """
+      every progress event crosses to the interface and redraws it, so one per \
+      file costs more than the walk and takes the whole machine down with it
+      """)
+    #expect(
+      filesSeen >= UInt64(PerformanceFixture.intendedFileCount),
+      "and the figure somebody is left looking at is still the true one")
+  }
+
   // MARK: Disk Map
 
   @Test("the full disk map of the typical fixture converges inside its budget")

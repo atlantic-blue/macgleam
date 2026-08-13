@@ -64,7 +64,11 @@ public struct DiskMapEngine: GleamEngine {
     context: ScanContext
   ) -> AsyncThrowingStream<DiskMapUpdate, Error> {
     AsyncThrowingStream { continuation in
-      let mapTask = Task {
+      // A walk runs below whatever asked for it. Reading a few hundred
+      // thousand files at the interface's own priority makes the whole machine
+      // feel slow while a scan is on, and nobody is waiting on any single file
+      // of it.
+      let mapTask = Task(priority: .utility) {
         do {
           try await Self.runMap(volume: volume, context: context) { continuation.yield($0) }
           continuation.yield(.completed)

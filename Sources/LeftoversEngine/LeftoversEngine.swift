@@ -31,7 +31,11 @@ public struct LeftoversEngine: GleamEngine {
 
   public func scan(_ context: ScanContext) -> AsyncThrowingStream<ScanEvent, Error> {
     AsyncThrowingStream { continuation in
-      let scanTask = Task {
+      // A walk runs below whatever asked for it. Reading a few hundred
+      // thousand files at the interface's own priority makes the whole machine
+      // feel slow while a scan is on, and nobody is waiting on any single file
+      // of it.
+      let scanTask = Task(priority: .utility) {
         do {
           try await runScan(context) { continuation.yield($0) }
           continuation.finish()
@@ -95,8 +99,13 @@ extension LeftoversEngine {
       guard record.path.isDescendant(of: userHome) else { continue }
       files.append(record)
       counters.filesSeen += 1
-      yield(.progress(counters))
+      if ProgressCadence.reports(filesSeen: counters.filesSeen) {
+        yield(.progress(counters))
+      }
     }
+    // The last report is the one somebody is left looking at, so it is made
+    // whatever the cadence did.
+    yield(.progress(counters))
     return files
   }
 
@@ -221,7 +230,7 @@ extension LeftoversEngine {
     context: ScanContext
   ) -> [Finding] {
     let downloads = downloadsFolder
-    let direct = files.filter { parent(of: $0.path) == downloads }
+    let direct = files.filter { $0.path.isChild(of: downloads) }
     let byBand = Dictionary(grouping: direct) { band(for: $0) }
     return DownloadsBand.allCases.compactMap { band in
       guard let records = byBand[band], !records.isEmpty else { return nil }
@@ -249,12 +258,6 @@ extension LeftoversEngine {
     return .beyondOneHundredEightyDays
   }
 
-  private func parent(of path: AbsolutePath) -> AbsolutePath {
-    var components = path.value.split(separator: "/").map(String.init)
-    guard !components.isEmpty else { return path }
-    components.removeLast()
-    return AbsolutePath(normalising: "/" + components.joined(separator: "/"))
-  }
 }
 
 // MARK: - Duplicate sets

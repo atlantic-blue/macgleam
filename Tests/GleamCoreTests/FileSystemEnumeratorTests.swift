@@ -1,6 +1,7 @@
 import Foundation
 import GleamCore
 import Testing
+import os
 
 /// Tests for the enumeration engine behind C13's enumerate, driven through
 /// the raw platform seam so platform misbehaviour can be scripted. The
@@ -295,5 +296,44 @@ struct EnumerationEngineCancellationTests {
       _ = await consumer.value
     }
     #expect(endedPromptly, "the bottomless enumeration kept running after cancellation")
+  }
+}
+
+/// A raw source that records the priority the walk asked for its listings at.
+private final class PriorityRecordingSource: RawDirectoryReading, @unchecked Sendable {
+  private let seen = OSAllocatedUnfairLock(initialState: [TaskPriority]())
+
+  var observed: [TaskPriority] {
+    seen.withLock { $0 }
+  }
+
+  func children(of directory: AbsolutePath) async throws -> [FileRecord] {
+    seen.withLock { $0.append(Task.currentPriority) }
+    guard directory == engineRoot else { return [] }
+    return [makeFileRecord(path: engineRoot.appending("file.txt"), fileID: 1)]
+  }
+}
+
+@Suite("Enumeration engine: priority")
+struct EnumerationEnginePriorityTests {
+
+  @Test("a walk reads below the interface that asked for it")
+  func aWalkReadsBelowTheInterface() async throws {
+    let source = PriorityRecordingSource()
+
+    await Task(priority: .userInitiated) {
+      _ = try? await collectEnumeration(
+        FileSystemEnumerator(source: source).enumerate(root: engineRoot, options: .default)
+      )
+    }.value
+
+    #expect(source.observed.isEmpty == false, "the walk must have read something to be measured")
+    #expect(
+      source.observed.allSatisfy { $0 <= TaskPriority.utility },
+      """
+      reading a few hundred thousand files at the interface's own priority \
+      makes the whole machine feel slow while a scan is on, and nobody is \
+      waiting on any single file of it
+      """)
   }
 }

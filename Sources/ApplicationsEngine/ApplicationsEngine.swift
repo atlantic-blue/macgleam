@@ -35,7 +35,11 @@ public struct ApplicationsEngine: GleamEngine {
 
   public func scan(_ context: ScanContext) -> AsyncThrowingStream<ScanEvent, Error> {
     AsyncThrowingStream { continuation in
-      let scanTask = Task {
+      // A walk runs below whatever asked for it. Reading a few hundred
+      // thousand files at the interface's own priority makes the whole machine
+      // feel slow while a scan is on, and nobody is waiting on any single file
+      // of it.
+      let scanTask = Task(priority: .utility) {
         do {
           try await runScan(context) { continuation.yield($0) }
           continuation.finish()

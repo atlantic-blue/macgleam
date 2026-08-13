@@ -17,7 +17,11 @@ public struct CleanupEngine: GleamEngine {
 
   public func scan(_ context: ScanContext) -> AsyncThrowingStream<ScanEvent, Error> {
     AsyncThrowingStream { continuation in
-      let scanTask = Task {
+      // A walk runs below whatever asked for it. Reading a few hundred
+      // thousand files at the interface's own priority makes the whole machine
+      // feel slow while a scan is on, and nobody is waiting on any single file
+      // of it.
+      let scanTask = Task(priority: .utility) {
         do {
           try await Self.runScan(context) { continuation.yield($0) }
           continuation.finish()
@@ -247,7 +251,9 @@ private struct FindingBatches {
   /// of every rule that has emitted nothing yet, however few entries it holds.
   mutating func countFile(yield: (ScanEvent) -> Void) {
     counters.filesSeen += 1
-    yield(.progress(counters))
+    if ProgressCadence.reports(filesSeen: counters.filesSeen) {
+      yield(.progress(counters))
+    }
     guard counters.filesSeen.isMultiple(of: ScanStreamPolicy.firstFindingCheckpointFiles) else {
       return
     }
@@ -260,6 +266,9 @@ private struct FindingBatches {
     for slot in batches.indices {
       flush(slot, yield: yield)
     }
+    // The last report is the one somebody is left looking at, so it is made
+    // whatever the cadence did.
+    yield(.progress(counters))
   }
 
   /// The batch a matched file belongs to. A trash bin's volume is part of its

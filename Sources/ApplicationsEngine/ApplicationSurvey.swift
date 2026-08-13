@@ -33,8 +33,13 @@ struct ApplicationSurvey {
       survey.take(record)
       guard !record.isDirectory else { continue }
       survey.counters.filesSeen += 1
-      yield(.progress(survey.counters))
+      if ProgressCadence.reports(filesSeen: survey.counters.filesSeen) {
+        yield(.progress(survey.counters))
+      }
     }
+    // The last report is the one somebody is left looking at, so it is made
+    // whatever the cadence did.
+    yield(.progress(survey.counters))
     return survey
   }
 
