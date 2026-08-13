@@ -279,15 +279,44 @@ func scanning(_ model: ProtectionModuleModel) -> Bool {
 /// driven by a task the model started, so a test that read the state
 /// immediately would be reading the state before the work.
 @MainActor
+// A scan now runs at utility priority, below the interface, which is what
+// keeps the machine usable while it reads. Under a loaded parallel test run a
+// utility task can wait a while for a core, so these helpers wait in seconds
+// rather than in fractions of one. Each returns the moment its condition
+// holds, so waiting longer costs a fast machine nothing.
 func settle(_ harness: ProtectionHarness) async {
-  for _ in 0..<200 {
+  // It waits for the state to CHANGE and then settle, never for a set of
+  // states it might already be in. Both traps are real: idle is where a scan
+  // starts, and reviewing is where a run starts, so a wait that stops at
+  // either can stop before the work it is waiting for began.
+  let before = harness.model.state
+  for _ in 0..<10_000 {
     await Task.yield()
     try? await Task.sleep(nanoseconds: 1_000_000)
-    switch harness.model.state {
+    let now = harness.model.state
+    guard now != before else { continue }
+    switch now {
     case .idle, .reviewing, .result, .allClear:
       return
     case .scanning, .executing:
       continue
+    }
+  }
+}
+
+/// For a scan that ends back at idle, which is what a failure does. It is a
+/// separate helper because idle is also where a scan starts, so a wait that
+/// stops at idle can stop before the work began: that is not a slow machine,
+/// it is a test reading the state before there is one.
+@MainActor
+func settleToIdle(_ harness: ProtectionHarness) async {
+  for _ in 0..<10_000 {
+    await Task.yield()
+    try? await Task.sleep(nanoseconds: 1_000_000)
+    if harness.engine.scanCount > 0, harness.model.state == .idle,
+      harness.model.failureNotice != nil
+    {
+      return
     }
   }
 }
@@ -298,7 +327,7 @@ func expectEventually(
   sourceLocation: SourceLocation = #_sourceLocation,
   _ condition: @MainActor () -> Bool
 ) async {
-  for _ in 0..<200 {
+  for _ in 0..<10_000 {
     if condition() { return }
     await Task.yield()
     try? await Task.sleep(nanoseconds: 1_000_000)
