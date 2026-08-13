@@ -240,6 +240,9 @@ public final class CleanupModuleModel {
       accumulator.merge(counters)
       state = .scanning(accumulator.progress)
       hubEstimateBytes = accumulator.progress.counters.bytesReclaimable
+    case .reading(let path):
+      accumulator.reading = path
+      state = .scanning(accumulator.progress)
     case .finding(let finding):
       accumulator.append(finding)
     case .degraded(let unavailable):
@@ -282,8 +285,11 @@ public final class CleanupModuleModel {
       self.sessionID = sessionID
     }
 
+    var reading: AbsolutePath?
+
     var progress: CleanupScanProgress {
-      CleanupScanProgress(sessionID: sessionID, phase: phase, counters: counters)
+      CleanupScanProgress(
+        sessionID: sessionID, phase: phase, counters: counters, reading: reading)
     }
 
     var categories: [CleanupReviewCategory] {

@@ -55,16 +55,19 @@ final class ScriptedOrchestrator: FullSweepOrchestrating, @unchecked Sendable {
   private let findings: [FullSweepJob: [Finding]]
   private let failing: Set<FullSweepJob>
   private let holdsOpen: Bool
+  private let reading: AbsolutePath?
   private let recorded = OSAllocatedUnfairLock(initialState: [[UUID]]())
 
   init(
     findings: [FullSweepJob: [Finding]],
     failing: Set<FullSweepJob> = [],
-    holdsOpen: Bool = false
+    holdsOpen: Bool = false,
+    reading: AbsolutePath? = nil
   ) {
     self.findings = findings
     self.failing = failing
     self.holdsOpen = holdsOpen
+    self.reading = reading
   }
 
   var plannedSelections: [[UUID]] { recorded.withLock { $0 } }
@@ -84,6 +87,9 @@ final class ScriptedOrchestrator: FullSweepOrchestrating, @unchecked Sendable {
   ) {
     var bytes: UInt64 = 0
     var issues: UInt32 = 0
+    if let reading {
+      continuation.yield(.job(.deepClean, .reading(reading)))
+    }
     for job in FullSweepJob.allCases {
       if failing.contains(job) {
         continuation.yield(.jobFailed(job, reason: "\(job.title) could not be run."))
@@ -209,10 +215,11 @@ struct SweepHarness {
 func makeSweepHarness(
   findings: [FullSweepJob: [Finding]],
   failing: Set<FullSweepJob> = [],
-  holdsOpen: Bool = false
+  holdsOpen: Bool = false,
+  reading: AbsolutePath? = nil
 ) -> SweepHarness {
   let orchestrator = ScriptedOrchestrator(
-    findings: findings, failing: failing, holdsOpen: holdsOpen)
+    findings: findings, failing: failing, holdsOpen: holdsOpen, reading: reading)
   return SweepHarness(
     orchestrator: orchestrator,
     model: FullSweepModuleModel(

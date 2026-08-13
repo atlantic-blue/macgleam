@@ -84,6 +84,10 @@ extension ProtectionEngine {
       try Task.checkCancellation()
       guard case .record(let record) = event, !record.isDirectory else { continue }
       counters.filesSeen += 1
+      if ProgressCadence.reports(filesSeen: counters.filesSeen) {
+        yield(.progress(counters))
+        yield(.reading(record.path))
+      }
       guard !context.rules.denylist.blocks(record.path) else { continue }
       detections.matchAdware(record)
       detections.matchPrivacy(record)

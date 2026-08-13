@@ -276,6 +276,8 @@ func similarPhotosRunScan(
       capture.phases.append(phase)
     case .progress(let counters):
       capture.progress.append(counters)
+    case .reading:
+      break
     case .finding(let finding):
       capture.findings.append(finding)
     case .degraded(let unavailable):

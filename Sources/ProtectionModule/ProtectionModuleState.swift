@@ -19,11 +19,16 @@ public struct ProtectionScanProgress: Sendable, Equatable {
   public let sessionID: UUID
   public let phase: ScanPhase
   public let counters: ScanCounters
+  /// The file the scan last reported reading, or nil before the first report.
+  public let reading: AbsolutePath?
 
-  public init(sessionID: UUID, phase: ScanPhase, counters: ScanCounters) {
+  public init(
+    sessionID: UUID, phase: ScanPhase, counters: ScanCounters, reading: AbsolutePath? = nil
+  ) {
     self.sessionID = sessionID
     self.phase = phase
     self.counters = counters
+    self.reading = reading
   }
 }
 

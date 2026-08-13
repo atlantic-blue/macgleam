@@ -28,17 +28,22 @@ public struct FullSweepProgress: Sendable, Equatable {
   public let issueCount: UInt32
   public let filesSeen: UInt64
   public let finishedJobs: Set<FullSweepJob>
+  /// The file the sweep last reported reading. Nil before the first report,
+  /// and it never goes back to nil once a sweep is under way.
+  public let reading: AbsolutePath?
 
   public init(
     bytesReclaimable: UInt64,
     issueCount: UInt32,
     filesSeen: UInt64,
-    finishedJobs: Set<FullSweepJob>
+    finishedJobs: Set<FullSweepJob>,
+    reading: AbsolutePath? = nil
   ) {
     self.bytesReclaimable = bytesReclaimable
     self.issueCount = issueCount
     self.filesSeen = filesSeen
     self.finishedJobs = finishedJobs
+    self.reading = reading
   }
 }
 
@@ -262,6 +267,7 @@ public final class FullSweepModuleModel {
     private var findings: [FullSweepJob: [Finding]] = [:]
     private var failures: [FullSweepJob: String] = [:]
     private var filesSeen: UInt64 = 0
+    private var reading: AbsolutePath?
     private var summary: FullSweepSummary?
 
     init(sessionID: UUID) {
@@ -273,7 +279,8 @@ public final class FullSweepModuleModel {
         bytesReclaimable: findings.values.flatMap { $0 }.reduce(0) { $0 + $1.byteSize },
         issueCount: UInt32(findings.values.reduce(0) { $0 + $1.count }),
         filesSeen: filesSeen,
-        finishedJobs: Set(failures.keys))
+        finishedJobs: Set(failures.keys),
+        reading: reading)
     }
 
     mutating func apply(_ event: ScanEvent, for job: FullSweepJob) {
@@ -282,6 +289,8 @@ public final class FullSweepModuleModel {
         findings[job, default: []].append(finding)
       case .progress(let counters):
         filesSeen = max(filesSeen, counters.filesSeen)
+      case .reading(let path):
+        reading = path
       case .phase, .degraded:
         break
       }

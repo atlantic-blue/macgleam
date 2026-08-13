@@ -191,6 +191,9 @@ public final class ProtectionModuleModel {
     case .progress(let counters):
       accumulator.merge(counters)
       state = .scanning(accumulator.progress)
+    case .reading(let path):
+      accumulator.reading = path
+      state = .scanning(accumulator.progress)
     case .finding(let finding):
       accumulator.append(finding)
     case .degraded(let sentence):
@@ -224,8 +227,11 @@ public final class ProtectionModuleModel {
       self.sessionID = sessionID
     }
 
+    var reading: AbsolutePath?
+
     var progress: ProtectionScanProgress {
-      ProtectionScanProgress(sessionID: sessionID, phase: phase, counters: counters)
+      ProtectionScanProgress(
+        sessionID: sessionID, phase: phase, counters: counters, reading: reading)
     }
 
     mutating func advance(to next: ScanPhase) {

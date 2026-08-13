@@ -395,6 +395,7 @@ struct ScanOutcome: Sendable {
   var findings: [Finding] = []
   var phases: [ScanPhase] = []
   var counters: [ScanCounters] = []
+  var readPaths: [AbsolutePath] = []
   var degradedMessages: [String] = []
 
   func findings(in category: FindingCategory) -> [Finding] {
@@ -437,6 +438,8 @@ func collectScan(
       outcome.counters.append(counters)
     case .finding(let finding):
       outcome.findings.append(finding)
+    case .reading(let path):
+      outcome.readPaths.append(path)
     case .degraded(let unavailable):
       outcome.degradedMessages.append(unavailable)
     }
