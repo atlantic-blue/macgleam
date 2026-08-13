@@ -27,3 +27,13 @@ jobs:
             exit 1
           fi
           echo "Executed $count tests."
+
+      # Building the app proves it compiles. Only starting the bundle proves the
+      # bundle carries every library the app loads at launch.
+      - name: Bundle the app and start it
+        run: |
+          swift build --product MacGleam
+          swift build --product GleamHelper
+          swift run GleamBundler
+          dist/MacGleam.app/Contents/MacOS/MacGleam --render bundled.png --size 900x600
+          test -s bundled.png
