@@ -206,3 +206,44 @@ struct AbsolutePathCodingTests {
     }
   }
 }
+
+@Suite("AbsolutePath direct children")
+struct AbsolutePathChildTests {
+
+  @Test("a file directly inside a folder is its child")
+  func aFileDirectlyInsideIsAChild() {
+    #expect(Fixture.path("/Users/ada/Downloads/report.pdf").isChild(of: downloads))
+  }
+
+  @Test("a file in a subfolder is not a child")
+  func aFileDeeperDownIsNotAChild() {
+    #expect(
+      !Fixture.path("/Users/ada/Downloads/invoices/2026.pdf").isChild(of: downloads),
+      "a triage of the Downloads folder is about what sits loose in it")
+  }
+
+  @Test("the folder is not its own child")
+  func theFolderIsNotItsOwnChild() {
+    #expect(!downloads.isChild(of: downloads))
+  }
+
+  @Test("a sibling folder that shares a prefix is not a child")
+  func aSharedPrefixIsNotAChild() {
+    #expect(!Fixture.path("/Users/ada/DownloadsOld/report.pdf").isChild(of: downloads))
+    #expect(!Fixture.path("/Users/ada/Down/report.pdf").isChild(of: downloads))
+  }
+
+  @Test("an ancestor is not a child")
+  func anAncestorIsNotAChild() {
+    #expect(!Fixture.path("/Users/ada").isChild(of: downloads))
+  }
+
+  @Test("a folder at the root is a child of the root")
+  func aFolderAtTheRootIsAChildOfTheRoot() {
+    #expect(Fixture.path("/Applications").isChild(of: Fixture.path("/")))
+    #expect(!Fixture.path("/Applications/Safari.app").isChild(of: Fixture.path("/")))
+    #expect(!Fixture.path("/").isChild(of: Fixture.path("/")))
+  }
+
+  private let downloads = Fixture.path("/Users/ada/Downloads")
+}

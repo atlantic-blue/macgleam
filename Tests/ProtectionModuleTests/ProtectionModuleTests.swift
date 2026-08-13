@@ -50,7 +50,7 @@ struct ProtectionModuleTests {
     let harness = makeProtectionHarness(findings: [], failsWith: ProtectionModuleFixture.Failure())
 
     harness.model.startScan()
-    await settle(harness)
+    await settleToIdle(harness)
 
     #expect(harness.model.state == .idle)
     #expect(harness.model.failureNotice != nil)

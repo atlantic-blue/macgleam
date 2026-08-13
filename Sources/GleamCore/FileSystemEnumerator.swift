@@ -29,7 +29,11 @@ public struct FileSystemEnumerator: Sendable {
   ) -> AsyncThrowingStream<EnumerationEvent, Error> {
     let source = self.source
     return AsyncThrowingStream { continuation in
-      let walk = Task {
+      // A walk runs below whatever asked for it. Reading a few hundred
+      // thousand files at the interface's own priority makes the whole machine
+      // feel slow while a scan is on, and nobody is waiting on any single file
+      // of it.
+      let walk = Task(priority: .utility) {
         do {
           try await Self.walk(root: root, options: options, source: source) { event in
             continuation.yield(event)

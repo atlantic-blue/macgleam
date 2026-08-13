@@ -36,6 +36,16 @@ public struct AbsolutePath: Codable, Sendable, Hashable, Comparable {
     return own[index] == UInt8(ascii: "/")
   }
 
+  /// Whether this path sits directly inside `folder`, with nothing between
+  /// them. It answers without building the parent path, because a walk asks
+  /// this of every file it sees, and a path built per file costs more than
+  /// reading the file did.
+  public func isChild(of folder: AbsolutePath) -> Bool {
+    guard isDescendant(of: folder) else { return false }
+    let consumed = folder.value == "/" ? 1 : folder.value.utf8.count + 1
+    return !value.utf8.dropFirst(consumed).contains(UInt8(ascii: "/"))
+  }
+
   public func isAncestor(of descendant: AbsolutePath) -> Bool {
     descendant.isDescendant(of: self)
   }

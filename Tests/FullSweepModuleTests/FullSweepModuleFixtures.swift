@@ -229,11 +229,23 @@ func reviewingSweep(_ model: FullSweepModuleModel) -> FullSweepReview? {
 }
 
 @MainActor
+// A scan now runs at utility priority, below the interface, which is what
+// keeps the machine usable while it reads. Under a loaded parallel test run a
+// utility task can wait a while for a core, so these helpers wait in seconds
+// rather than in fractions of one. Each returns the moment its condition
+// holds, so waiting longer costs a fast machine nothing.
 func settleSweep(_ harness: SweepHarness) async {
-  for _ in 0..<300 {
+  // It waits for the state to CHANGE and then settle, never for a set of
+  // states it might already be in. Both traps are real: idle is where a sweep
+  // starts, and reviewing is where a run starts, so a wait that stops at
+  // either can stop before the work it is waiting for began.
+  let before = harness.model.state
+  for _ in 0..<10_000 {
     await Task.yield()
     try? await Task.sleep(nanoseconds: 1_000_000)
-    switch harness.model.state {
+    let now = harness.model.state
+    guard now != before else { continue }
+    switch now {
     case .idle, .reviewing, .result, .cleanSweep:
       return
     case .scanning, .executing:
@@ -248,7 +260,7 @@ func expectEventuallySweep(
   sourceLocation: SourceLocation = #_sourceLocation,
   _ condition: @MainActor () -> Bool
 ) async {
-  for _ in 0..<300 {
+  for _ in 0..<10_000 {
     if condition() { return }
     await Task.yield()
     try? await Task.sleep(nanoseconds: 1_000_000)
