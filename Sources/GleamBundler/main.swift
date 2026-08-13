@@ -49,6 +49,7 @@ struct Bundler {
     try replaceBundle()
     try installBinary(from: binary, named: Self.executableName)
     try installBinary(from: helperBinary, named: Self.helperExecutableName)
+    try installFrameworks()
     try writeInformationPropertyList()
     try writeLaunchDaemonPropertyList()
     try sign()
@@ -62,7 +63,10 @@ struct Bundler {
     if manager.fileExists(atPath: bundleURL.path) {
       try manager.removeItem(at: bundleURL)
     }
-    for directory in ["Contents/MacOS", "Contents/Resources", "Contents/Library/LaunchDaemons"] {
+    for directory in [
+      "Contents/MacOS", "Contents/Resources", "Contents/Frameworks",
+      "Contents/Library/LaunchDaemons",
+    ] {
       try manager.createDirectory(
         at: bundleURL.appending(path: directory),
         withIntermediateDirectories: true
@@ -75,6 +79,46 @@ struct Bundler {
       at: binary,
       to: bundleURL.appending(path: "Contents/MacOS/\(name)")
     )
+  }
+
+  /// Every framework the build produced, and the search path that finds them.
+  ///
+  /// A dynamically linked framework left in the build directory is a bundle
+  /// that builds, links, signs and then refuses to start: the loader looks
+  /// beside the executable, finds nothing, and macOS reports that the
+  /// application quit unexpectedly. So the frameworks travel inside the
+  /// bundle, in the one place a signature can seal them and a notarised app is
+  /// allowed to keep them.
+  private func installFrameworks() throws {
+    let manager = FileManager.default
+    // The build directory is a symbolic link to the architecture's own
+    // directory, and listing a link is not listing a directory.
+    let built = try manager.contentsOfDirectory(
+      at: buildDirectory.resolvingSymlinksInPath(), includingPropertiesForKeys: nil)
+    let frameworks = built.filter { $0.pathExtension == "framework" }
+    for framework in frameworks {
+      try manager.copyItem(
+        at: framework,
+        to: bundleURL.appending(path: "Contents/Frameworks/\(framework.lastPathComponent)"))
+    }
+    guard !frameworks.isEmpty else { return }
+    // The linker leaves @loader_path on the executable, which resolves to
+    // Contents/MacOS once it is inside the bundle. This is the path that makes
+    // Contents/Frameworks reachable from there.
+    try addRunPath(
+      "@executable_path/../Frameworks",
+      to: bundleURL.appending(path: "Contents/MacOS/\(Self.executableName)"))
+  }
+
+  private func addRunPath(_ path: String, to binary: URL) throws {
+    let process = Process()
+    process.executableURL = URL(filePath: "/usr/bin/install_name_tool")
+    process.arguments = ["-add_rpath", path, binary.path]
+    // install_name_tool writes to standard error when the path is already
+    // there, which is not a failure worth stopping a build for.
+    process.standardError = FileHandle.nullDevice
+    try process.run()
+    process.waitUntilExit()
   }
 
   /// The daemon's launchd job. `BundleProgram` is relative to the app bundle,
@@ -142,6 +186,13 @@ struct Bundler {
   /// hashes of everything inside it, so a nested executable signed afterwards
   /// invalidates the enclosing signature it is sealed into.
   private func sign() throws {
+    let frameworks = bundleURL.appending(path: "Contents/Frameworks")
+    let contents =
+      (try? FileManager.default.contentsOfDirectory(
+        at: frameworks, includingPropertiesForKeys: nil)) ?? []
+    for framework in contents where framework.pathExtension == "framework" {
+      try codesign(framework)
+    }
     try codesign(bundleURL.appending(path: "Contents/MacOS/\(Self.helperExecutableName)"))
     try codesign(bundleURL)
   }
