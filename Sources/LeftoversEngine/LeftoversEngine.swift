@@ -101,6 +101,7 @@ extension LeftoversEngine {
       counters.filesSeen += 1
       if ProgressCadence.reports(filesSeen: counters.filesSeen) {
         yield(.progress(counters))
+        yield(.reading(record.path))
       }
     }
     // The last report is the one somebody is left looking at, so it is made

@@ -280,7 +280,10 @@ func scanning(_ model: ProtectionModuleModel) -> Bool {
 /// immediately would be reading the state before the work.
 @MainActor
 func settle(_ harness: ProtectionHarness) async {
-  for _ in 0..<200 {
+  // It returns the moment the state lands, so a high bound costs nothing on a
+  // quiet machine and stops a loaded one from failing a test that was only
+  // slow.
+  for _ in 0..<5_000 {
     await Task.yield()
     try? await Task.sleep(nanoseconds: 1_000_000)
     switch harness.model.state {

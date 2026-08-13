@@ -83,7 +83,7 @@ struct PerformanceGateTests {
         entryCount += finding.entries.count
       case .progress(let counters):
         finalCounters = counters
-      case .phase, .degraded:
+      case .phase, .degraded, .reading:
         break
       }
     }

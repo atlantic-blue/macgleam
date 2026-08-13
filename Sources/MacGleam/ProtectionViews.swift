@@ -11,12 +11,22 @@ struct ProtectionScanningView: View {
   let onCancel: () -> Void
   @Environment(\.colorScheme) private var colorScheme
 
+  private static let home = AbsolutePath(normalising: NSHomeDirectory())
+
   var body: some View {
     VStack(alignment: .leading, spacing: GleamSpacing.points(2)) {
       Text("Checking this Mac")
         .gleamType(.body)
         .fontWeight(.semibold)
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
+      if let reading = progress.reading {
+        Text(PathDisplay.short(reading, home: Self.home))
+          .gleamType(.caption)
+          .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
+          .lineLimit(1)
+          .truncationMode(.middle)
+          .monospaced()
+      }
       Text("\(progress.counters.filesSeen) files read so far.")
         .gleamType(.caption)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))

@@ -35,6 +35,7 @@ struct ApplicationSurvey {
       survey.counters.filesSeen += 1
       if ProgressCadence.reports(filesSeen: survey.counters.filesSeen) {
         yield(.progress(survey.counters))
+        yield(.reading(record.path))
       }
     }
     // The last report is the one somebody is left looking at, so it is made

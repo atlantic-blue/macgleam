@@ -64,10 +64,13 @@ public struct PlanContext: Sendable {
 }
 
 /// One event of a scan stream. `degraded` carries a plain sentence naming
-/// what was skipped, so the honest banner has real content.
+/// what was skipped, so the honest banner has real content. `reading` names
+/// where the walk has got to, on the same cadence as `progress`, so a scan can
+/// say where it is rather than only how busy it is.
 public enum ScanEvent: Sendable {
   case phase(ScanPhase)
   case progress(ScanCounters)
+  case reading(AbsolutePath)
   case finding(Finding)
   case degraded(unavailable: String)
 }

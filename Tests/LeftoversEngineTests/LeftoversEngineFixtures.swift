@@ -471,6 +471,8 @@ func collectScan(
       outcome.phases.append(phase)
     case .progress(let counters):
       outcome.counters.append(counters)
+    case .reading:
+      break
     case .finding(let finding):
       outcome.findings.append(finding)
     case .degraded(let unavailable):

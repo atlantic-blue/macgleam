@@ -287,6 +287,8 @@ func duplicatesRunScan(context: ScanContext) async throws -> DuplicatesScanOutco
       outcome.phases.append(phase)
     case .progress(let counters):
       outcome.counters.append(counters)
+    case .reading:
+      break
     case .degraded(let unavailable):
       outcome.degradedNotices.append(unavailable)
     }

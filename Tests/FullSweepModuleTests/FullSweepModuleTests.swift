@@ -163,6 +163,20 @@ struct FullSweepModuleTests {
     #expect(harness.orchestrator.plannedSelections.isEmpty)
   }
 
+  @Test("the sweep says which file it is reading, not only how many it has read")
+  func theSweepSaysWhichFileItIsReading() async throws {
+    let reading = AbsolutePath(normalising: "/Users/ada/Library/Caches/com.example/blob.bin")
+    let harness = makeSweepHarness(
+      findings: [.deepClean: [SweepModuleFixture.cache()]], holdsOpen: true, reading: reading)
+
+    harness.model.startSweep()
+
+    await expectEventuallySweep("the sweep names the file it is reading") {
+      guard case .scanning(let progress) = harness.model.state else { return false }
+      return progress.reading == reading
+    }
+  }
+
   // MARK: - What the orb is told
 
   @Test("the orb is scanning while the sweep runs, and the figure only goes up")

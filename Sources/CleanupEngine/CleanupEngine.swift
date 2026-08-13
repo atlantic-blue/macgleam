@@ -85,7 +85,7 @@ extension CleanupEngine {
       try Task.checkCancellation()
       guard case .record(let record) = event, !record.isDirectory else { continue }
       batches.match(record, denylist: context.rules.denylist, yield: yield)
-      batches.countFile(yield: yield)
+      batches.countFile(at: record.path, yield: yield)
     }
   }
 
@@ -249,10 +249,11 @@ private struct FindingBatches {
 
   /// Counts the file and, at each checkpoint boundary, streams the first batch
   /// of every rule that has emitted nothing yet, however few entries it holds.
-  mutating func countFile(yield: (ScanEvent) -> Void) {
+  mutating func countFile(at path: AbsolutePath, yield: (ScanEvent) -> Void) {
     counters.filesSeen += 1
     if ProgressCadence.reports(filesSeen: counters.filesSeen) {
       yield(.progress(counters))
+      yield(.reading(path))
     }
     guard counters.filesSeen.isMultiple(of: ScanStreamPolicy.firstFindingCheckpointFiles) else {
       return

@@ -91,6 +91,12 @@ struct FullSweepScanningView: View {
         .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
       Text(line)
         .gleamType(.caption)
+        .foregroundStyle(GleamColorToken.textPrimary.color(for: colorScheme))
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .monospaced()
+      Text(figures)
+        .gleamType(.caption)
         .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))
         .contentTransition(.numericText())
       Spacer()
@@ -104,11 +110,20 @@ struct FullSweepScanningView: View {
     }
   }
 
+  /// The file being read, because a count says the sweep is busy and a path
+  /// says where it has got to. The figures follow it on the line below.
   private var line: String {
+    guard let reading = progress.reading else { return figures }
+    return PathDisplay.short(reading, home: Self.home)
+  }
+
+  private var figures: String {
     guard progress.bytesReclaimable > 0 else { return "\(progress.filesSeen) files read." }
     return "\(ByteFigure.string(progress.bytesReclaimable)) so far, "
       + "\(progress.filesSeen) files read."
   }
+
+  private static let home = AbsolutePath(normalising: NSHomeDirectory())
 }
 
 /// The combined review, grouped by job. A job that could not run says so where
