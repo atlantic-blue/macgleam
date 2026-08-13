@@ -54,7 +54,7 @@ struct SettingsPaneView: View {
         PrimaryButton(
           title: "Check now",
           action: { Task { await updates.check() } },
-          isEnabled: true)
+          isEnabled: updates.isAvailable)
         Text(updates.lastCheckLine)
           .gleamType(.caption)
           .foregroundStyle(GleamColorToken.textSecondary.color(for: colorScheme))

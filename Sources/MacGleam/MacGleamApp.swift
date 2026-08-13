@@ -97,7 +97,7 @@ struct MacGleamApp: App {
     _fullSweep = State(
       initialValue: FullSweepComposition.make(supply: supply, helpers: HelperSupply()))
     _licence = State(initialValue: LicenceComposition.make())
-    _updates = State(initialValue: UpdatesModel(updater: SparkleUpdater()))
+    _updates = State(initialValue: UpdatesModel(updater: UpdaterComposition.make()))
     _menuBar = State(
       initialValue: MenuBarModel(
         stats: LiveSystemStats(), preferences: Settings.defaults.menuBar))

@@ -143,10 +143,18 @@ struct Bundler {
 
   /// The public half of the appcast signing key. The private half exists only
   /// in the release pipeline's secrets, so an update signed anywhere else is
-  /// refused by every installation. This is a development stage placeholder
-  /// until the launch ceremony mints the real pair, and a placeholder here
-  /// fails closed: nothing verifies against it, so nothing installs.
-  static let appcastPublicKey = "REPLACE_AT_LAUNCH_WITH_THE_APPCAST_PUBLIC_KEY"
+  /// refused by every installation.
+  ///
+  /// The release pipeline passes the real key in the environment. A build
+  /// without one carries the placeholder, and the app reads that as having no
+  /// updater at all: it starts nothing, offers no check, and says why. So a
+  /// development build fails closed and quietly, rather than showing somebody
+  /// a framework's failure they can do nothing about.
+  static var appcastPublicKey: String {
+    let supplied = ProcessInfo.processInfo.environment["SPARKLE_PUBLIC_KEY"] ?? ""
+    let trimmed = supplied.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? UpdaterAvailability.placeholder : trimmed
+  }
 
   private func writeInformationPropertyList() throws {
     let keys: [String: Any] = [

@@ -1,12 +1,12 @@
 ```state
 stage:    done
-updated:  2026-08-12
+updated:  2026-08-13
 goal:     MacGleam at CleanMyMac 5 feature parity, interaction first, M0 to M7
 next:     Julian's: the four credentials, and the s5e decision
 blocked:  none. The live window cannot be captured (the terminal has no
           Screen Recording permission), so visual checks run off offscreen
           renders and the human checks stay queued below.
-prs:      atlantic-blue/macgleam#1 to #46, merged in order
+prs:      atlantic-blue/macgleam#1 to #49, merged in order
 steps:
   - [x] s0a tokens and workspace (atlantic-blue/macgleam#1)
   - [x] s0b the shell model (atlantic-blue/macgleam#2)
@@ -94,22 +94,9 @@ needs its signing key and `licence.macgleam.app`.
 
 Everything fails closed while they are missing: the release guard refuses and
 names the placeholder, the publishers refuse without their keys, activation
-reports the server as unreachable, and a rules refresh finds nothing. Nothing
-pretends to work.
-
-## The launch credentials, all of them yours
-
-Every M7 slice is built to its credential boundary and none of them can run
-until the credentials exist. The release pipeline needs a Developer ID
-certificate, an App Store Connect key for notarising, the appcast signing key,
-and the Developer ID team identifier written into `ExpectedClientIdentity`.
-The rules channel needs its signing key and `rules.macgleam.app`. Licensing
-needs its signing key and `licence.macgleam.app`.
-
-Everything fails closed while they are missing: the release guard refuses and
-names the placeholder, the publishers refuse without their keys, activation
-reports the server as unreachable, and a rules refresh finds nothing. Nothing
-pretends to work.
+reports the server as unreachable, and a rules refresh finds nothing. A build
+with no appcast key starts no updater at all, and Settings says so with the
+check disabled. Nothing pretends to work.
 
 ## Two things waiting on Julian
 

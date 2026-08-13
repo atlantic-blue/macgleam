@@ -122,12 +122,19 @@ struct UpdateBundleKeyTests {
   @Test("the appcast key in the tree is a placeholder that verifies nothing")
   func theAppcastKeyIsAPlaceholderThatVerifiesNothing() {
     #expect(
-      Self.bundlerSource.contains("REPLACE_AT_LAUNCH_WITH_THE_APPCAST_PUBLIC_KEY"),
+      Self.bundlerSource.contains("UpdaterAvailability.placeholder"),
       """
-      the private half exists only in the release pipeline, so the public half \
-      here is a placeholder until the launch ceremony. A placeholder fails \
-      closed: nothing verifies against it, so nothing installs
+      the private half exists only in the release pipeline, so a build made \
+      anywhere else carries the placeholder until the launch ceremony. A \
+      placeholder fails closed: the app reads it as having no updater, so \
+      nothing is checked and nothing installs
       """)
+    #expect(
+      Self.bundlerSource.contains("SPARKLE_PUBLIC_KEY"),
+      "the real key reaches a release build from the pipeline's secrets and nowhere else")
+    #expect(
+      UpdaterAvailability.canUpdate(publicKey: UpdaterAvailability.placeholder) == false,
+      "and the placeholder is not a key any build will act on")
     #expect(
       !Self.bundlerSource.contains("BEGIN PRIVATE KEY"),
       "no signing key material lives in the repository")
