@@ -76,6 +76,10 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -k "" build.keychain >/dev/null
 
       - name: Build and bundle
+        env:
+          # Without this the bundle carries the placeholder, and the app then
+          # reports that it has no updater rather than starting one that fails.
+          SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
         run: |
           set -euo pipefail
           swift build --configuration release --product MacGleam

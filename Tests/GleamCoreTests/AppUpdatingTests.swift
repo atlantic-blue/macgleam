@@ -55,6 +55,8 @@ actor RecordingUpdater: AppUpdating {
     self.recorded = lastCheck
   }
 
+  nonisolated var isAvailable: Bool { true }
+
   func apply(_ policy: UpdatePolicy) async {
     applied.append(policy)
   }

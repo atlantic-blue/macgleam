@@ -27,6 +27,10 @@ final class UpdatesModel {
     await updater.apply(policy)
   }
 
+  /// Whether this build can update itself at all. A build without a key
+  /// offers no check, rather than offering one that fails.
+  var isAvailable: Bool { updater.isAvailable }
+
   func check() async {
     await updater.check()
     lastCheck = await updater.lastCheck
@@ -36,10 +40,11 @@ final class UpdatesModel {
   /// showing a blank, because "never checked" and "checked and found nothing"
   /// are different facts.
   var lastCheckLine: String {
-    guard let lastCheck else { return "Not checked yet." }
     let formatter = DateFormatter()
     formatter.dateStyle = .medium
     formatter.timeStyle = .short
-    return "Last checked \(formatter.string(from: lastCheck))."
+    return UpdatesSummary.line(
+      isAvailable: updater.isAvailable,
+      lastCheck: lastCheck.map { formatter.string(from: $0) })
   }
 }

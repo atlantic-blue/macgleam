@@ -14,10 +14,13 @@ import Foundation
 ///   name one.
 /// - An entry whose signature does not verify against the key in the bundle is
 ///   refused before it reaches a person.
+/// - `isAvailable` is false when the build cannot update itself at all, and
+///   the interface offers no check when it is.
 public protocol AppUpdating: Sendable {
   func apply(_ policy: UpdatePolicy) async
   func check() async
   var lastCheck: Date? { get async }
+  var isAvailable: Bool { get }
 }
 
 /// The updater a build has when it has none: it says so, and it never claims
@@ -25,6 +28,8 @@ public protocol AppUpdating: Sendable {
 /// different facts and only one of them is good news.
 public struct UnavailableUpdater: AppUpdating {
   public init() {}
+
+  public var isAvailable: Bool { false }
 
   public func apply(_ policy: UpdatePolicy) async {}
 

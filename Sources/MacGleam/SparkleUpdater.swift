@@ -42,6 +42,10 @@ final class SparkleUpdater: AppUpdating {
     controller.updater.canCheckForUpdates
   }
 
+  // Constructed only when the build carries a usable key, so an instance of
+  // this type is by definition a build that can update itself.
+  nonisolated var isAvailable: Bool { true }
+
   private func applyNow(_ policy: UpdatePolicy) {
     controller.updater.automaticallyChecksForUpdates = policy.checksAutomatically
     controller.updater.updateCheckInterval = policy.checkInterval
